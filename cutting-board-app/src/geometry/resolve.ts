@@ -1,0 +1,144 @@
+// SPEC §5.3 precedence and §5.5 rematching: binding crossing records to the
+// listed intersections of their context.
+
+import { canonicalize, canonicalKey, commonPrefix, contextsAlong, pairKey, recordsOf, withRecords } from '../domain/crossings.ts'
+import { occurrenceKey, refKey } from '../domain/keys.ts'
+import type { BandRef, ContextId, Crossing, Project } from '../domain/model.ts'
+import { expand, expandContext } from './expand.ts'
+import type { Intersection, IntersectionSide } from './intersections.ts'
+import { findIntersections } from './intersections.ts'
+import { REMATCH_TOLERANCE_MM } from './tolerance.ts'
+
+export type Resolved = {
+  over: 'a' | 'b' // a side of the Intersection
+  source: 'default' | 'definition' | 'override'
+  record: Crossing | null
+  contextId: ContextId // the record's context; null when `source` is 'default'
+}
+
+/** A side's BandRef with the first `strip` path steps removed (relative to the context `strip` steps in). */
+export function sideRef(side: IntersectionSide, strip = 0): BandRef {
+  return { path: side.occ.path.slice(strip), bandId: side.occ.sourceId, segmentStart: side.segmentStart }
+}
+
+/** The canonical key of the record that would bind `i`, in the context `strip` steps along its common prefix. */
+export function intersectionKey(i: Intersection, strip = 0): string {
+  return canonicalKey({ a: sideRef(i.a, strip), b: sideRef(i.b, strip) })
+}
+
+/** Every listed intersection of `ctx`, in that context's space (world space for the root). */
+export function contextIntersections(p: Project, ctx: ContextId): Intersection[] {
+  return findIntersections(expandContext(p, ctx))
+}
+
+/**
+ * SPEC §5.3: look up the intersection's canonical key in each context from
+ * the root inward along the common path prefix; the outermost record wins.
+ * With no record, the later occurrence in paint order is over.
+ */
+export function resolveIntersection(p: Project, i: Intersection, paintIndex: (key: string) => number): Resolved {
+  const prefix = commonPrefix(i.a.occ.path, i.b.occ.path)
+  const contexts = contextsAlong(p, prefix)
+
+  for (const [depth, ctx] of contexts.entries()) {
+    const key = intersectionKey(i, depth)
+    const record = recordsOf(p, ctx).find((c) => canonicalKey(c) === key)
+    if (record === undefined) continue
+    const overRef = record.over === 'a' ? record.a : record.b
+    return {
+      over: refKey(sideRef(i.a, depth)) === refKey(overRef) ? 'a' : 'b',
+      source: ctx === null && prefix.length > 0 ? 'override' : 'definition',
+      record,
+      contextId: ctx,
+    }
+  }
+
+  return { over: paintIndex(i.a.occ.key) > paintIndex(i.b.occ.key) ? 'a' : 'b', source: 'default', record: null, contextId: null }
+}
+
+/** World paint order as a lookup: occurrence key → index in `expand(p)`. */
+export function paintIndexOf(p: Project): (key: string) => number {
+  const order = new Map(expand(p).map((o, index) => [o.key, index]))
+  return (key) => order.get(key)!
+}
+
+/** Whether the record's refs yield a listed intersection in its context. */
+export function isRecordResolved(p: Project, ctx: ContextId, c: Crossing): boolean {
+  const key = canonicalKey(c)
+  return contextIntersections(p, ctx).some((i) => intersectionKey(i) === key)
+}
+
+/**
+ * SPEC §5.5, from the pre-command project to the post-command one, per
+ * context (definition records in definition space, root records in world
+ * space). Only records resolved in `before` are touched: still resolved →
+ * fresh `hint`; lost → rebound to the single unbound, new intersection of the
+ * same occurrence pair within REMATCH_TOLERANCE_MM of `hint`, if there is one.
+ */
+export function rematchCrossings(before: Project, after: Project): Project {
+  let result = after
+  for (const ctx of [null, ...Object.keys(after.motifs)]) {
+    const records = recordsOf(after, ctx)
+    const existedBefore = ctx === null || Object.hasOwn(before.motifs, ctx)
+    if (records.length === 0 || !existedBefore) continue
+
+    const beforeKeys = new Set(contextIntersections(before, ctx).map((i) => intersectionKey(i)))
+    const wasResolved = new Set(recordsOf(before, ctx).filter((c) => beforeKeys.has(canonicalKey(c))).map((c) => c.id))
+    if (wasResolved.size === 0) continue
+
+    const next = rematchContext(records, wasResolved, beforeKeys, contextIntersections(after, ctx))
+    if (next !== records) result = withRecords(result, ctx, next)
+  }
+  return result
+}
+
+function rematchContext(records: Crossing[], wasResolved: Set<string>, beforeKeys: Set<string>, afterList: Intersection[]): Crossing[] {
+  const afterByKey = new Map(afterList.map((i) => [intersectionKey(i), i]))
+  // Keys of intersections some record in this context currently binds.
+  const bound = new Set(records.map((c) => canonicalKey(c)).filter((key) => afterByKey.has(key)))
+  const next = [...records]
+  let changed = false
+
+  const lost: number[] = []
+  for (const [index, c] of records.entries()) {
+    if (!wasResolved.has(c.id)) continue // step 3: never auto-rebound
+    const hit = afterByKey.get(canonicalKey(c))
+    if (hit === undefined) {
+      lost.push(index)
+    } else if (hit.point.x !== c.hint.x || hit.point.y !== c.hint.y) {
+      next[index] = { ...c, hint: { x: hit.point.x, y: hit.point.y } } // step 1
+      changed = true
+    }
+  }
+
+  lost.sort((m, n) => (canonicalKey(records[m]!) < canonicalKey(records[n]!) ? -1 : 1))
+  for (const index of lost) {
+    const c = records[index]!
+    const pair = pairKey(c.a, c.b)
+    const candidates = afterList.filter((i) => {
+      const key = intersectionKey(i)
+      return (
+        pairKey(sideRef(i.a), sideRef(i.b)) === pair &&
+        Math.hypot(i.point.x - c.hint.x, i.point.y - c.hint.y) <= REMATCH_TOLERANCE_MM &&
+        !beforeKeys.has(key) && // (a) new in `after`
+        !bound.has(key) // (b) not bound by another record
+      )
+    })
+    if (candidates.length !== 1) continue
+    const target = candidates[0]!
+    next[index] = rebind(c, target)
+    bound.add(intersectionKey(target))
+    changed = true
+  }
+
+  return changed ? next : records
+}
+
+/** The record with its refs and hint moved onto `i` (same occurrence pair), `over` kept on the same occurrence. */
+function rebind(c: Crossing, i: Intersection): Crossing {
+  const onto = (r: BandRef): BandRef => {
+    const side = [i.a, i.b].find((s) => s.occ.key === occurrenceKey(r.path, r.bandId))!
+    return { ...r, segmentStart: side.segmentStart }
+  }
+  return canonicalize({ ...c, a: onto(c.a), b: onto(c.b), hint: { x: i.point.x, y: i.point.y } })
+}

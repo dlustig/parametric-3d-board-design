@@ -1,0 +1,49 @@
+// Immutable-update helpers shared by the command modules.
+
+import type { Band, ContextId, Crossing, DesignObject, Id, Project, Region } from '../model.ts'
+import type { CommandResult } from './index.ts'
+
+export function ok(project: Project): CommandResult {
+  return { ok: true, project }
+}
+
+export function fail(message: string): CommandResult {
+  return { ok: false, message }
+}
+
+export function replaceObject(p: Project, obj: DesignObject): Project {
+  return { ...p, objects: { ...p.objects, [obj.id]: obj } }
+}
+
+/** Replaces each listed object with `fn(object)`. */
+export function mapObjects(p: Project, ids: Id[], fn: (obj: DesignObject) => DesignObject): Project {
+  const objects = { ...p.objects }
+  for (const id of ids) objects[id] = fn(objects[id]!)
+  return { ...p, objects }
+}
+
+export function withChildren(p: Project, ctx: ContextId, children: Id[]): Project {
+  if (ctx === null) return { ...p, rootChildren: children }
+  return { ...p, motifs: { ...p.motifs, [ctx]: { ...p.motifs[ctx]!, children } } }
+}
+
+/** Applies `fn` to the record list of every context, keeping untouched lists (and the project) identical. */
+export function mapAllRecords(p: Project, fn: (records: Crossing[]) => Crossing[]): Project {
+  const crossings = fn(p.crossings)
+  let motifs = p.motifs
+  for (const [id, motif] of Object.entries(p.motifs)) {
+    const next = fn(motif.crossings)
+    if (next !== motif.crossings) motifs = { ...motifs, [id]: { ...motif, crossings: next } }
+  }
+  return crossings === p.crossings && motifs === p.motifs ? p : { ...p, crossings, motifs }
+}
+
+/** Keeps only the records `keep` accepts, preserving list identity when none is dropped. */
+export function filterAllRecords(p: Project, keep: (c: Crossing) => boolean): Project {
+  return mapAllRecords(p, (records) => (records.every(keep) ? records : records.filter(keep)))
+}
+
+/** Whether the shape's last point connects back to its first (closed Band or Region). */
+export function wraps(shape: Band | Region): boolean {
+  return shape.type === 'region' || shape.closed
+}

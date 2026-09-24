@@ -1,7 +1,7 @@
 // SPEC §4.4: expansion — flattens the semantic Project into the world-space
 // occurrence list, in paint order.
 
-import type { Band, ContextId, Id, Point, Project, Region, Step } from '@/domain/model'
+import type { Band, ContextId, Id, MotifInstance, Point, Project, Region, RepeatField, Step } from '@/domain/model'
 import { childrenOf } from '@/domain/project'
 import { occurrenceKey } from '@/domain/keys'
 import type { Mat } from './affine.ts'
@@ -98,6 +98,21 @@ export function expand(p: Project): Occurrence[] {
 /** Like `expand`, but rooted at `ctx` with the identity matrix — `expandContext(p, null)` equals `expand(p)`. */
 export function expandContext(p: Project, ctx: ContextId): Occurrence[] {
   return expandChildren(p, ctx, [], IDENTITY)
+}
+
+/** Maps the last step's definition space into the space of the context `path` starts in. */
+export function pathMatrix(p: Project, path: Step[]): Mat {
+  let matrix = IDENTITY
+  for (const step of path) {
+    if ('instanceId' in step) {
+      const instance = p.objects[step.instanceId] as MotifInstance
+      matrix = multiply(matrix, fromTransform(instance.transform))
+    } else {
+      const field = p.objects[step.repeatId] as RepeatField
+      matrix = multiply(matrix, multiply(fromTransform(field.transform), cell(field, step.row, step.column)))
+    }
+  }
+  return matrix
 }
 
 /** A Band occurrence's segments; a closed band's closing segment is keyed by the last point's id (SPEC §4.2). */
