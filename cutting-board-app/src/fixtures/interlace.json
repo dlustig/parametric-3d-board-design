@@ -4,8 +4,8 @@
   "name": "Interlace",
   "displayUnits": "mm",
   "board": {
-    "widthMm": 375,
-    "heightMm": 400,
+    "widthMm": 399,
+    "heightMm": 399,
     "backgroundMaterialId": null
   },
   "materials": [
@@ -45,18 +45,18 @@
       "type": "band",
       "id": "accent-a",
       "materialId": "padauk",
-      "widthMm": 1.6,
+      "widthMm": 3.25,
       "closed": false,
       "points": [
         {
           "id": "accent-ap0",
-          "x": -3,
-          "y": -3
+          "x": -7.15,
+          "y": -24.05
         },
         {
           "id": "accent-ap1",
-          "x": 3,
-          "y": 3
+          "x": 7.15,
+          "y": -17.55
         }
       ]
     },
@@ -64,114 +64,162 @@
       "type": "band",
       "id": "accent-b",
       "materialId": "oak",
-      "widthMm": 1.6,
+      "widthMm": 3.25,
       "closed": false,
       "points": [
         {
           "id": "accent-bp0",
-          "x": -3,
-          "y": 3
+          "x": -7.15,
+          "y": -17.55
         },
         {
           "id": "accent-bp1",
-          "x": 3,
-          "y": -3
+          "x": 7.15,
+          "y": -24.05
         }
       ]
     },
-    "lat-0": {
+    "p0": {
       "type": "band",
-      "id": "lat-0",
+      "id": "p0",
       "materialId": "maple",
-      "widthMm": 2.8,
+      "widthMm": 3.25,
       "closed": false,
       "points": [
         {
-          "id": "lat-0p0",
-          "x": 16.689309382202175,
-          "y": 6.742918681486416
+          "id": "p0p0",
+          "x": -26.17029842353558,
+          "y": 25.290191768391853
         },
         {
-          "id": "lat-0p1",
-          "x": 1.102182119232618e-15,
-          "y": 18
+          "id": "p0p1",
+          "x": -29.139147022433754,
+          "y": 22.76117259155267
         },
         {
-          "id": "lat-0p2",
-          "x": -16.689309382202172,
-          "y": 6.742918681486421
+          "id": "p0p2",
+          "x": 9.639147022433754,
+          "y": -22.76117259155267
         }
       ]
     },
-    "lat-1": {
+    "p1": {
       "type": "band",
-      "id": "lat-1",
+      "id": "p1",
       "materialId": "walnut",
-      "widthMm": 2.8,
+      "widthMm": 3.25,
       "closed": false,
       "points": [
         {
-          "id": "lat-1p0",
-          "x": -6.742918681486415,
-          "y": 16.689309382202175
+          "id": "p1p0",
+          "x": -16.42029842353558,
+          "y": 25.290191768391853
         },
         {
-          "id": "lat-1p1",
-          "x": -18,
-          "y": 2.204364238465236e-15
+          "id": "p1p1",
+          "x": -19.389147022433754,
+          "y": 22.76117259155267
         },
         {
-          "id": "lat-1p2",
-          "x": -6.7429186814864215,
-          "y": -16.689309382202172
+          "id": "p1p2",
+          "x": 19.389147022433754,
+          "y": -22.76117259155267
         }
       ]
     },
-    "lat-2": {
+    "p2": {
       "type": "band",
-      "id": "lat-2",
+      "id": "p2",
       "materialId": "cherry",
-      "widthMm": 2.8,
+      "widthMm": 3.25,
       "closed": false,
       "points": [
         {
-          "id": "lat-2p0",
-          "x": -16.689309382202175,
-          "y": -6.742918681486414
+          "id": "p2p0",
+          "x": -6.67029842353558,
+          "y": 25.290191768391853
         },
         {
-          "id": "lat-2p1",
-          "x": -3.3065463576978537e-15,
-          "y": -18
+          "id": "p2p1",
+          "x": -9.639147022433754,
+          "y": 22.76117259155267
         },
         {
-          "id": "lat-2p2",
-          "x": 16.689309382202172,
-          "y": -6.742918681486422
+          "id": "p2p2",
+          "x": 29.139147022433754,
+          "y": -22.76117259155267
         }
       ]
     },
-    "lat-3": {
+    "n0": {
       "type": "band",
-      "id": "lat-3",
+      "id": "n0",
       "materialId": "purpleheart",
-      "widthMm": 2.8,
+      "widthMm": 3.25,
       "closed": false,
       "points": [
         {
-          "id": "lat-3p0",
-          "x": 6.7429186814864135,
-          "y": -16.689309382202175
+          "id": "n0p0",
+          "x": 26.17029842353558,
+          "y": 25.290191768391853
         },
         {
-          "id": "lat-3p1",
-          "x": 18,
-          "y": -4.408728476930472e-15
+          "id": "n0p1",
+          "x": 29.139147022433754,
+          "y": 22.76117259155267
         },
         {
-          "id": "lat-3p2",
-          "x": 6.742918681486423,
-          "y": 16.689309382202172
+          "id": "n0p2",
+          "x": -9.639147022433754,
+          "y": -22.76117259155267
+        }
+      ]
+    },
+    "n1": {
+      "type": "band",
+      "id": "n1",
+      "materialId": "maple",
+      "widthMm": 3.25,
+      "closed": false,
+      "points": [
+        {
+          "id": "n1p0",
+          "x": 16.42029842353558,
+          "y": 25.290191768391853
+        },
+        {
+          "id": "n1p1",
+          "x": 19.389147022433754,
+          "y": 22.76117259155267
+        },
+        {
+          "id": "n1p2",
+          "x": -19.389147022433754,
+          "y": -22.76117259155267
+        }
+      ]
+    },
+    "n2": {
+      "type": "band",
+      "id": "n2",
+      "materialId": "walnut",
+      "widthMm": 3.25,
+      "closed": false,
+      "points": [
+        {
+          "id": "n2p0",
+          "x": 6.67029842353558,
+          "y": 25.290191768391853
+        },
+        {
+          "id": "n2p1",
+          "x": 9.639147022433754,
+          "y": 22.76117259155267
+        },
+        {
+          "id": "n2p2",
+          "x": -29.139147022433754,
+          "y": -22.76117259155267
         }
       ]
     },
@@ -180,7 +228,7 @@
       "id": "accent-inst",
       "motifId": "accent-unit",
       "transform": {
-        "x": 27.2,
+        "x": 0,
         "y": 0,
         "rotationDeg": 0,
         "mirrorX": false,
@@ -193,8 +241,8 @@
       "id": "interlace-field",
       "motifId": "lat-unit",
       "transform": {
-        "x": 46.49,
-        "y": 58.99,
+        "x": 51.87616727197466,
+        "y": 51.87616727197466,
         "rotationDeg": 0,
         "mirrorX": false,
         "mirrorY": false,
@@ -202,8 +250,8 @@
       },
       "rows": 5,
       "columns": 5,
-      "stepXMm": 70.48,
-      "stepYMm": 70.48,
+      "stepXMm": 73.75,
+      "stepYMm": 73.75,
       "rowOffsetMm": 0,
       "columnOffsetMm": 0,
       "alternateMirrorX": true,
@@ -238,7 +286,7 @@
           "over": "a",
           "hint": {
             "x": 0,
-            "y": 0
+            "y": -20.800000000000004
           }
         }
       ]
@@ -247,83 +295,175 @@
       "id": "lat-unit",
       "name": "Lattice unit",
       "children": [
-        "lat-0",
-        "lat-1",
-        "lat-2",
-        "lat-3",
+        "p0",
+        "p1",
+        "p2",
+        "n0",
+        "n1",
+        "n2",
         "accent-inst"
       ],
       "crossings": [
         {
-          "id": "x-01",
+          "id": "x-p0n0",
           "a": {
             "path": [],
-            "bandId": "lat-0",
-            "segmentStart": "lat-0p1"
+            "bandId": "n0",
+            "segmentStart": "n0p1"
           },
           "b": {
             "path": [],
-            "bandId": "lat-1",
-            "segmentStart": "lat-1p0"
-          },
-          "over": "a",
-          "hint": {
-            "x": -10.749422782239467,
-            "y": 10.749422782239467
-          }
-        },
-        {
-          "id": "x-12",
-          "a": {
-            "path": [],
-            "bandId": "lat-1",
-            "segmentStart": "lat-1p1"
-          },
-          "b": {
-            "path": [],
-            "bandId": "lat-2",
-            "segmentStart": "lat-2p0"
-          },
-          "over": "a",
-          "hint": {
-            "x": -10.749422782239465,
-            "y": -10.749422782239465
-          }
-        },
-        {
-          "id": "x-23",
-          "a": {
-            "path": [],
-            "bandId": "lat-2",
-            "segmentStart": "lat-2p1"
-          },
-          "b": {
-            "path": [],
-            "bandId": "lat-3",
-            "segmentStart": "lat-3p0"
-          },
-          "over": "a",
-          "hint": {
-            "x": 10.749422782239465,
-            "y": -10.749422782239465
-          }
-        },
-        {
-          "id": "x-30",
-          "a": {
-            "path": [],
-            "bandId": "lat-0",
-            "segmentStart": "lat-0p0"
-          },
-          "b": {
-            "path": [],
-            "bandId": "lat-3",
-            "segmentStart": "lat-3p1"
+            "bandId": "p0",
+            "segmentStart": "p0p1"
           },
           "over": "b",
           "hint": {
-            "x": 10.749422782239467,
-            "y": 10.749422782239467
+            "x": 0,
+            "y": -11.445652173913043
+          }
+        },
+        {
+          "id": "x-p0n1",
+          "a": {
+            "path": [],
+            "bandId": "n1",
+            "segmentStart": "n1p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "p0",
+            "segmentStart": "p0p1"
+          },
+          "over": "a",
+          "hint": {
+            "x": -4.875,
+            "y": -5.7228260869565215
+          }
+        },
+        {
+          "id": "x-p0n2",
+          "a": {
+            "path": [],
+            "bandId": "n2",
+            "segmentStart": "n2p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "p0",
+            "segmentStart": "p0p1"
+          },
+          "over": "b",
+          "hint": {
+            "x": -9.75,
+            "y": 8.996203317091444e-16
+          }
+        },
+        {
+          "id": "x-p1n0",
+          "a": {
+            "path": [],
+            "bandId": "n0",
+            "segmentStart": "n0p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "p1",
+            "segmentStart": "p1p1"
+          },
+          "over": "a",
+          "hint": {
+            "x": 4.875,
+            "y": -5.7228260869565215
+          }
+        },
+        {
+          "id": "x-p1n1",
+          "a": {
+            "path": [],
+            "bandId": "n1",
+            "segmentStart": "n1p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "p1",
+            "segmentStart": "p1p1"
+          },
+          "over": "b",
+          "hint": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "id": "x-p1n2",
+          "a": {
+            "path": [],
+            "bandId": "n2",
+            "segmentStart": "n2p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "p1",
+            "segmentStart": "p1p1"
+          },
+          "over": "a",
+          "hint": {
+            "x": -4.875000000000001,
+            "y": 5.722826086956522
+          }
+        },
+        {
+          "id": "x-p2n0",
+          "a": {
+            "path": [],
+            "bandId": "n0",
+            "segmentStart": "n0p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "p2",
+            "segmentStart": "p2p1"
+          },
+          "over": "b",
+          "hint": {
+            "x": 9.75,
+            "y": 8.996203317091444e-16
+          }
+        },
+        {
+          "id": "x-p2n1",
+          "a": {
+            "path": [],
+            "bandId": "n1",
+            "segmentStart": "n1p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "p2",
+            "segmentStart": "p2p1"
+          },
+          "over": "a",
+          "hint": {
+            "x": 4.875000000000001,
+            "y": 5.722826086956522
+          }
+        },
+        {
+          "id": "x-p2n2",
+          "a": {
+            "path": [],
+            "bandId": "n2",
+            "segmentStart": "n2p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "p2",
+            "segmentStart": "p2p1"
+          },
+          "over": "b",
+          "hint": {
+            "x": 0,
+            "y": 11.445652173913045
           }
         }
       ]
@@ -340,8 +480,8 @@
             "column": 2
           }
         ],
-        "bandId": "lat-0",
-        "segmentStart": "lat-0p1"
+        "bandId": "n0",
+        "segmentStart": "n0p1"
       },
       "b": {
         "path": [
@@ -351,13 +491,13 @@
             "column": 2
           }
         ],
-        "bandId": "lat-1",
-        "segmentStart": "lat-1p0"
+        "bandId": "p0",
+        "segmentStart": "p0p1"
       },
-      "over": "b",
+      "over": "a",
       "hint": {
-        "x": 176.70057721776055,
-        "y": 140.21942278223946
+        "x": 199.37616727197465,
+        "y": 114.18051509806158
       }
     },
     {
@@ -370,8 +510,8 @@
             "column": 3
           }
         ],
-        "bandId": "lat-0",
-        "segmentStart": "lat-0p1"
+        "bandId": "n0",
+        "segmentStart": "n0p1"
       },
       "b": {
         "path": [
@@ -381,13 +521,13 @@
             "column": 3
           }
         ],
-        "bandId": "lat-1",
-        "segmentStart": "lat-1p0"
+        "bandId": "p0",
+        "segmentStart": "p0p1"
       },
-      "over": "b",
+      "over": "a",
       "hint": {
-        "x": 268.6794227822395,
-        "y": 281.17942278223956
+        "x": 273.1261672719747,
+        "y": 261.68051509806156
       }
     }
   ]

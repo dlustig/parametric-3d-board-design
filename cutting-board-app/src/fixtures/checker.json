@@ -29,22 +29,22 @@
         {
           "id": "checker-leftp0",
           "x": -20,
-          "y": -20
+          "y": -10
         },
         {
           "id": "checker-leftp1",
           "x": 0,
-          "y": -20
+          "y": -10
         },
         {
           "id": "checker-leftp2",
           "x": 0,
-          "y": 20
+          "y": 10
         },
         {
           "id": "checker-leftp3",
           "x": -20,
-          "y": 20
+          "y": 10
         }
       ]
     },
@@ -56,22 +56,22 @@
         {
           "id": "checker-rightp0",
           "x": 0,
-          "y": -20
+          "y": -10
         },
         {
           "id": "checker-rightp1",
           "x": 20,
-          "y": -20
+          "y": -10
         },
         {
           "id": "checker-rightp2",
           "x": 20,
-          "y": 20
+          "y": 10
         },
         {
           "id": "checker-rightp3",
           "x": 0,
-          "y": 20
+          "y": 10
         }
       ]
     },
@@ -90,7 +90,7 @@
       "rows": 6,
       "columns": 6,
       "stepXMm": 40,
-      "stepYMm": 40,
+      "stepYMm": 20,
       "rowOffsetMm": 20,
       "columnOffsetMm": 0,
       "alternateMirrorX": false,

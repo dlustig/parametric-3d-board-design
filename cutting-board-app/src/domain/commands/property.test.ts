@@ -174,13 +174,20 @@ function commandsFor(p: Project): Command[] {
 
 describe('every command preserves the §2.1 invariants', () => {
   for (const [name, p] of corpus) {
-    it(name, () => {
-      expect(validateProject(p)).toBeNull()
-      for (const [label, run] of commandsFor(p)) {
-        const result = run(p)
-        const next = 'ok' in result ? (result.ok ? result.project : p) : result
-        expect({ label, error: validateProject(next) }).toEqual({ label, error: null })
-      }
-    })
+    // Fixture interlace alone generates ~600 crossing-toggle commands (300
+    // eligible crossings x 2 scopes), each re-running findIntersections; the
+    // 5s default timeout is too tight for that, not a sign of a stuck test.
+    it(
+      name,
+      () => {
+        expect(validateProject(p)).toBeNull()
+        for (const [label, run] of commandsFor(p)) {
+          const result = run(p)
+          const next = 'ok' in result ? (result.ok ? result.project : p) : result
+          expect({ label, error: validateProject(next) }).toEqual({ label, error: null })
+        }
+      },
+      20_000,
+    )
   }
 })
