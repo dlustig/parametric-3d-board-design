@@ -64,6 +64,21 @@ describe('paintedBounds — band', () => {
   })
 })
 
+describe('paintedBounds — rotated band segment', () => {
+  it('a 45° segment (0,0)→(10,10) width 2 is not axis-aligned ±w/2 padding', () => {
+    const base = newProject('mm')
+    const materialId = base.materials[0]!.id
+    const b = band(materialId, [pt(0, 0), pt(10, 10)], { widthMm: 2 })
+    const p: Project = { ...base, objects: { [b.id]: b }, rootChildren: [b.id] }
+
+    const [occ] = expand(p)
+    const half = Math.SQRT2 / 2 // w/2 (=1) along the segment normal, decomposed onto x/y at 45°.
+    // Axis-aligned ±w/2 padding of the raw endpoints would give {-1,-1,11,11}; the true
+    // stroke-rectangle corners are rotated with the segment, giving a tighter box.
+    expectBoxClose(paintedBounds(occ!), { minX: -half, minY: -half, maxX: 10 + half, maxY: 10 + half })
+  })
+})
+
 describe('conservativeBounds — band', () => {
   it('expands the polyline bounds by 2.5 × width', () => {
     const base = newProject('mm')

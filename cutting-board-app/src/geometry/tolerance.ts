@@ -19,6 +19,9 @@ export const REMATCH_TOLERANCE_MM = 3
 /** Region same-colour seam stroke width (SPEC §4.3), in mm. */
 export const REGION_SEAM_MM = 0.1
 
+/** Conservative-bounds padding factor: the miter-limit-10 tip extent (SPEC §4.5). */
+export const MITER_EXTENT_FACTOR = 2.5
+
 /** Footprint enlargement for the `occluded`/`crowded` classes, in mm. */
 export const CLASSIFY_EXTEND_MM = 0.5
 

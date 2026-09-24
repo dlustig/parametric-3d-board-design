@@ -1,8 +1,8 @@
 // SPEC §4.4: expansion — flattens the semantic Project into the world-space
 // occurrence list, in paint order.
 
-import type { Band, ContextId, Id, Point, Project, Region, Step } from '../domain/model.ts'
-import { childrenOf } from '../domain/project.ts'
+import type { Band, ContextId, Id, Point, Project, Region, Step } from '@/domain/model'
+import { childrenOf } from '@/domain/project'
 import { occurrenceKey } from '@/domain/keys'
 import type { Mat } from './affine.ts'
 import { apply, cell, fromTransform, IDENTITY, multiply, scaleOf } from './affine.ts'

@@ -91,17 +91,32 @@ describe('scaleOf / isMirrored', () => {
 })
 
 describe('cell', () => {
-  it('G3: alternateRotationDeg=90 rotates cells where (row+column) is odd', () => {
+  // Origin-only assertions can't catch a wrong parity or a wrong R/Mirror
+  // composition order: apply(m, {x:0,y:0}) is just m's translation (e,f) —
+  // it never exercises m's a/b/c/d. The tests below apply to (1,0) instead,
+  // so a parity or ordering bug moves the result, not just at origin.
+
+  it('G3: alternateRotationDeg=90 rotates (1,0) at cells where (row+column) is odd', () => {
     const repeat = repeatField({ alternateRotationDeg: 90 })
-    const originAt = (row: number, column: number) => apply(cell(repeat, row, column), { x: 0, y: 0 })
+    const at = (row: number, column: number) => apply(cell(repeat, row, column), { x: 1, y: 0 })
 
-    const c01 = originAt(0, 1)
+    const c01 = at(0, 1) // row+col=1 odd -> rotated; translation (50,0)
     expect(c01.x).toBeCloseTo(50, 9)
-    expect(c01.y).toBeCloseTo(0, 9)
+    expect(c01.y).toBeCloseTo(1, 9)
 
-    const c11 = originAt(1, 1)
-    expect(c11.x).toBeCloseTo(50, 9)
+    const c11 = at(1, 1) // row+col=2 even -> not rotated; translation (50,50)
+    expect(c11.x).toBeCloseTo(51, 9)
     expect(c11.y).toBeCloseTo(50, 9)
+  })
+
+  it('pins R · Mirror composition order (Mirror applied first, then R)', () => {
+    const repeat = repeatField({ alternateRotationDeg: 90, alternateMirrorX: true })
+    const c01 = apply(cell(repeat, 0, 1), { x: 1, y: 0 })
+
+    // Correct order R · Mirror: Mirror(1,0)=(-1,0), then R(90) -> (0,-1), then T(50,0) -> (50,-1).
+    // The wrong order Mirror · R: R(90)(1,0)=(0,1), then Mirror -> (0,1) [x=0 unchanged], then T -> (50,1).
+    expect(c01.x).toBeCloseTo(50, 9)
+    expect(c01.y).toBeCloseTo(-1, 9)
   })
 
   it('brick: rowOffsetMm shifts odd rows in X only', () => {
@@ -111,5 +126,14 @@ describe('cell', () => {
 
     expect(row1.x - row0.x).toBeCloseTo(25, 9)
     expect(row1.y - row0.y).toBeCloseTo(repeat.stepYMm, 9)
+  })
+
+  it('columnOffsetMm shifts odd columns in Y only', () => {
+    const repeat = repeatField({ columnOffsetMm: 25 })
+    const col0 = apply(cell(repeat, 0, 0), { x: 0, y: 0 })
+    const col1 = apply(cell(repeat, 0, 1), { x: 0, y: 0 })
+
+    expect(col1.y - col0.y).toBeCloseTo(25, 9)
+    expect(col1.x - col0.x).toBeCloseTo(repeat.stepXMm, 9)
   })
 })

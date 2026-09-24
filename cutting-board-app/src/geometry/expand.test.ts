@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Band, MotifDefinition, MotifInstance, Point, Project, RepeatField, Transform } from '../domain/model.ts'
 import { newId } from '../domain/ids.ts'
 import { newProject } from '../domain/project.ts'
-import { cell, fromTransform, IDENTITY, multiply } from './affine.ts'
+import { IDENTITY } from './affine.ts'
 import type { BandOccurrence } from './expand.ts'
 import { expand, expandContext, segmentsOf } from './expand.ts'
 
@@ -114,14 +114,25 @@ describe('expand — repeat field', () => {
     expect(keys[5]).toBe(`r:${repeat.id}:2:1#${child.id}`)
   })
 
-  it('nested instance inside a repeat cell: path length 2, matrix = repeat · cell · instance', () => {
+  it('nested instance inside a repeat cell: path length 2, matrix = M(repeat.transform) · Cell · M(instance.transform)', () => {
     const base = newProject('mm')
     const materialId = base.materials[0]!.id
+    // Leaf point (0,0): applying the full chain to it isolates the chain's net
+    // translation, so a wrong M(t)·Cell vs Cell·M(t) order moves this point.
     const leaf = band(materialId, [pt(0, 0), pt(1, 0)])
     const innerMotifId = newId()
-    const instance = motifInstance(innerMotifId, { x: 1, y: 2, rotationDeg: 15, mirrorX: false, mirrorY: false, scale: 1 })
+    const instance = motifInstance(innerMotifId, { x: 1, y: 2, rotationDeg: 0, mirrorX: false, mirrorY: false, scale: 1 })
     const outerMotifId = newId()
-    const repeat = repeatField(outerMotifId, { rows: 1, columns: 2, stepXMm: 10, stepYMm: 10 })
+    // A non-identity repeat transform (rotation + translation) is required: with an
+    // identity repeat.transform, M(t)·Cell and Cell·M(t) are the same matrix, so that
+    // ordering bug would be invisible to this test.
+    const repeat = repeatField(outerMotifId, {
+      rows: 1,
+      columns: 2,
+      stepXMm: 10,
+      stepYMm: 10,
+      transform: { x: 7, y: 3, rotationDeg: 90, mirrorX: false, mirrorY: false, scale: 1 },
+    })
     const p: Project = {
       ...base,
       objects: { [leaf.id]: leaf, [instance.id]: instance, [repeat.id]: repeat },
@@ -138,8 +149,18 @@ describe('expand — repeat field', () => {
 
     expect(occ.path).toEqual([{ repeatId: repeat.id, row: 0, column: 1 }, { instanceId: instance.id }])
 
-    const expectedMatrix = multiply(multiply(fromTransform(repeat.transform), cell(repeat, 0, 1)), fromTransform(instance.transform))
-    for (let i = 0; i < 6; i++) expect(occ.matrix[i]).toBeCloseTo(expectedMatrix[i]!, 9)
+    // Hand-computed independently of affine.ts's multiply/cell/fromTransform (to avoid
+    // testing the composition order against itself): matrix = M(repeat.transform) · Cell(0,1) · M(instance.transform).
+    //   Cell(0,1) = T(10,0)               (alternateRotationDeg defaults to 0: no cell rotation)
+    //   M(instance.transform) = T(1,2)    (pure translation)
+    //   Cell(0,1) · M(instance.transform) = T(10,0)·T(1,2) = T(11,2)  (translations add)
+    //   M(repeat.transform) = T(7,3)·R(90°); apply to (11,2):
+    //     R(90°)(11,2) = (cos90·11 − sin90·2, sin90·11 + cos90·2) = (−2, 11)
+    //     T(7,3)(−2,11) = (5, 14)
+    // The wrong order, Cell(0,1) · M(repeat.transform) · M(instance.transform), gives
+    // (15, 4) instead for this same leaf point — a different result, so this pins the order.
+    expect(occ.worldPoints[0]!.x).toBeCloseTo(5, 9)
+    expect(occ.worldPoints[0]!.y).toBeCloseTo(14, 9)
   })
 })
 

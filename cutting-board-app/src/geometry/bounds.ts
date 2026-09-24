@@ -4,6 +4,7 @@ import type { Id, Project } from '../domain/model.ts'
 import { contextOf } from '../domain/project.ts'
 import type { Occurrence } from './expand.ts'
 import { expandContext, segmentsOf } from './expand.ts'
+import { MITER_EXTENT_FACTOR } from './tolerance.ts'
 
 export type Box = {
   minX: number
@@ -58,7 +59,7 @@ export function conservativeBounds(o: Occurrence): Box {
   const box = boxOfPoints(o.worldPoints)
   if (o.kind === 'region') return box
 
-  const pad = 2.5 * o.worldWidth
+  const pad = MITER_EXTENT_FACTOR * o.worldWidth
   return { minX: box.minX - pad, minY: box.minY - pad, maxX: box.maxX + pad, maxY: box.maxY + pad }
 }
 
