@@ -6,7 +6,7 @@
 import type { JSX } from 'react'
 import { mirrorObjects, reorder, rotateObjects, translateObjects } from '@/domain/commands'
 import { unionBoxes } from '@/geometry/bounds'
-import { copySelection, deleteSelection, duplicateSelection } from '@/editor/keyboard'
+import { copySelection, createMotifFromSelection, deleteSelection, duplicateSelection, repeatSelection } from '@/editor/keyboard'
 import { useEditor } from '@/editor/store'
 import { selectableBounds } from '@/editor/tools/select'
 import type { PreviewOutcome } from './NumberField.tsx'
@@ -86,6 +86,14 @@ export function SelectionPanel(): JSX.Element | null {
         </button>
         <button type="button" onClick={deleteSelection}>
           Delete
+        </button>
+      </div>
+      <div className="button-row">
+        <button type="button" onClick={createMotifFromSelection}>
+          Create Motif
+        </button>
+        <button type="button" onClick={repeatSelection}>
+          Repeat
         </button>
       </div>
     </section>

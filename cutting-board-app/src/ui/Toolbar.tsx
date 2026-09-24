@@ -2,7 +2,7 @@
 // and Show grid toggles (SPEC §7.7); and −, +, Fit (SPEC §7.2).
 
 import type { JSX } from 'react'
-import { pasteClipboard } from '@/editor/keyboard'
+import { createMotifFromSelection, pasteClipboard } from '@/editor/keyboard'
 import { fitView, zoomViewBy } from '@/editor/input'
 import type { Tool } from '@/editor/store'
 import { useEditor } from '@/editor/store'
@@ -14,6 +14,7 @@ export function Toolbar(): JSX.Element {
   const setTool = useEditor((s) => s.setTool)
   const snapEnabled = useEditor((s) => s.snapEnabled)
   const showGrid = useEditor((s) => s.showGrid)
+  const hasSelection = useEditor((s) => s.selection.length > 0)
   const toolButton = (t: Tool, label: string): JSX.Element => (
     <button type="button" aria-pressed={tool === t} onClick={() => setTool(t)}>
       {label}
@@ -34,6 +35,9 @@ export function Toolbar(): JSX.Element {
       </button>
       <button type="button" onClick={pasteClipboard}>
         Paste
+      </button>
+      <button type="button" disabled={!hasSelection} onClick={createMotifFromSelection}>
+        Create Motif
       </button>
       <span className="toolbar-gap" />
       <button type="button" aria-label="Zoom out" onClick={() => zoomViewBy(1 / ZOOM_STEP)}>

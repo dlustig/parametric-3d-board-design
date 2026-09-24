@@ -14,11 +14,11 @@
 // Mirror X/Y, Rotate 90°/by, the order buttons, and Offset copy have no
 // keyboard shortcut in SPEC §7.4 — only a toolbar/inspector button, already
 // wired (SelectionPanel, BandPanel) straight to the same domain commands
-// this dispatcher calls, so nothing here duplicates them. `Ctrl/Cmd+G`
-// (Create Motif) is reserved for Task 13: swallowed, no action yet.
+// this dispatcher calls, so nothing here duplicates them. `Ctrl/Cmd+G` is
+// Create Motif.
 
 import type { Clipboard } from '@/domain/commands'
-import { copyObjects, deleteObjects, duplicateObjects, pasteObjects, translateObjects } from '@/domain/commands'
+import { copyObjects, createMotif, deleteObjects, duplicateObjects, makeRepeat, pasteObjects, translateObjects } from '@/domain/commands'
 import type { Id } from '@/domain/model'
 import { apply, invert } from '@/geometry/affine'
 import { cancelDrawing, finishDrawing, undoPoint } from './tools/draw.ts'
@@ -78,6 +78,39 @@ export function pasteClipboard(): void {
     return result.project
   })
   if (newIds.length > 0) useEditor.setState({ selection: newIds })
+}
+
+/** SPEC §7.4 Create Motif (`Ctrl/Cmd+G`): the selection becomes a motif; the new instance is selected. */
+export function createMotifFromSelection(): void {
+  const s = useEditor.getState()
+  if (s.selection.length === 0) return
+  const ctx = currentContext(s)
+  let instanceId: Id | null = null
+  s.run((p) => {
+    const created = createMotif(p, ctx, s.selection)
+    instanceId = created.instanceId
+    return created.project
+  })
+  if (instanceId !== null) useEditor.setState({ selection: [instanceId] })
+}
+
+/** SPEC §7.4 Repeat: one selected instance becomes a 2×2 field; any other selection is made a motif first (one history step). */
+export function repeatSelection(): void {
+  const s = useEditor.getState()
+  if (s.selection.length === 0) return
+  const ctx = currentContext(s)
+  const only = s.selection.length === 1 ? s.project.objects[s.selection[0]!] : undefined
+  let fieldId: Id | null = null
+  s.run((p) => {
+    if (only?.type === 'motif-instance') {
+      fieldId = only.id
+      return makeRepeat(p, only.id)
+    }
+    const created = createMotif(p, ctx, s.selection)
+    fieldId = created.instanceId
+    return makeRepeat(created.project, created.instanceId)
+  })
+  if (fieldId !== null && Object.hasOwn(useEditor.getState().project.objects, fieldId)) useEditor.setState({ selection: [fieldId] })
 }
 
 /** Maps a world-space delta vector into the current context's space (a vector, not a point: no translation term). */
@@ -176,7 +209,8 @@ export function installKeyboardDispatcher(): () => void {
         return
       }
       if (!e.shiftKey && lower === 'g') {
-        e.preventDefault() // Create Motif — reserved for Task 13
+        createMotifFromSelection()
+        e.preventDefault()
         return
       }
       if (!e.shiftKey && lower === 'c') {

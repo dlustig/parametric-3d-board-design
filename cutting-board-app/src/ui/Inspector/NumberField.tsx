@@ -34,7 +34,9 @@ function parseText(text: string, unit: Unit | 'deg' | null): Parsed {
   return r.ok ? { ok: true, value: r.deg } : r
 }
 
+/** Unitless values (scale, rows/columns) show up to 4 decimals. */
 function formatValue(value: number, unit: Unit | 'deg' | null): string {
+  if (unit === null) return String(Number(value.toFixed(4)))
   return unit === 'in' || unit === 'mm' ? formatLength(value, unit) : formatAngle(value)
 }
 

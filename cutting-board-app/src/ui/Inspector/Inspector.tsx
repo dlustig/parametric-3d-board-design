@@ -1,15 +1,17 @@
 // SPEC §7.5: the right-hand inspector panel, routed by selection. Nothing
 // selected → Board. Any non-empty selection → the Selection panel (bounds,
 // rotate, mirror, order), plus the type-specific panel when exactly one
-// Band or Region is selected. Instance/Repeat are a one-line placeholder
-// until Task 13. Multi-selection gets the Selection panel only.
+// Band, Region, Instance, or Repeat is selected. Multi-selection gets the
+// Selection panel only.
 
 import type { JSX } from 'react'
 import { useEditor } from '@/editor/store'
 import { MaterialPalette } from '../MaterialPalette.tsx'
 import { BandPanel } from './BandPanel.tsx'
 import { BoardPanel } from './BoardPanel.tsx'
+import { InstancePanel } from './InstancePanel.tsx'
 import { RegionPanel } from './RegionPanel.tsx'
+import { RepeatPanel } from './RepeatPanel.tsx'
 import { SelectionPanel } from './SelectionPanel.tsx'
 
 export function Inspector(): JSX.Element {
@@ -33,11 +35,8 @@ export function Inspector(): JSX.Element {
       <SelectionPanel />
       {single?.type === 'band' && <BandPanel key={single.id} band={single} />}
       {single?.type === 'region' && <RegionPanel region={single} />}
-      {(single?.type === 'motif-instance' || single?.type === 'repeat') && (
-        <section className="panel" aria-label={single.type === 'motif-instance' ? 'Instance' : 'Repeat'}>
-          <p>{single.type === 'motif-instance' ? 'Instance' : 'Repeat'} inspector — coming in Task 13.</p>
-        </section>
-      )}
+      {single?.type === 'motif-instance' && <InstancePanel key={single.id} instance={single} />}
+      {single?.type === 'repeat' && <RepeatPanel key={single.id} field={single} />}
     </aside>
   )
 }
