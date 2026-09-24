@@ -2,7 +2,7 @@
 // undo/redo repair of ephemeral state (selection, edit context).
 
 import { describe, expect, it } from 'vitest'
-import { IDENTITY } from '../geometry/affine.ts'
+import { IDENTITY, multiply } from '../geometry/affine.ts'
 import { pathMatrix } from '../geometry/expand.ts'
 import { deleteObjects } from '../domain/commands/index.ts'
 import type { Project } from '../domain/model.ts'
@@ -101,6 +101,18 @@ describe('run settles an active preview first', () => {
     expect(useEditor.getState().project).toBe(before)
     expect(useEditor.temporal.getState().pastStates.length).toBe(0)
   })
+
+  it('a later successful command clears a stale failure message', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])])
+    resetStore(p0)
+
+    useEditor.getState().run(() => ({ ok: false, message: 'nope' }))
+    expect(useEditor.getState().message).toBe('nope')
+
+    useEditor.getState().run((p) => deleteObjects(p, ['b1']))
+
+    expect(useEditor.getState().message).toBeNull()
+  })
 })
 
 describe('undo() during a gesture preview', () => {
@@ -117,6 +129,26 @@ describe('undo() during a gesture preview', () => {
     expect(useEditor.getState().project.objects['b1']).toBeDefined()
     const rendererSource = useEditor.getState().preview?.next ?? useEditor.getState().project
     expect(rendererSource).toBe(useEditor.getState().project)
+  })
+})
+
+describe('undo() during a field (commit) preview', () => {
+  it('settles the preview (two history entries), then undoes back to the pre-preview project', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])])
+    resetStore(p0)
+
+    useEditor.getState().run((p) => deleteObjects(p, ['b1'])) // entry #1
+    const prePreviewProject = useEditor.getState().project
+    expect(useEditor.temporal.getState().pastStates.length).toBe(1)
+
+    useEditor.getState().setPreview({ ...prePreviewProject, name: 'field-edit' }, 'commit')
+    useEditor.getState().undo() // settlePreview() commits (entry #2), then undoes it
+
+    expect(useEditor.getState().preview).toBeNull()
+    expect(useEditor.getState().project).toBe(prePreviewProject) // back to the pre-preview project, not the preview
+    // Two entries were pushed (run, then the settled commit); undo() consumed the second one.
+    expect(useEditor.temporal.getState().pastStates.length).toBe(1)
+    expect(useEditor.temporal.getState().futureStates.length).toBe(1)
   })
 })
 
@@ -186,5 +218,59 @@ describe('currentContext and contextMatrix', () => {
 
     expect(currentContext(useEditor.getState())).toBe('m1')
     expect(contextMatrix(useEditor.getState())).toEqual(pathMatrix(p0, [{ instanceId: 'inst1' }]))
+  })
+})
+
+describe('two-level editContext repair', () => {
+  // Root has two instances of motif A (instA1, instA2); A's definition holds
+  // an instance of motif B (instB). Entering A via instA1, then B via instB,
+  // mirrors the review's reproduction: instA1 is deletable without deleting A
+  // (instA2 keeps it alive) or B (instB is untouched), so a naive "check only
+  // the deepest level" repair leaves a dangling outer level behind.
+  const PATH_A = [{ instanceId: 'instA1' }]
+  const PATH_B = [{ instanceId: 'instB' }]
+
+  function twoLevelProject(): Project {
+    return project(
+      [instance('instA1', 'A', { x: 100, y: 0 }), instance('instA2', 'A')],
+      [
+        { id: 'A', children: [band('bandA', [[0, 0], [1, 1]]), instance('instB', 'B', { x: 0, y: 50 })] },
+        { id: 'B', children: [band('bandB', [[2, 2], [3, 3]])] },
+      ],
+    )
+  }
+
+  it('keeps both levels, and contextMatrix multiplies both path matrices, when nothing invalidates them', () => {
+    const p0 = twoLevelProject()
+    resetStore(p0)
+
+    useEditor.getState().enterContext({ motifId: 'A', path: PATH_A })
+    useEditor.getState().enterContext({ motifId: 'B', path: PATH_B })
+
+    // No history to undo, but undo() always runs the post-undo repair against
+    // the (here unchanged) current project — nothing invalidates either level.
+    useEditor.getState().undo()
+
+    expect(useEditor.getState().editContext).toHaveLength(2)
+    const expected = multiply(pathMatrix(p0, PATH_A), pathMatrix(p0, PATH_B))
+    expect(contextMatrix(useEditor.getState())).toEqual(expected)
+  })
+
+  it("deleting the outer level's entering instance clears the whole editContext, even though the inner level would still resolve on its own", () => {
+    const p0 = twoLevelProject()
+    resetStore(p0)
+
+    useEditor.getState().enterContext({ motifId: 'A', path: PATH_A })
+    useEditor.getState().enterContext({ motifId: 'B', path: PATH_B })
+
+    useEditor.getState().run((p) => deleteObjects(p, ['instA1'])) // entry #1: instA1 gone
+    useEditor.getState().run((p) => deleteObjects(p, ['bandB'])) // entry #2: unrelated further change
+    expect(useEditor.getState().project.motifs['A']).toBeDefined() // instA2 keeps A alive
+    expect(useEditor.getState().project.objects['instB']).toBeDefined() // B untouched
+
+    useEditor.getState().undo() // reverts entry #2 only; lands back on the instA1-missing project
+
+    expect(useEditor.getState().project.objects['instA1']).toBeUndefined()
+    expect(useEditor.getState().editContext).toEqual([])
   })
 })

@@ -110,11 +110,11 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
         get().settlePreview()
         const result = cmd(get().project)
         if (isCommandResult(result)) {
-          if (result.ok) set({ project: result.project })
+          if (result.ok) set({ project: result.project, message: null })
           else set({ message: result.message })
           return
         }
-        set({ project: result })
+        set({ project: result, message: null })
       },
 
       setPreview(next, onInterrupt) {
