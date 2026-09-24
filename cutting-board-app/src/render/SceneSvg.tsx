@@ -4,38 +4,49 @@
 // No element ever gets a `transform`.
 
 import type { JSX } from 'react'
-import type { Project } from '@/domain/model'
-import { buildScene, pathD } from '@/geometry/scene'
+import type { Material } from '@/domain/model'
+import type { Occurrence } from '@/geometry/expand'
+import type { Scene } from '@/geometry/scene'
+import { pathD } from '@/geometry/scene'
 import { REGION_SEAM_MM } from '@/geometry/tolerance'
 
-const CLIP_PREFIX = 'cbpd-clip'
-
 interface Props {
-  project: Project
-  clipExtendMm: number
+  scene: Scene
+  materials: Material[]
+  /** Distinguishes clipPath ids when the scene is drawn more than once in one document. */
+  clipPrefix: string
+  /** Draw only the occurrences it accepts, each with the patches inserted after it (SPEC §7.6 scrim redraw). */
+  include?: (o: Occurrence) => boolean
 }
 
-export function SceneSvg({ project, clipExtendMm }: Props): JSX.Element {
-  const scene = buildScene(project, clipExtendMm)
-  const colors = new Map(project.materials.map((m) => [m.id, m.color]))
+export function SceneSvg({ scene, materials, clipPrefix, include }: Props): JSX.Element {
+  const colors = new Map(materials.map((m) => [m.id, m.color]))
   const colorOf = (materialId: string): string => colors.get(materialId) ?? '#ff00ff'
 
   const clips: JSX.Element[] = []
-  const drawn = scene.elements.map((el, k) => {
+  const drawn: JSX.Element[] = []
+  let keep = true // a patch follows the under occurrence it was inserted after
+  scene.elements.forEach((el, k) => {
+    if (el.kind !== 'patch') keep = include?.(el.occurrence) ?? true
+    if (!keep) return
     if (el.kind === 'region') {
       const c = colorOf(el.occurrence.materialId)
-      return <path key={k} d={pathD(el.occurrence.worldPoints, true)} fill={c} fillRule="nonzero" stroke={c} strokeWidth={REGION_SEAM_MM} />
+      drawn.push(<path key={k} d={pathD(el.occurrence.worldPoints, true)} fill={c} fillRule="nonzero" stroke={c} strokeWidth={REGION_SEAM_MM} />)
+      return
     }
     const o = el.kind === 'band' ? el.occurrence : el.over
     const band = { fill: 'none', stroke: colorOf(o.materialId), strokeWidth: o.worldWidth, strokeLinejoin: 'miter', strokeMiterlimit: 10, strokeLinecap: 'butt' } as const
-    if (el.kind === 'band') return <path key={k} d={pathD(o.worldPoints, o.closed)} {...band} />
-    const id = `${CLIP_PREFIX}-${clips.length}`
+    if (el.kind === 'band') {
+      drawn.push(<path key={k} d={pathD(o.worldPoints, o.closed)} {...band} />)
+      return
+    }
+    const id = `${clipPrefix}-${clips.length}`
     clips.push(
       <clipPath key={id} id={id} clipPathUnits="userSpaceOnUse">
         <polygon points={el.clip.map((pt) => `${pt.x},${pt.y}`).join(' ')} />
       </clipPath>,
     )
-    return <path key={k} d={pathD(el.segment, false)} {...band} clipPath={`url(#${id})`} />
+    drawn.push(<path key={k} d={pathD(el.segment, false)} {...band} clipPath={`url(#${id})`} />)
   })
 
   return (

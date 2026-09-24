@@ -3,6 +3,7 @@ import type { JSX } from 'react'
 import { useEffect } from 'react'
 import { installKeyboardDispatcher } from '@/editor/keyboard'
 import { Canvas } from '@/render/Canvas'
+import { Breadcrumb } from './Breadcrumb.tsx'
 import { Inspector } from './Inspector/Inspector.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { ToolOptions } from './ToolOptions.tsx'
@@ -18,6 +19,7 @@ function App(): JSX.Element {
           <main className="canvas-host">
             <Canvas />
             <ToolOptions />
+            <Breadcrumb />
           </main>
           <Inspector />
         </div>

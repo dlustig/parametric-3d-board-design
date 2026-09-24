@@ -7,7 +7,7 @@
 
 import { rotateObjects, translateObjects } from '@/domain/commands'
 import { stepKey } from '@/domain/keys'
-import type { Id, Project, Step } from '@/domain/model'
+import type { Id, MotifInstance, Project, RepeatField, Step } from '@/domain/model'
 import { childrenOf } from '@/domain/project'
 import { apply, invert, isMirrored } from '@/geometry/affine'
 import type { Box } from '@/geometry/bounds'
@@ -21,7 +21,7 @@ import { contextMatrix, useEditor } from '../store.ts'
 type XY = { x: number; y: number }
 
 /** The world path of the entered occurrence: each level's path is relative to the previous level. */
-function contextPrefix(editContext: EditContextLevel[]): Step[] {
+export function contextPrefix(editContext: EditContextLevel[]): Step[] {
   return editContext.flatMap((level) => level.path)
 }
 
@@ -90,13 +90,55 @@ function hits(o: Occurrence, q: XY): boolean {
   return segmentsOf(o).some((seg) => distanceToSegment(q, seg.a, seg.b) <= o.worldWidth / 2)
 }
 
-/** SPEC §7.3: the topmost occurrence under the world point, mapped to its top-level object in the current context. */
-export function objectAt(p: Project, editContext: EditContextLevel[], world: XY): Id | null {
+/** The topmost occurrence under the world point that belongs to the context `editContext` enters, with its top-level owner there. */
+function occurrenceAt(p: Project, editContext: EditContextLevel[], world: XY): { id: Id; o: Occurrence } | null {
   const owned = occurrencesByOwner(p, editContext)
   for (let k = owned.length - 1; k >= 0; k--) {
-    if (hits(owned[k]!.o, world)) return owned[k]!.id
+    if (hits(owned[k]!.o, world)) return owned[k]!
   }
   return null
+}
+
+/** SPEC §7.3: the topmost occurrence under the world point, mapped to its top-level object in the current context. */
+export function objectAt(p: Project, editContext: EditContextLevel[], world: XY): Id | null {
+  return occurrenceAt(p, editContext, world)?.id ?? null
+}
+
+/** The edit-context level entering the instance or repeat cell under the world point, relative to `editContext`'s innermost level (SPEC §7.6). */
+function levelAt(p: Project, editContext: EditContextLevel[], world: XY): EditContextLevel | null {
+  const hit = occurrenceAt(p, editContext, world)
+  const step = hit?.o.path[contextPrefix(editContext).length]
+  if (step === undefined) return null // nothing, or a plain Band/Region
+  const placed = p.objects['instanceId' in step ? step.instanceId : step.repeatId] as MotifInstance | RepeatField
+  return { motifId: placed.motifId, path: [step] }
+}
+
+/** SPEC §7.6 double-tap: enters the instance or repeat cell under the client point, if any. */
+export function enterAt(svg: SVGSVGElement, client: XY): boolean {
+  const s = useEditor.getState()
+  const level = levelAt(s.project, s.editContext, screenToWorld(svg, client))
+  if (level === null) return false
+  s.enterContext(level)
+  s.select([])
+  return true
+}
+
+/**
+ * SPEC §7.6 re-targeting: a tap outside the entered occurrence, on another
+ * occurrence of the same definition placed in the parent context, moves the
+ * innermost level's path onto it.
+ */
+export function retargetAt(svg: SVGSVGElement, client: XY): boolean {
+  const s = useEditor.getState()
+  const current = s.editContext[s.editContext.length - 1]
+  if (current === undefined) return false
+  const parent = s.editContext.slice(0, -1)
+  const world = screenToWorld(svg, client)
+  if (objectAt(s.project, s.editContext, world) !== null) return false
+  const level = levelAt(s.project, parent, world)
+  if (level === null || level.motifId !== current.motifId) return false
+  useEditor.setState({ editContext: [...parent, level], selection: [] })
+  return true
 }
 
 /**

@@ -317,3 +317,56 @@ body {
   color: var(--page-bg);
   border-radius: 4px;
 }
+
+/* SPEC §7.6 edit context: the scrim over the full scene, and the breadcrumb. */
+.context-scrim-rect {
+  fill: var(--page-bg);
+  opacity: 0.6;
+}
+
+.breadcrumb {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--page-bg);
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-radius: 6px;
+}
+
+.breadcrumb button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* SPEC §7.5 Repeat panel: an offset field with its ½ step button. */
+.field-with-button {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.field-with-button .field {
+  flex: 1;
+}
+
+.overrides {
+  list-style: none;
+  padding: 0;
+}
+
+.overrides li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.panel-note {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}

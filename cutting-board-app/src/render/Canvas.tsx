@@ -19,16 +19,20 @@ import Selecto from 'react-selecto'
 import type { OnDragStart as OnSelectoDragStart, OnSelectEnd } from 'react-selecto'
 import { useShallow } from 'zustand/react/shallow'
 import { unionBoxes } from '@/geometry/bounds'
+import { buildScene } from '@/geometry/scene'
+import { DOUBLE_TAP_MS } from '@/geometry/tolerance'
 import { editorClipExtendMm, screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
 import { contextMatrix, useEditor } from '@/editor/store'
 import { drawPointerCancel, drawPointerDown, drawPointerMove, drawPointerUp, isDrawTool, resetDrawInput } from '@/editor/tools/draw'
 import type { Gesture } from '@/editor/tools/select'
-import { clickSelect, endGesture, objectAt, selectableBounds, startRotate, startTranslate, toggleSelection } from '@/editor/tools/select'
+import { clickSelect, contextPrefix, endGesture, enterAt, objectAt, retargetAt, selectableBounds, startRotate, startTranslate, toggleSelection } from '@/editor/tools/select'
 import { Proxies } from './Proxies.tsx'
 import { SceneSvg } from './SceneSvg.tsx'
+import { ContextScrim } from './overlays/ContextScrim.tsx'
 import { DrawPreview } from './overlays/DrawPreview.tsx'
 import { Grid } from './overlays/Grid.tsx'
+import { PivotMarkers } from './overlays/Pivot.tsx'
 import { SelectionOverlay } from './overlays/Selection.tsx'
 import { SnapGuide } from './overlays/SnapGuide.tsx'
 
@@ -64,6 +68,7 @@ export function Canvas(): JSX.Element {
   const gestureRef = useRef<Gesture | null>(null)
   /** The current press selected its object itself, so its tap must not toggle it again. */
   const pressSelectedRef = useRef(false)
+  const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null)
   const [spaceDown, setSpaceDown] = useState(false)
   const [multiTouch, setMultiTouch] = useState(false)
   const [rotating, setRotating] = useState(false)
@@ -174,10 +179,20 @@ export function Canvas(): JSX.Element {
     gestureRef.current = null
     endGesture(e.isDrag, e.inputEvent as Event | undefined)
   }
-  /** A drag that never moved is a tap on the selection: re-select from domain geometry (SPEC §7.4). */
+  /** Own double-tap detection (SPEC §4.6: DOUBLE_TAP_MS, ≤ 10 px) over completed Select taps, mouse and touch alike. */
+  const isDoubleTap = (client: XY): boolean => {
+    const now = performance.now()
+    const last = lastTapRef.current
+    const double = last !== null && now - last.t <= DOUBLE_TAP_MS && Math.hypot(client.x - last.x, client.y - last.y) <= 10
+    lastTapRef.current = double ? null : { t: now, ...client }
+    return double
+  }
+  /** A drag that never moved is a tap on the selection: re-select from domain geometry (SPEC §7.4); a double-tap enters the instance/cell (SPEC §7.6). */
   const onDragEnd = (e: OnDragEnd): void => {
     finish(e)
-    if (e.isDrag || pressSelectedRef.current) return
+    if (e.isDrag) return
+    if (isDoubleTap(clientOf(e)) && enterAt(svg(), clientOf(e))) return
+    if (pressSelectedRef.current) return
     const input = e.inputEvent as MouseEvent | TouchEvent | undefined
     clickSelect(svg(), clientOf(e), input?.shiftKey === true || useEditor.getState().addToSelection)
   }
@@ -220,7 +235,10 @@ export function Canvas(): JSX.Element {
     const input = e.inputEvent as MouseEvent | TouchEvent
     const toggle = input.shiftKey || s.addToSelection
     if (e.isClick) {
-      clickSelect(svg(), clientOf(e.inputEvent as { clientX: number; clientY: number }), toggle)
+      const client = clientOf(e.inputEvent as { clientX: number; clientY: number })
+      if (isDoubleTap(client) && enterAt(svg(), client)) return
+      if (retargetAt(svg(), client)) return
+      clickSelect(svg(), client, toggle)
       return
     }
     const ids = e.selected.map((el) => el.getAttribute('data-object-id')!)
@@ -228,6 +246,7 @@ export function Canvas(): JSX.Element {
   }
 
   const clipExtendMm = editorClipExtendMm(camera.zoom)
+  const scene = buildScene(shown, clipExtendMm)
   const { widthMm: bw, heightMm: bh, backgroundMaterialId } = project.board
   const boardFill = project.materials.find((m) => m.id === backgroundMaterialId)?.color ?? '#ffffff'
   const vx = camera.x
@@ -264,11 +283,13 @@ export function Canvas(): JSX.Element {
     <div className="canvas" ref={setWrapper}>
       <svg ref={setSvgEl} className="canvas-svg" viewBox={viewBoxFor(camera, view)} width={view.w} height={view.h}>
         <rect className="board" width={bw} height={bh} fill={boardFill} />
-        <SceneSvg project={shown} clipExtendMm={clipExtendMm} />
+        <SceneSvg scene={scene} materials={shown.materials} clipPrefix="cbpd-clip" />
+        {editContext.length > 0 && <ContextScrim scene={scene} materials={shown.materials} prefix={contextPrefix(editContext)} view={{ x: vx, y: vy, w: vw, h: vh }} />}
         <path className="board-mat" d={matD} fillRule="evenodd" pointerEvents="none" />
         {showGrid && <Grid gridMm={gridMm} matrix={ctxMatrix} zoom={camera.zoom} view={{ x: vx, y: vy, w: vw, h: vh }} />}
         <Proxies bounds={bounds} />
         <SelectionOverlay boxes={selectedBoxes} zoom={camera.zoom} />
+        <PivotMarkers project={shown} selection={selection} matrix={ctxMatrix} zoom={camera.zoom} />
         {drawing !== null && <DrawPreview drawing={drawing} matrix={ctxMatrix} zoom={camera.zoom} unit={project.displayUnits} />}
         {drawing?.cursor != null && <SnapGuide snap={drawing.cursor} matrix={ctxMatrix} zoom={camera.zoom} />}
       </svg>
