@@ -15,7 +15,7 @@ interface Props {
   materials: Material[]
   /** Distinguishes clipPath ids when the scene is drawn more than once in one document. */
   clipPrefix: string
-  /** Draw only the occurrences it accepts, each with the patches inserted after it (SPEC §7.6 scrim redraw). */
+  /** Draw only the occurrences it accepts, each with the patches inserted after it whose over occurrence it also accepts (SPEC §7.6 scrim redraw). */
   include?: (o: Occurrence) => boolean
 }
 
@@ -25,10 +25,10 @@ export function SceneSvg({ scene, materials, clipPrefix, include }: Props): JSX.
 
   const clips: JSX.Element[] = []
   const drawn: JSX.Element[] = []
-  let keep = true // a patch follows the under occurrence it was inserted after
+  let underKept = true // a patch follows the under occurrence it was inserted after
   scene.elements.forEach((el, k) => {
-    if (el.kind !== 'patch') keep = include?.(el.occurrence) ?? true
-    if (!keep) return
+    if (el.kind !== 'patch') underKept = include?.(el.occurrence) ?? true
+    if (!underKept || (el.kind === 'patch' && include?.(el.over) === false)) return
     if (el.kind === 'region') {
       const c = colorOf(el.occurrence.materialId)
       drawn.push(<path key={k} d={pathD(el.occurrence.worldPoints, true)} fill={c} fillRule="nonzero" stroke={c} strokeWidth={REGION_SEAM_MM} />)

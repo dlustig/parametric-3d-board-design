@@ -19,7 +19,7 @@ export function Breadcrumb(): JSX.Element | null {
       <span>Board</span>
       {editContext.map((level, k) => (
         <span key={k}>
-          {' / '}Motif: {motifs[level.motifId]?.name}
+          {' / '}Motif: {motifs[level.motifId]!.name}
         </span>
       ))}
       <button type="button" onClick={done}>

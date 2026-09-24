@@ -1,7 +1,8 @@
 // SPEC §7.6 rendering while a definition is entered: the full scene is drawn
 // normally underneath; this draws a 60% scrim in the page background colour
-// over the whole view, then the entered occurrence's elements (with their
-// patches) again above it. Per-element opacity is never used: it would
+// over the whole view, then the entered occurrence's elements again above
+// it, with the patches between two of them (a patch whose over occurrence is
+// outside stays under the scrim, consistent at the boundary). Per-element opacity is never used: it would
 // double-paint patches.
 
 import type { JSX } from 'react'
