@@ -204,6 +204,34 @@ describe('replaceProject', () => {
 
     expect(useEditor.getState().currentMaterialId).toBe(MAT2)
   })
+
+  // Review ruling (Task 16 fix round 1): message is shown in exactly one
+  // place (StatusBar) now, so a stale failure/notice must not survive a
+  // project replacement (New/Open/fixture load) that has nothing to do
+  // with it.
+  it('clears a stale message', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])])
+    resetStore(p0)
+    useEditor.setState({ message: 'stale error' })
+
+    useEditor.getState().replaceProject(newProject('mm'))
+
+    expect(useEditor.getState().message).toBeNull()
+  })
+})
+
+describe('setTool', () => {
+  // Review ruling (Task 16 fix round 1): same reasoning as replaceProject —
+  // a message from one tool/context must not linger after switching away.
+  it('clears a stale message', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])])
+    resetStore(p0)
+    useEditor.setState({ message: 'stale error' })
+
+    useEditor.getState().setTool('band')
+
+    expect(useEditor.getState().message).toBeNull()
+  })
 })
 
 describe('undo that removes a definition', () => {

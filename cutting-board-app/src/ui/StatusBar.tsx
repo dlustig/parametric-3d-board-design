@@ -1,6 +1,9 @@
 // SPEC §9: the autosave status text, and a Download button when the status
 // is 'unsaved' (save failure) or 'other-tab' (suspended: another tab owns
-// the key now).
+// the key now). Review ruling (Task 16 fix round 1): this is also the one
+// and only place the store's `message` (last command failure / notice) is
+// rendered — always visible at the App level, instead of leaking into
+// per-tool or per-menu regions that may not be on screen when it's set.
 
 import type { JSX } from 'react'
 import type { SaveStatus } from '@/editor/store'
@@ -17,6 +20,7 @@ const STATUS_TEXT: Record<SaveStatus, string> = {
 export function StatusBar(): JSX.Element {
   const status = useEditor((s) => s.saveStatus)
   const project = useEditor((s) => s.project)
+  const message = useEditor((s) => s.message)
   const showDownload = status === 'unsaved' || status === 'other-tab'
 
   return (
@@ -27,6 +31,7 @@ export function StatusBar(): JSX.Element {
           Download
         </button>
       )}
+      {message !== null && <span className="status-bar-message">{message}</span>}
     </div>
   )
 }

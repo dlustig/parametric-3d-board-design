@@ -3,6 +3,11 @@
 // type="file">` via `File.text()` and `importProject`, leaving project and
 // history untouched on failure. Export SVG is a placeholder, wired in
 // Task 17.
+//
+// Review ruling (Task 16 fix round 1): the store's `message` is rendered in
+// exactly one place — StatusBar — so this component only ever sets it (on
+// an Open failure); `replaceProject` itself clears a stale message on
+// success, so no manual clear is needed here.
 
 import * as Dialog from '@radix-ui/react-dialog'
 import type { ChangeEvent, JSX } from 'react'
@@ -18,8 +23,14 @@ export function isBlankProject(project: Project): boolean {
   return Object.keys(project.objects).length === 0
 }
 
+/** Replaces characters a filesystem might reject with `_`; an all-disallowed (or empty) name falls back to "project". */
+export function sanitizeFilenamePart(name: string): string {
+  const sanitized = name.replace(/[^A-Za-z0-9 _-]/g, '_')
+  return sanitized === '' ? 'project' : sanitized
+}
+
 export function downloadProject(project: Project): void {
-  downloadText(`${project.name}.cbpd.json`, JSON.stringify(project, null, 2), 'application/json')
+  downloadText(`${sanitizeFilenamePart(project.name)}.cbpd.json`, JSON.stringify(project, null, 2), 'application/json')
 }
 
 type PendingAction = 'new' | 'open' | null
@@ -27,12 +38,10 @@ type PendingAction = 'new' | 'open' | null
 export function ProjectMenu(): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<PendingAction>(null)
-  const message = useEditor((s) => s.message)
 
   const startNew = (): void => {
     const displayUnits = useEditor.getState().project.displayUnits
     useEditor.getState().replaceProject(newProject(displayUnits))
-    useEditor.setState({ message: null }) // clear a stale Open-file error, if any
   }
 
   const onNewClick = (): void => {
@@ -62,7 +71,6 @@ export function ProjectMenu(): JSX.Element {
         return
       }
       useEditor.getState().replaceProject(result.project)
-      useEditor.setState({ message: null })
     })
   }
 
@@ -85,11 +93,6 @@ export function ProjectMenu(): JSX.Element {
       <button type="button" disabled title="Coming in a later release">
         Export SVG
       </button>
-      {message !== null && (
-        <span className="project-menu-message" role="status">
-          {message}
-        </span>
-      )}
       <Dialog.Root open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />

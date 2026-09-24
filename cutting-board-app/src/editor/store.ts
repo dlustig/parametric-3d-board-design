@@ -173,7 +173,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       replaceProject(p) {
         get().settlePreview()
-        set({ project: p, selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId) })
+        set({ project: p, selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId), message: null })
         useEditor.temporal.getState().clear()
       },
 
@@ -182,7 +182,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       },
 
       setTool(t) {
-        set({ tool: t, drawing: null, crossingNotice: null })
+        set({ tool: t, drawing: null, crossingNotice: null, message: null })
       },
 
       enterContext(c) {

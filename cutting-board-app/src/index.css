@@ -222,11 +222,6 @@ body {
   width: 6rem;
 }
 
-.tool-options-message {
-  font-size: 0.8rem;
-  color: #c0392b;
-}
-
 /* SPEC §3 materials palette. */
 .materials-panel {
   padding-bottom: 12px;
@@ -401,16 +396,15 @@ body {
   gap: 6px;
 }
 
-.project-menu-message {
-  font-size: 0.8rem;
-  opacity: 0.85;
-}
-
 .status-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.8rem;
+}
+
+.status-bar-message {
+  color: #c0392b;
 }
 
 .recovery-banner {

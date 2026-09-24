@@ -1,10 +1,16 @@
-// SPEC §7.4: the drawing tools' options bar — the pending segment's Length and
-// Angle (live snapped values; typed values place the point on Enter), Finish,
-// Undo point, Cancel, and the last command message. The drawing keys
-// (Enter/Backspace/Ctrl+Z/Esc) are dispatched by `editor/keyboard.ts`, not
-// here. The Crossing tool's bar holds the scope control and the tapped
-// marker's read-out. Alt keyup is preventDefault'ed (SPEC §7.7) — unrelated to that
-// dispatch, so it stays a small listener of its own.
+// SPEC §7.4: the drawing tools' options bar — the pending segment's Length
+// and Angle (live snapped values; typed values place the point on Enter),
+// Finish, Undo point, Cancel. The drawing keys (Enter/Backspace/Ctrl+Z/Esc)
+// are dispatched by `editor/keyboard.ts`, not here. The Crossing tool's bar
+// holds the scope control and the tapped marker's read-out. Alt keyup is
+// preventDefault'ed (SPEC §7.7) — unrelated to that dispatch, so it stays a
+// small listener of its own.
+//
+// Review ruling (Task 16 fix round 1): the store's `message` (last command
+// failure/notice) is shown only in StatusBar now, not here — this bar shows
+// tool-specific state only (`crossingNotice`, drawing hints), so it doesn't
+// go stale or blank when the current tool has nothing to do with a message
+// set elsewhere.
 
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
@@ -28,7 +34,6 @@ export function ToolOptions(): JSX.Element | null {
   const tool = useEditor((s) => s.tool)
   const drawing = useEditor((s) => s.drawing)
   const unit = useEditor((s) => s.project.displayUnits)
-  const message = useEditor((s) => s.message)
   useAltKeyupGuard()
 
   // Typed values: state for display, refs for the synchronous read on Enter
@@ -93,11 +98,6 @@ export function ToolOptions(): JSX.Element | null {
         </>
       )}
       {!segmenting && <span className="tool-options-hint">Drag corner to corner</span>}
-      {message !== null && (
-        <span className="tool-options-message" role="status">
-          {message}
-        </span>
-      )}
     </div>
   )
 }
@@ -106,7 +106,6 @@ export function ToolOptions(): JSX.Element | null {
 function CrossingOptions(): JSX.Element {
   const scope = useEditor((s) => s.crossingScope)
   const notice = useEditor((s) => s.crossingNotice)
-  const message = useEditor((s) => s.message)
   const scoped = scopeControlShown(useScene())
   const scopeButton = (value: 'all' | 'occurrence', label: string): JSX.Element => (
     <button type="button" aria-pressed={scope === value} onClick={() => useEditor.setState({ crossingScope: value })}>
@@ -122,7 +121,7 @@ function CrossingOptions(): JSX.Element {
         </div>
       )}
       <span className="tool-options-hint" role="status">
-        {notice ?? message ?? 'Tap a crossing to swap which band is on top'}
+        {notice ?? 'Tap a crossing to swap which band is on top'}
       </span>
     </div>
   )
