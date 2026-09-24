@@ -29,6 +29,9 @@ import { pruneCurrentMaterial, pruneEditContext, pruneSelection } from './select
 
 export type Tool = 'select' | 'hand' | 'band' | 'rect' | 'polygon' | 'crossing'
 
+/** SPEC §9: local autosave status, surfaced by `StatusBar` (`storage/local.ts` drives it). */
+export type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'other-tab'
+
 export interface Preview {
   next: Project
   onInterrupt: 'commit' | 'cancel'
@@ -63,7 +66,7 @@ export interface EditorState {
   crossingScope: 'all' | 'occurrence'
   crossingNotice: string | null // Crossing tool read-out: an unsupported marker's reason, a scope fallback (SPEC §7.4)
   currentMaterialId: Id
-  saveStatus: 'saved' | 'saving' | 'unsaved' | 'other-tab'
+  saveStatus: SaveStatus
   message: string | null // last command failure / notice
   drawing: Drawing
   lastBandWidthMm: number // width for new Bands: the last one set (SPEC §7.4)
@@ -170,7 +173,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       replaceProject(p) {
         get().settlePreview()
-        set({ project: p, selection: [], editContext: [], drawing: null })
+        set({ project: p, selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId) })
         useEditor.temporal.getState().clear()
       },
 

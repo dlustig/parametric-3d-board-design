@@ -179,6 +179,31 @@ describe('replaceProject', () => {
     expect(useEditor.temporal.getState().pastStates.length).toBe(0)
     expect(useEditor.temporal.getState().futureStates.length).toBe(0)
   })
+
+  // Controller ruling (Task 16): replaceProject must repair a dangling
+  // currentMaterialId too, the same way undo/redo and deleteMaterial do —
+  // an imported/new project may not contain the id the editor had selected.
+  it('repairs a dangling currentMaterialId to the first material of the replacement project', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])])
+    resetStore(p0)
+    useEditor.setState({ currentMaterialId: 'not-a-real-material-id' })
+
+    const fresh = newProject('mm')
+    useEditor.getState().replaceProject(fresh)
+
+    expect(useEditor.getState().currentMaterialId).toBe(fresh.materials[0]!.id)
+  })
+
+  it('leaves currentMaterialId alone when it still names a material in the replacement project', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])])
+    resetStore(p0)
+    useEditor.setState({ currentMaterialId: MAT2 })
+
+    const replacement = project([band('b2', [[0, 0], [20, 0]])])
+    useEditor.getState().replaceProject(replacement)
+
+    expect(useEditor.getState().currentMaterialId).toBe(MAT2)
+  })
 })
 
 describe('undo that removes a definition', () => {
