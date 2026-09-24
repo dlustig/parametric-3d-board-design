@@ -130,6 +130,15 @@ function commandsFor(p: Project): Command[] {
     )
   }
 
+  // SPEC §5.6 motif operations: Create Motif over the root and each definition's children, Repeat/Detach on every instance.
+  if (root.length > 0) out.push(['createMotif root', (q) => commands.createMotif(q, null, root).project], ['createMotif root first', (q) => commands.createMotif(q, null, root.slice(0, 1)).project])
+  for (const m of Object.keys(p.motifs)) {
+    out.push([`createMotif in ${m}`, (q) => commands.createMotif(q, m, q.motifs[m]!.children.slice(0, 1)).project], [`renameMotif ${m}`, (q) => commands.renameMotif(q, m, 'Renamed')])
+  }
+  for (const o of Object.values(p.objects).filter((x) => x.type === 'motif-instance')) {
+    out.push([`makeRepeat ${o.id}`, (q) => commands.makeRepeat(q, o.id)], [`detachInstance ${o.id}`, (q) => commands.detachInstance(q, o.id)])
+  }
+
   const placed = firstOfType(p, 'motif-instance') ?? firstOfType(p, 'repeat')
   if (placed !== undefined) out.push(['setTransform', (q) => commands.setTransform(q, placed, { rotationDeg: 45, scale: 1.5, mirrorX: true })])
   const field = firstOfType(p, 'repeat')
