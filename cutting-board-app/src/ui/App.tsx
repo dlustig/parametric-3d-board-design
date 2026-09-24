@@ -1,3 +1,4 @@
+import * as Tooltip from '@radix-ui/react-tooltip'
 import type { JSX } from 'react'
 import { useEffect } from 'react'
 import { installKeyboardDispatcher } from '@/editor/keyboard'
@@ -10,16 +11,18 @@ function App(): JSX.Element {
   useEffect(() => installKeyboardDispatcher(), [])
 
   return (
-    <div className="app">
-      <div className="app-body">
-        <Toolbar />
-        <main className="canvas-host">
-          <Canvas />
-          <ToolOptions />
-        </main>
-        <Inspector />
+    <Tooltip.Provider delayDuration={400}>
+      <div className="app">
+        <div className="app-body">
+          <Toolbar />
+          <main className="canvas-host">
+            <Canvas />
+            <ToolOptions />
+          </main>
+          <Inspector />
+        </div>
       </div>
-    </div>
+    </Tooltip.Provider>
   )
 }
 

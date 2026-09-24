@@ -1,15 +1,38 @@
 // Immutable-update helpers shared by the command modules.
 
 import { newId } from '@/domain/ids'
+import { MAX_OCCURRENCES, MIN_SEGMENT_MM } from '@/domain/limits'
 import type { Band, ContextId, Crossing, DesignObject, Id, Project, Region } from '@/domain/model'
+import { countOccurrences } from '@/domain/validate'
 import type { CommandResult } from './index.ts'
 
 export function ok(project: Project): CommandResult {
   return { ok: true, project }
 }
 
-export function fail(message: string): CommandResult {
+// Narrower than `CommandResult`: every failure return is assignable to any
+// ok-result union that shares this shape (`CommandResult`, `IdsResult`, …)
+// without a cast at the call site.
+export function fail(message: string): { ok: false; message: string } {
   return { ok: false, message }
+}
+
+/** A `CommandResult` that also carries fresh ids created by the command (Duplicate, Paste), for the caller to select. */
+export type IdsResult = { ok: true; project: Project; newIds: Id[] } | { ok: false; message: string }
+
+export function okIds(project: Project, newIds: Id[]): IdsResult {
+  return { ok: true, project, newIds }
+}
+
+/** `ok(after)`, or a refusal when `after` expands to more than MAX_OCCURRENCES. Shared by every command that can add occurrences (addBand/addRegion, setRepeatParams, Duplicate, Paste, Offset copy). */
+export function withinCap(after: Project): CommandResult {
+  const count = countOccurrences(after)
+  return count > MAX_OCCURRENCES ? fail(`This would make ${count} occurrences; the limit is ${MAX_OCCURRENCES}.`) : ok(after)
+}
+
+/** SPEC §2.1 invariant 3: whether two points are closer than MIN_SEGMENT_MM. */
+export function tooClose(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
+  return Math.hypot(a.x - b.x, a.y - b.y) < MIN_SEGMENT_MM
 }
 
 export function replaceObject(p: Project, obj: DesignObject): Project {

@@ -329,26 +329,36 @@ describe('offsetCopyBand', () => {
     const p = ok(addBand(project([]), { ctx: null, materialId: MAT2, widthMm: 6, points: [{ x: 0, y: 0 }, { x: 10, y: 0 }] }))
     const original = p.rootChildren[0]!
 
-    const right = offsetCopyBand(p, original, 'right', 4)
+    const right = ok(offsetCopyBand(p, original, 'right', 4))
     expect(right.rootChildren).toHaveLength(2)
     const rightCopy = bandOf(right, right.rootChildren[1]!)
     expect(coords(right, rightCopy.id)).toEqual([[0, 5], [10, 5]])
     expect(rightCopy).toMatchObject({ materialId: MAT2, widthMm: 4, closed: false })
     expect(new Set(rightCopy.points.map((pt) => pt.id)).size).toBe(2)
 
-    const left = offsetCopyBand(p, original, 'left', 4)
+    const left = ok(offsetCopyBand(p, original, 'left', 4))
     const leftCopy = bandOf(left, left.rootChildren[1]!)
     expect(coords(left, leftCopy.id)).toEqual([[0, -5], [10, -5]])
-
-    expect(validateProject(right)).toBeNull()
-    expect(validateProject(left)).toBeNull()
   })
 
   it('offsets into a motif definition context', () => {
     const base = project([instance('I', 'M')], [plus])
-    const p = offsetCopyBand(base, 'H', 'right', 6)
+    const p = ok(offsetCopyBand(base, 'H', 'right', 6))
     expect(p.motifs.M!.children).toHaveLength(3)
-    expect(validateProject(p)).toBeNull()
+  })
+
+  it('refuses when the offset collapses every point (closed 10mm square, w=5, offset inward past its own half-width)', () => {
+    const square = project([band('S', [[0, 0], [10, 0], [10, 10], [0, 10]], { closed: true, widthMm: 5 })])
+    // distance = (5 + 5) / 2 = 5 = half the square's side: every corner maps onto the centre.
+    expect(offsetCopyBand(square, 'S', 'right', 5)).toEqual({ ok: false, message: 'The offset copy would collapse a segment' })
+    // The other side just makes it bigger — no collapse.
+    const outward = ok(offsetCopyBand(square, 'S', 'left', 5))
+    expect(outward.rootChildren).toHaveLength(2)
+  })
+
+  it('refuses over the occurrence cap', () => {
+    const atCap = project([repeat('F', 'M', { rows: 50, columns: 50 })], [plus]) // 50 x 50 x 2 = 5000, exactly at cap
+    expect(offsetCopyBand(atCap, 'H', 'right', 2)).toEqual({ ok: false, message: 'This would make 7500 occurrences; the limit is 5000.' })
   })
 })
 

@@ -4,16 +4,11 @@ import { rematchCrossings } from '@/geometry/resolve'
 import { canonicalize, canonicalKey } from '@/domain/crossings'
 import { newId } from '@/domain/ids'
 import { refKey } from '@/domain/keys'
-import { MIN_SEGMENT_MM } from '@/domain/limits'
 import type { Band, BandRef, Crossing, Id, Point, Project, Region } from '@/domain/model'
 import type { CommandResult } from './index.ts'
-import { fail, mapAllRecords, ok, replaceObject, wraps } from './shared.ts'
+import { fail, mapAllRecords, ok, replaceObject, tooClose, wraps } from './shared.ts'
 
 type XY = { x: number; y: number }
-
-function tooClose(a: XY, b: XY): boolean {
-  return Math.hypot(a.x - b.x, a.y - b.y) < MIN_SEGMENT_MM
-}
 
 /** The points joined to `points[index]` by a segment. */
 function neighbours(shape: Band | Region, index: number): Point[] {

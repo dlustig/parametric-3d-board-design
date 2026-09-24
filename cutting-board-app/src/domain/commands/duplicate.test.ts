@@ -2,10 +2,10 @@
 // `clipboard.ts` existed.
 
 import { describe, expect, it } from 'vitest'
-import type { Band, Project } from '@/domain/model'
-import { band, instance, MAT2, project, region } from '@/domain/test-builders'
+import type { Band, Id, Project } from '@/domain/model'
+import { band, instance, MAT2, project, region, repeat } from '@/domain/test-builders'
 import { validateProject } from '@/domain/validate'
-import type { CommandResult } from './index.ts'
+import type { IdsResult } from './shared.ts'
 import { copyObjects, pasteObjects } from './clipboard.ts'
 import { duplicateObjects } from './duplicate.ts'
 
@@ -15,11 +15,8 @@ function bandOf(p: Project, id: string): Band {
   return obj
 }
 
-function okProject(r: Project | CommandResult): Project {
-  if ('ok' in r) {
-    if (!r.ok) throw new Error(r.message)
-    return r.project
-  }
+function okIds(r: IdsResult): { project: Project; newIds: Id[] } {
+  if (!r.ok) throw new Error(r.message)
   return r
 }
 
@@ -28,7 +25,7 @@ const plus = { id: 'M', children: [band('H', [[-20, 0], [20, 0]]), band('V', [[0
 describe('duplicateObjects', () => {
   it('gives fresh ids for objects and points, with identical geometry', () => {
     const src = project([band('A', [[0, 0], [10, 0], [10, 10]]), region('G', [[0, 0], [4, 0], [4, 4]])])
-    const { project: p, newIds } = duplicateObjects(src, null, ['A', 'G'])
+    const { project: p, newIds } = okIds(duplicateObjects(src, null, ['A', 'G']))
 
     expect(p.rootChildren).toEqual(['A', 'G', ...newIds])
     expect(newIds).toHaveLength(2)
@@ -48,7 +45,7 @@ describe('duplicateObjects', () => {
 
   it('leaves the original objects and definition-internal records untouched', () => {
     const src = project([instance('I', 'M')], [plus])
-    const { project: p, newIds } = duplicateObjects(src, null, ['I'])
+    const { project: p, newIds } = okIds(duplicateObjects(src, null, ['I']))
     expect(p.motifs).toEqual(src.motifs) // the definition itself is not cloned
     const copy = p.objects[newIds[0]!]!
     expect(copy).toMatchObject({ type: 'motif-instance', motifId: 'M' })
@@ -58,9 +55,18 @@ describe('duplicateObjects', () => {
 
   it('duplicates into a motif definition context', () => {
     const src = project([instance('I', 'M')], [plus])
-    const { project: p, newIds } = duplicateObjects(src, 'M', ['H'])
+    const { project: p, newIds } = okIds(duplicateObjects(src, 'M', ['H']))
     expect(p.motifs.M!.children).toEqual(['H', 'V', ...newIds])
     expect(validateProject(p)).toBeNull()
+  })
+
+  it("appends copies in the originals' own paint order, not the (possibly reversed) selection order", () => {
+    const src = project([band('A', [[0, 0], [1, 1]]), band('B', [[2, 2], [3, 3]]), band('C', [[4, 4], [5, 5]])])
+    const { project: p, newIds } = okIds(duplicateObjects(src, null, ['C', 'A'])) // selected out of paint order
+    expect(newIds).toHaveLength(2)
+    const [copyOfA, copyOfC] = newIds
+    // A is painted before C, so its copy comes first, regardless of ['C', 'A'] selection order.
+    expect(p.rootChildren).toEqual(['A', 'B', 'C', copyOfA, copyOfC])
   })
 })
 
@@ -70,7 +76,7 @@ describe('copyObjects / pasteObjects', () => {
     const clip = copyObjects(src, ['A'])
     expect(clip).toEqual({ objects: [src.objects.A], motifs: [] })
 
-    const p = okProject(pasteObjects(src, null, clip))
+    const p = okIds(pasteObjects(src, null, clip)).project
     expect(p.rootChildren).toHaveLength(2)
     const pastedId = p.rootChildren[1]!
     expect(pastedId).not.toBe('A')
@@ -79,13 +85,23 @@ describe('copyObjects / pasteObjects', () => {
     expect(validateProject(p)).toBeNull()
   })
 
+  it("copies (and so later pastes) in the originals' own paint order, not the selection order", () => {
+    const src = project([band('A', [[0, 0], [1, 1]]), band('B', [[2, 2], [3, 3]]), band('C', [[4, 4], [5, 5]])])
+    const clip = copyObjects(src, ['C', 'A']) // selected out of paint order
+    expect(clip.objects.map((o) => o.id)).toEqual(['A', 'C'])
+
+    const result = okIds(pasteObjects(src, null, clip))
+    expect(result.newIds).toHaveLength(2)
+    expect(result.project.rootChildren).toEqual(['A', 'B', 'C', ...result.newIds])
+  })
+
   it('copies the referenced motif definition and pastes it as-is when it still exists', () => {
     const src = project([instance('I', 'M')], [plus])
     const clip = copyObjects(src, ['I'])
     expect(clip.motifs.map((m) => m.id)).toEqual(['M'])
     expect(clip.objects.map((o) => o.id).sort()).toEqual(['H', 'I', 'V'])
 
-    const p = okProject(pasteObjects(src, null, clip))
+    const p = okIds(pasteObjects(src, null, clip)).project
     expect(p.motifs).toEqual(src.motifs) // already present: reused, not re-created
     expect(p.rootChildren).toHaveLength(2)
     expect(validateProject(p)).toBeNull()
@@ -99,7 +115,7 @@ describe('copyObjects / pasteObjects', () => {
     const withoutM = project([band('other', [[0, 0], [1, 1]])])
     expect(withoutM.motifs.M).toBeUndefined()
 
-    const p = okProject(pasteObjects(withoutM, null, clip))
+    const p = okIds(pasteObjects(withoutM, null, clip)).project
     expect(p.motifs.M).toEqual(src.motifs.M) // restored under its original id
     expect(Object.hasOwn(p.objects, 'H')).toBe(true)
     expect(Object.hasOwn(p.objects, 'V')).toBe(true)
@@ -127,5 +143,38 @@ describe('copyObjects / pasteObjects', () => {
     const withoutM = project([band('other', [[0, 0], [1, 1]])])
     const result = pasteObjects(withoutM, null, incomplete)
     expect('ok' in result && result.ok).toBe(false)
+  })
+
+  it('refuses pasting a root instance of M back into M\'s own definition (would close a cycle)', () => {
+    const src = project([instance('I', 'M')], [plus])
+    const clip = copyObjects(src, ['I'])
+
+    const result = pasteObjects(src, 'M', clip)
+
+    expect(result).toEqual({ ok: false, message: 'Cannot paste: this motif contains the definition being pasted into' })
+  })
+
+  it('still pastes a copy of M elsewhere (root), unaffected by the cycle check', () => {
+    const src = project([instance('I', 'M')], [plus])
+    const clip = copyObjects(src, ['I'])
+
+    const p = okIds(pasteObjects(src, null, clip)).project
+
+    expect(p.rootChildren).toHaveLength(2)
+  })
+})
+
+describe('occurrence cap', () => {
+  it('duplicateObjects refuses when the result would exceed MAX_OCCURRENCES', () => {
+    const atCap = project([repeat('F', 'M', { rows: 50, columns: 50 })], [plus]) // 50 x 50 x 2 = 5000, exactly at cap
+    const result = duplicateObjects(atCap, 'M', ['H']) // M gains a 3rd shape: 50 x 50 x 3 = 7500
+    expect(result).toEqual({ ok: false, message: 'This would make 7500 occurrences; the limit is 5000.' })
+  })
+
+  it('pasteObjects refuses when the result would exceed MAX_OCCURRENCES', () => {
+    const atCap = project([repeat('F', 'M', { rows: 50, columns: 50 })], [plus])
+    const clip = copyObjects(atCap, ['F']) // a second 50x50 repeat of the same motif, pasted at root
+    const result = pasteObjects(atCap, null, clip)
+    expect(result.ok).toBe(false)
   })
 })

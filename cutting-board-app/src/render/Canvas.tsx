@@ -82,6 +82,14 @@ export function Canvas(): JSX.Element {
   const abortRef = useRef(abortGesture)
   abortRef.current = abortGesture
 
+  // Registers the abort hook in the store so keyboard.ts's Esc "cancel
+  // gesture" step can reach it too — one stable wrapper over the always-fresh
+  // abortRef, so it stays correct across re-renders without re-registering.
+  useEffect(() => {
+    useEditor.getState().setAbortGesture(() => abortRef.current())
+    return () => useEditor.getState().setAbortGesture(null)
+  }, [])
+
   // Viewport size → store (viewBox, toolbar zoom/Fit); fit the Board on mount.
   useLayoutEffect(() => {
     if (wrapper === null) return

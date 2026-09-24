@@ -8,9 +8,9 @@
 // motifs. `motifs` holds every `MotifDefinition` reached the same way.
 
 import type { ContextId, DesignObject, Id, MotifDefinition, MotifInstance, Project, RepeatField } from '@/domain/model'
-import { childrenOf } from '@/domain/project'
-import type { CommandResult } from './index.ts'
-import { cloneObjectFreshIds, fail, ok, withChildren } from './shared.ts'
+import { childrenOf, contextOf } from '@/domain/project'
+import type { IdsResult } from './shared.ts'
+import { cloneObjectFreshIds, fail, okIds, withChildren, withinCap } from './shared.ts'
 
 export type Clipboard = { objects: DesignObject[]; motifs: MotifDefinition[] }
 
@@ -20,7 +20,11 @@ function isPlaced(obj: DesignObject): obj is MotifInstance | RepeatField {
 
 /** Copies `ids` plus every `MotifDefinition` they (transitively) reference, and that definition's own children objects. */
 export function copyObjects(p: Project, ids: Id[]): Clipboard {
-  const objects = ids.map((id) => p.objects[id]!)
+  // Captured in the originals' own paint order, not `ids`' (arbitrary selection/click) order.
+  const idSet = new Set(ids)
+  const ctx = ids.length === 0 ? null : contextOf(p, ids[0]!)
+  const objects = childrenOf(p, ctx).filter((id) => idSet.has(id)).map((id) => p.objects[id]!)
+
   const motifs: MotifDefinition[] = []
   const extraObjects: DesignObject[] = []
   const seenMotifs = new Set<Id>()
@@ -48,16 +52,35 @@ export function copyObjects(p: Project, ids: Id[]): Clipboard {
   return { objects: [...objects, ...extraObjects], motifs }
 }
 
+/** Whether motif `from`'s reference graph reaches `target`, directly or through nested motifs — pasting an instance/repeat of `from` into `target` would close this into a cycle. */
+function motifReaches(motifs: Project['motifs'], objects: Project['objects'], from: Id, target: Id, seen: Set<Id> = new Set()): boolean {
+  if (from === target) return true
+  if (seen.has(from)) return false
+  seen.add(from)
+  const def = motifs[from]
+  if (def === undefined) return false
+  for (const childId of def.children) {
+    const child = objects[childId]
+    if (child !== undefined && isPlaced(child) && motifReaches(motifs, objects, child.motifId, target, seen)) return true
+  }
+  return false
+}
+
 /**
- * Pastes `clip` into `ctx`, in place. The top-level objects (everything in
- * `clip.objects` that no `clip.motifs` entry lists as a child) get fresh ids,
- * same as Duplicate. Any referenced `MotifDefinition` missing from the
- * project is restored from `clip.motifs` under its original id, along with
- * its children from `clip.objects` — refused if a referenced definition is
- * in neither the project nor the clipboard, or the clipboard's copy of it is
- * incomplete (a listed child missing from `clip.objects`).
+ * Pastes `clip` into `ctx`, in place, in the copied objects' own relative
+ * paint order. The top-level objects (everything in `clip.objects` that no
+ * `clip.motifs` entry lists as a child) get fresh ids, same as Duplicate; the
+ * caller selects `newIds`, mirroring Duplicate. Any referenced
+ * `MotifDefinition` missing from the project is restored from `clip.motifs`
+ * under its original id, along with its children from `clip.objects`.
+ * Refused (SPEC §2.1 invariants 2 and 4) if: a referenced definition is in
+ * neither the project nor the clipboard; the clipboard's copy of one is
+ * incomplete (a listed child missing from `clip.objects`); pasting into `ctx`
+ * would close a cycle (SPEC §2.1 invariant 4) — a motif-instance/repeat being
+ * pasted whose own definition reaches `ctx`, most directly a motif's own
+ * instance pasted back into itself; or the occurrence cap is exceeded.
  */
-export function pasteObjects(p: Project, ctx: ContextId, clip: Clipboard): Project | CommandResult {
+export function pasteObjects(p: Project, ctx: ContextId, clip: Clipboard): IdsResult {
   const internalIds = new Set(clip.motifs.flatMap((m) => m.children))
   const byId = new Map(clip.objects.map((o) => [o.id, o]))
   const topLevel = clip.objects.filter((o) => !internalIds.has(o.id))
@@ -76,10 +99,17 @@ export function pasteObjects(p: Project, ctx: ContextId, clip: Clipboard): Proje
     for (const child of children) objects = { ...objects, [child.id]: child }
   }
 
-  const referencedMotifIds = (list: DesignObject[]): Id[] => list.filter(isPlaced).map((o) => o.motifId)
   const allPasted = [...topLevel, ...clip.motifs.flatMap((m) => m.children.map((id) => byId.get(id)).filter((o): o is DesignObject => o !== undefined))]
-  for (const motifId of referencedMotifIds(allPasted)) {
-    if (!Object.hasOwn(motifs, motifId)) return fail('Cannot paste: a referenced motif no longer exists')
+  for (const obj of allPasted) {
+    if (isPlaced(obj) && !Object.hasOwn(motifs, obj.motifId)) return fail('Cannot paste: a referenced motif no longer exists')
+  }
+
+  if (ctx !== null) {
+    for (const obj of topLevel) {
+      if (isPlaced(obj) && motifReaches(motifs, objects, obj.motifId, ctx)) {
+        return fail('Cannot paste: this motif contains the definition being pasted into')
+      }
+    }
   }
 
   const cloned = topLevel.map(cloneObjectFreshIds)
@@ -87,5 +117,6 @@ export function pasteObjects(p: Project, ctx: ContextId, clip: Clipboard): Proje
 
   const withObjectsAndMotifs: Project = { ...p, objects, motifs }
   const children = [...childrenOf(withObjectsAndMotifs, ctx), ...cloned.map((o) => o.id)]
-  return ok(withChildren(withObjectsAndMotifs, ctx, children))
+  const capped = withinCap(withChildren(withObjectsAndMotifs, ctx, children))
+  return capped.ok ? okIds(capped.project, cloned.map((o) => o.id)) : capped
 }

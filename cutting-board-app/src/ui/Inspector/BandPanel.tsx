@@ -3,7 +3,7 @@
 // translates the points after it), insert-after and delete.
 
 import type { JSX } from 'react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { offsetCopyBand, setBandClosed, setBandWidth, setMaterial } from '@/domain/commands'
 import type { Band } from '@/domain/model'
 import { useEditor } from '@/editor/store'
@@ -62,11 +62,11 @@ export function BandPanel({ band }: Props): JSX.Element {
   const commit = (): void => useEditor.getState().commit()
 
   // SPEC §7.4 Offset copy (Band only): a width field defaulting to this
-  // band's own width, reset whenever the selected band changes.
+  // band's own width. Inspector.tsx keys this panel on the selected object's
+  // id, so React remounts it (re-running this initializer) on every band
+  // change instead of a `band.widthMm` edit clobbering a width already typed
+  // here.
   const [offsetWidth, setOffsetWidth] = useState(band.widthMm)
-  // Intentionally keyed on band.id only, not band.widthMm: re-defaulting on
-  // every width edit would clobber a width the user already typed here.
-  useEffect(() => setOffsetWidth(band.widthMm), [band.id])
 
   const n = band.points.length
 

@@ -18,8 +18,7 @@
 // (Create Motif) is reserved for Task 13: swallowed, no action yet.
 
 import type { Clipboard } from '@/domain/commands'
-import { copyObjects, deleteObjects, pasteObjects, translateObjects } from '@/domain/commands'
-import { duplicateObjects } from '@/domain/commands/duplicate.ts'
+import { copyObjects, deleteObjects, duplicateObjects, pasteObjects, translateObjects } from '@/domain/commands'
 import type { Id } from '@/domain/model'
 import { apply, invert } from '@/geometry/affine'
 import { cancelDrawing, finishDrawing, undoPoint } from './tools/draw.ts'
@@ -53,10 +52,11 @@ export function duplicateSelection(): void {
   let newIds: Id[] = []
   s.run((p) => {
     const result = duplicateObjects(p, ctx, s.selection)
+    if (!result.ok) return result
     newIds = result.newIds
     return result.project
   })
-  useEditor.setState({ selection: newIds })
+  if (newIds.length > 0) useEditor.setState({ selection: newIds })
 }
 
 export function copySelection(): void {
@@ -70,7 +70,14 @@ export function pasteClipboard(): void {
   const s = useEditor.getState()
   const ctx = currentContext(s)
   const clip = clipboard
-  s.run((p) => pasteObjects(p, ctx, clip))
+  let newIds: Id[] = []
+  s.run((p) => {
+    const result = pasteObjects(p, ctx, clip)
+    if (!result.ok) return result
+    newIds = result.newIds
+    return result.project
+  })
+  if (newIds.length > 0) useEditor.setState({ selection: newIds })
 }
 
 /** Maps a world-space delta vector into the current context's space (a vector, not a point: no translation term). */
@@ -95,6 +102,7 @@ function nudge(dx: number, dy: number, shift: boolean): void {
 function handleEscape(): void {
   const s = useEditor.getState()
   if (s.preview !== null) {
+    s.abortGesture?.() // stops Moveable's own drag tracking (Canvas.tsx), not just the store's preview
     s.cancelPreview()
     return
   }
@@ -117,18 +125,23 @@ export function installKeyboardDispatcher(): () => void {
   const onKeyDown = (e: KeyboardEvent): void => {
     if (isFieldTarget(e.target)) return
 
-    const mod = e.ctrlKey || e.metaKey
+    // "do not treat Ctrl+Meta as mod": exactly one of Ctrl/Meta, never both
+    // together, never neither. `noModifiers` is its own independent check —
+    // holding both Ctrl and Meta makes `mod` false but must not look "plain".
+    const ctrlOrMeta = e.ctrlKey || e.metaKey
+    const mod = e.ctrlKey !== e.metaKey
+    const noModifiers = !ctrlOrMeta && !e.altKey && !e.shiftKey
     const key = e.key
     const lower = key.toLowerCase()
 
     if (useEditor.getState().drawing !== null) {
-      if (key === 'Enter') {
+      if (noModifiers && key === 'Enter') {
         finishDrawing()
         e.preventDefault()
         return
       }
       const undoChord = mod && !e.shiftKey && !e.altKey && lower === 'z'
-      if (key === 'Backspace' || undoChord) {
+      if ((noModifiers && key === 'Backspace') || undoChord) {
         undoPoint()
         e.preventDefault()
         return
@@ -157,27 +170,27 @@ export function installKeyboardDispatcher(): () => void {
         e.preventDefault()
         return
       }
-      if (lower === 'd') {
+      if (!e.shiftKey && lower === 'd') {
         duplicateSelection()
         e.preventDefault()
         return
       }
-      if (lower === 'g') {
+      if (!e.shiftKey && lower === 'g') {
         e.preventDefault() // Create Motif — reserved for Task 13
         return
       }
-      if (lower === 'c') {
+      if (!e.shiftKey && lower === 'c') {
         copySelection()
         return
       }
-      if (lower === 'v') {
+      if (!e.shiftKey && lower === 'v') {
         pasteClipboard()
         return
       }
       return // an unrecognized modified chord: never falls through to a plain-key binding
     }
 
-    if (!e.altKey && !e.shiftKey) {
+    if (noModifiers) {
       const tool = TOOL_KEYS[lower]
       if (tool !== undefined) {
         useEditor.getState().setTool(tool)
@@ -186,13 +199,13 @@ export function installKeyboardDispatcher(): () => void {
       }
     }
 
-    if (!e.altKey && (key === 'Delete' || key === 'Backspace')) {
+    if (noModifiers && (key === 'Delete' || key === 'Backspace')) {
       deleteSelection()
       e.preventDefault()
       return
     }
 
-    if (!e.altKey && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
+    if (!ctrlOrMeta && !e.altKey && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
       const dx = key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0
       const dy = key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0
       nudge(dx, dy, e.shiftKey)

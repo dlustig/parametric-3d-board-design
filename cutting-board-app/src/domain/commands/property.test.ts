@@ -7,7 +7,7 @@ import { findIntersections } from '../../geometry/intersections.ts'
 import type { Band, Id, Project, Step } from '../model.ts'
 import { newProject } from '../project.ts'
 import { band, instance, MAT, MAT2, project, record, ref, repeat } from '../test-builders.ts'
-import { validateProject } from '../validate.ts'
+import { countOccurrences, validateProject } from '../validate.ts'
 import type { CommandResult } from './index.ts'
 import * as commands from './index.ts'
 
@@ -44,11 +44,18 @@ const nested = project(
   ],
 )
 
+// A 2-band motif repeated 50x50 = exactly MAX_OCCURRENCES (5000): every
+// occurrence-adding command (Duplicate, Paste, Offset copy, `setRepeatParams`)
+// must refuse here rather than push the project over the cap.
+const twoBand = { id: 'M2', children: [band('H2', [[-20, 0], [20, 0]]), band('V2', [[0, -20], [0, 20]])] }
+const atCap = project([repeat('F2', 'M2', { rows: 50, columns: 50 })], [twoBand])
+
 const corpus: Array<[string, Project]> = [
   ['blank', newProject('mm')],
   ['stripes-like', stripes],
   ['3×3 repeat with records', field],
   ['nested motif', nested],
+  ['at occurrence cap', atCap],
 ]
 
 type Command = [string, (p: Project) => Project | CommandResult]
@@ -83,16 +90,25 @@ function commandsFor(p: Project): Command[] {
     ...root.map((id): Command => [`delete ${id}`, (q) => commands.deleteObjects(q, [id])]),
     ...Object.keys(p.motifs).map((m): Command => [`addBand in ${m}`, (q) => commands.addBand(q, { ctx: m, materialId: m0, widthMm: 2, points: [{ x: -9, y: -9 }, { x: 9, y: 9 }] })]),
     ...p.crossings.map((c): Command => [`removeRecord ${c.id}`, (q) => commands.removeRecord(q, null, c.id)]),
-    ['duplicate root', (q) => commands.duplicateObjects(q, null, root).project],
+    ['duplicate root', (q) => commands.duplicateObjects(q, null, root)],
     ['copy/paste root', (q) => commands.pasteObjects(q, null, commands.copyObjects(q, root))],
     ...Object.keys(p.motifs).map((m): Command => [
       `duplicate in ${m}`,
-      (q) => commands.duplicateObjects(q, m, q.motifs[m]!.children).project,
+      (q) => commands.duplicateObjects(q, m, q.motifs[m]!.children),
     ]),
     ...Object.keys(p.motifs).map((m): Command => [
       `copy/paste in ${m}`,
       (q) => commands.pasteObjects(q, m, commands.copyObjects(q, q.motifs[m]!.children)),
     ]),
+    // Self-paste cycle: copy a root object that places motif m, paste it back
+    // into m's own definition — must refuse (SPEC §2.1 invariant 4), not
+    // introduce a cycle.
+    ...root.flatMap((id): Command[] => {
+      const obj = p.objects[id]!
+      if (obj.type !== 'motif-instance' && obj.type !== 'repeat') return []
+      const motifId = obj.motifId
+      return [[`self-paste ${id} into ${motifId}`, (q) => commands.pasteObjects(q, motifId, commands.copyObjects(q, [id]))]]
+    }),
   ]
 
   for (const b of Object.values(p.objects).filter((o): o is Band => o.type === 'band')) {
@@ -126,9 +142,16 @@ function commandsFor(p: Project): Command[] {
     )
   }
 
-  findIntersections(expand(p)).forEach((i, k) => {
-    out.push([`toggle all #${k}`, (q) => commands.toggleCrossing(q, i, 'all')], [`toggle occurrence #${k}`, (q) => commands.toggleCrossing(q, i, 'occurrence')])
-  })
+  // `findIntersections(expand(p))` materializes every occurrence's geometry
+  // and checks each pair — cheap for these small fixtures, prohibitive at
+  // the occurrence cap. The cap fixture's job is the cap-refusal commands
+  // above (all O(1) via `countOccurrences`'s memoized formula, no expand),
+  // not crossing toggles, so this is skipped there.
+  if (countOccurrences(p) <= 500) {
+    findIntersections(expand(p)).forEach((i, k) => {
+      out.push([`toggle all #${k}`, (q) => commands.toggleCrossing(q, i, 'all')], [`toggle occurrence #${k}`, (q) => commands.toggleCrossing(q, i, 'occurrence')])
+    })
+  }
   return out
 }
 

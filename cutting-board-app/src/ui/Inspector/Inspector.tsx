@@ -31,7 +31,7 @@ export function Inspector(): JSX.Element {
     <aside className="inspector">
       <MaterialPalette />
       <SelectionPanel />
-      {single?.type === 'band' && <BandPanel band={single} />}
+      {single?.type === 'band' && <BandPanel key={single.id} band={single} />}
       {single?.type === 'region' && <RegionPanel region={single} />}
       {(single?.type === 'motif-instance' || single?.type === 'repeat') && (
         <section className="panel" aria-label={single.type === 'motif-instance' ? 'Instance' : 'Repeat'}>

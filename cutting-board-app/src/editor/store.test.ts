@@ -4,10 +4,10 @@
 import { describe, expect, it } from 'vitest'
 import { IDENTITY, multiply } from '../geometry/affine.ts'
 import { pathMatrix } from '../geometry/expand.ts'
-import { deleteObjects } from '../domain/commands/index.ts'
+import { addMaterial, deleteMaterial, deleteObjects } from '../domain/commands/index.ts'
 import type { Project } from '../domain/model.ts'
 import { newProject } from '../domain/project.ts'
-import { band, instance, project } from '../domain/test-builders.ts'
+import { band, instance, MAT, MAT2, project } from '../domain/test-builders.ts'
 import { contextMatrix, currentContext, useEditor } from './store.ts'
 
 /** Resets the shared store singleton to a known baseline before each test. */
@@ -19,6 +19,7 @@ function resetStore(p: Project): void {
     selection: [],
     editContext: [],
     camera: { x: 0, y: 0, zoom: 2 },
+    currentMaterialId: p.materials[0]?.id ?? '',
     message: null,
     drawing: null,
   })
@@ -272,5 +273,42 @@ describe('two-level editContext repair', () => {
 
     expect(useEditor.getState().project.objects['instA1']).toBeUndefined()
     expect(useEditor.getState().editContext).toEqual([])
+  })
+})
+
+describe('currentMaterialId repair', () => {
+  it('deleteMaterial resets currentMaterialId to the first remaining material when the current one is deleted', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])]) // materials: [Maple (MAT), Walnut (MAT2)]; b1 uses Maple, so Walnut is unused
+    resetStore(p0)
+    useEditor.setState({ currentMaterialId: MAT2 })
+
+    useEditor.getState().run((p) => deleteMaterial(p, MAT2))
+
+    expect(useEditor.getState().project.materials.map((m) => m.id)).toEqual([MAT])
+    expect(useEditor.getState().currentMaterialId).toBe(MAT)
+  })
+
+  it('leaves currentMaterialId alone when a run() succeeds without touching materials', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])])
+    resetStore(p0)
+    useEditor.setState({ currentMaterialId: MAT2 })
+
+    useEditor.getState().run((p) => deleteObjects(p, ['b1']))
+
+    expect(useEditor.getState().currentMaterialId).toBe(MAT2)
+  })
+
+  it('undo of an Add repairs currentMaterialId after selecting the new material', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])])
+    resetStore(p0)
+
+    useEditor.getState().run((p) => addMaterial(p, { name: 'Oak', color: '#C19A6B' }))
+    const added = useEditor.getState().project.materials.at(-1)!.id
+    useEditor.setState({ currentMaterialId: added }) // simulates clicking the new swatch
+
+    useEditor.getState().undo()
+
+    expect(useEditor.getState().project.materials.map((m) => m.id)).toEqual([MAT, MAT2])
+    expect(useEditor.getState().currentMaterialId).toBe(MAT)
   })
 })

@@ -5,6 +5,7 @@
 import * as Popover from '@radix-ui/react-popover'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import type { JSX } from 'react'
+// Tooltip.Provider is hoisted to App.tsx (one per app, not one per trigger).
 import { useEffect, useState } from 'react'
 import { addMaterial, deleteMaterial, materialUsageCount, replaceMaterial, updateMaterial } from '@/domain/commands'
 import type { Material, Project } from '@/domain/model'
@@ -40,14 +41,17 @@ export function MaterialEditor({ project, material }: Props): JSX.Element {
     setOpen(false)
   }
 
+  // No usage/replaceTarget guard here: both buttons are already `disabled`
+  // for exactly these conditions, so a click can't reach either handler
+  // otherwise.
   const onDelete = (): void => {
-    if (material === undefined || usage > 0) return
+    if (material === undefined) return
     useEditor.getState().run((p) => deleteMaterial(p, material.id))
     setOpen(false)
   }
 
   const onReplace = (): void => {
-    if (material === undefined || replaceTarget === '') return
+    if (material === undefined) return
     useEditor.getState().run((p) => replaceMaterial(p, material.id, replaceTarget))
     setOpen(false)
   }
@@ -56,22 +60,20 @@ export function MaterialEditor({ project, material }: Props): JSX.Element {
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Tooltip.Provider delayDuration={400}>
-        <Tooltip.Root>
-          <Tooltip.Trigger asChild>
-            <Popover.Trigger asChild>
-              <button type="button" className="material-editor-trigger" aria-label={triggerLabel}>
-                {material === undefined ? '+' : '✎'}
-              </button>
-            </Popover.Trigger>
-          </Tooltip.Trigger>
-          <Tooltip.Portal>
-            <Tooltip.Content className="tooltip" sideOffset={4}>
-              {triggerLabel}
-            </Tooltip.Content>
-          </Tooltip.Portal>
-        </Tooltip.Root>
-      </Tooltip.Provider>
+      <Tooltip.Root>
+        <Tooltip.Trigger asChild>
+          <Popover.Trigger asChild>
+            <button type="button" className="material-editor-trigger" aria-label={triggerLabel}>
+              {material === undefined ? '+' : '✎'}
+            </button>
+          </Popover.Trigger>
+        </Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content className="tooltip" sideOffset={4}>
+            {triggerLabel}
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
       <Popover.Portal>
         <Popover.Content className="material-editor-popover" sideOffset={6} aria-label={triggerLabel}>
           <div className="field">

@@ -70,3 +70,9 @@ export function pruneSelection(p: Project, selection: Id[]): Id[] {
   const next = selection.filter((id) => Object.hasOwn(p.objects, id))
   return next.length === selection.length ? selection : next
 }
+
+/** `currentMaterialId` if it still names a material in `p`; else the first remaining one (or, with none left, left as-is — nothing valid to fall back to). */
+export function pruneCurrentMaterial(p: Project, currentMaterialId: Id): Id {
+  if (p.materials.some((m) => m.id === currentMaterialId)) return currentMaterialId
+  return p.materials[0]?.id ?? currentMaterialId
+}

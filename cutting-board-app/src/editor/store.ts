@@ -25,7 +25,7 @@ import { pathMatrix } from '@/geometry/expand'
 import { rematchCrossings } from '@/geometry/resolve'
 import type { SegmentSnap } from '@/geometry/snap'
 import type { EditContextLevel } from './selection.ts'
-import { pruneEditContext, pruneSelection } from './selection.ts'
+import { pruneCurrentMaterial, pruneEditContext, pruneSelection } from './selection.ts'
 
 export type Tool = 'select' | 'hand' | 'band' | 'rect' | 'polygon' | 'crossing'
 
@@ -66,6 +66,8 @@ export interface EditorState {
   message: string | null // last command failure / notice
   drawing: Drawing
   lastBandWidthMm: number // width for new Bands: the last one set (SPEC §7.4)
+  /** Canvas.tsx's gesture-abort hook (stops Moveable, cancels a gesture preview), registered while it's mounted — null otherwise. SPEC §7.4 Esc's "cancel gesture" step calls it. */
+  abortGesture: (() => void) | null
 
   run(cmd: (p: Project) => Project | CommandResult): void
   setPreview(next: Project, onInterrupt: 'commit' | 'cancel'): void
@@ -82,6 +84,7 @@ export interface EditorState {
   setCamera(c: Camera): void
   setViewport(v: { w: number; h: number }): void
   setGridMm(mm: number): void
+  setAbortGesture(fn: (() => void) | null): void
 }
 
 type Temporal = StoreApi<TemporalState<{ project: Project }>>
@@ -117,16 +120,17 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       message: null,
       drawing: null,
       lastBandWidthMm: 6.35,
+      abortGesture: null,
 
       run(cmd) {
         get().settlePreview()
         const result = cmd(get().project)
         if (isCommandResult(result)) {
-          if (result.ok) set({ project: result.project, message: null })
+          if (result.ok) set({ project: result.project, message: null, currentMaterialId: pruneCurrentMaterial(result.project, get().currentMaterialId) })
           else set({ message: result.message })
           return
         }
-        set({ project: result, message: null })
+        set({ project: result, message: null, currentMaterialId: pruneCurrentMaterial(result, get().currentMaterialId) })
       },
 
       setPreview(next, onInterrupt) {
@@ -195,6 +199,10 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       setGridMm(mm) {
         set({ gridMm: mm })
       },
+
+      setAbortGesture(fn) {
+        set({ abortGesture: fn })
+      },
     }),
     {
       partialize: (s) => ({ project: s.project }),
@@ -204,10 +212,15 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
   ),
 )
 
-/** Drops selection ids and edit-context levels invalidated by the undo/redo that just ran (SPEC §7.1); cancels drawing. */
+/** Drops selection ids, edit-context levels, and a dangling `currentMaterialId` invalidated by the undo/redo that just ran (SPEC §7.1); cancels drawing. */
 function repairAfterHistoryChange(set: StoreApi<EditorState>['setState'], get: StoreApi<EditorState>['getState']): void {
-  const { project, selection, editContext } = get()
-  set({ selection: pruneSelection(project, selection), editContext: pruneEditContext(project, editContext), drawing: null })
+  const { project, selection, editContext, currentMaterialId } = get()
+  set({
+    selection: pruneSelection(project, selection),
+    editContext: pruneEditContext(project, editContext),
+    currentMaterialId: pruneCurrentMaterial(project, currentMaterialId),
+    drawing: null,
+  })
 }
 
 /** The innermost entered definition, or `null` at the Project root (SPEC §7.6). */
