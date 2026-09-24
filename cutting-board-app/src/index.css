@@ -32,11 +32,22 @@ body {
   flex-direction: column;
 }
 
+/* SPEC §7.5 Inspector layout: three-column flex — left Toolbar rail, centre
+   Canvas, right Inspector. */
+.app-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
 .toolbar {
   display: flex;
+  flex-direction: column;
   gap: 4px;
-  padding: 6px 8px;
-  border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  padding: 8px 6px;
+  overflow-y: auto;
+  border-right: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
 }
 
 .toolbar button {
@@ -55,7 +66,87 @@ body {
 .canvas-host {
   position: relative;
   flex: 1;
+  min-width: 0;
   min-height: 0;
+}
+
+.inspector {
+  flex: 0 0 280px;
+  width: 280px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  overflow-y: auto;
+  border-left: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+}
+
+.panel {
+  margin-bottom: 18px;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.panel h3 {
+  margin: 12px 0 6px;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.field label {
+  min-width: 5.5rem;
+  font-size: 0.8rem;
+}
+
+.field input,
+.field select {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-checkbox {
+  justify-content: flex-start;
+}
+
+.field-unit {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.field-error {
+  flex-basis: 100%;
+  font-size: 0.7rem;
+  color: #c0392b;
+}
+
+.point-row,
+.segment-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.segment-label {
+  min-width: 4.5rem;
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
 .canvas {
