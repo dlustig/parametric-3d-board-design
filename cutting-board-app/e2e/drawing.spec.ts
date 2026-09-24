@@ -88,6 +88,28 @@ test.describe('mouse', () => {
     expect(await history(page)).toEqual({ past: 1, future: 0 })
   })
 
+  test('a band tapped back onto its first point becomes closed', async ({ page }) => {
+    await start(page, 'Band')
+    for (const w of [{ x: 50, y: 50 }, { x: 100, y: 50 }, { x: 100, y: 100 }, { x: 51, y: 49 }]) {
+      const c = await at(page, w)
+      await page.mouse.click(c.x, c.y)
+    }
+    const band = await onlyBand(page)
+    expect(band.closed).toBe(true)
+    expectPoints(band.points, [{ x: 50, y: 50 }, { x: 100, y: 50 }, { x: 100, y: 100 }])
+    expect(await history(page)).toEqual({ past: 1, future: 0 })
+  })
+
+  test('with two points, a tap on the first point adds no point on top of it', async ({ page }) => {
+    await start(page, 'Band')
+    for (const w of [{ x: 50, y: 50 }, { x: 100, y: 50 }, { x: 51, y: 49 }]) {
+      const c = await at(page, w)
+      await page.mouse.click(c.x, c.y)
+    }
+    expectPoints(await drawnPoints(page), [{ x: 50, y: 50 }, { x: 100, y: 50 }])
+    expect((await getProject(page)).rootChildren).toHaveLength(0)
+  })
+
   test('a polygon closes on its first point; a rectangle drags corner to corner', async ({ page }) => {
     await start(page, 'Polygon')
     for (const w of [{ x: 50, y: 50 }, { x: 100, y: 50 }, { x: 100, y: 100 }, { x: 51, y: 51 }]) {
@@ -133,6 +155,20 @@ test.describe('touch', () => {
     await page.getByRole('button', { name: 'Finish' }).tap()
     expectPoints((await onlyBand(page)).points, [{ x: 50, y: 50 }, { x: 100, y: 50 }])
     expect(await history(page)).toEqual({ past: 1, future: 0 })
+  })
+
+  test('a finger lifted after a tool switch mid-press does not block later taps', async ({ page }) => {
+    await start(page, 'Band')
+    const touch = await Touch.attach(page)
+    await touch.start([await at(page, { x: 80, y: 80 })])
+    // Switch tools while the finger is still down, lift it with no draw listener bound, switch back.
+    await page.getByRole('button', { name: 'Select', exact: true }).click()
+    await touch.end([])
+    await page.getByRole('button', { name: 'Band', exact: true }).click()
+
+    const a = await at(page, { x: 50, y: 50 })
+    await page.touchscreen.tap(a.x, a.y)
+    expectPoints(await drawnPoints(page), [{ x: 50, y: 50 }])
   })
 
   test('a two-finger pan/pinch mid-draw places no point', async ({ page }) => {
