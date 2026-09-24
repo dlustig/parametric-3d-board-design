@@ -1,7 +1,8 @@
 // SPEC §9, G8 browser part: quota-failure status + recovery, startup
 // corruption recovery, a failed Open leaving project/history untouched,
-// New's confirmation on a non-blank project, the pagehide flush, and
-// multi-tab detection via the `storage` event.
+// New's and Open's confirmation on a non-blank project (and the direct
+// path — no dialog — on a blank one), the pagehide flush, and multi-tab
+// detection via the `storage` event.
 
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
@@ -81,9 +82,37 @@ test.describe('Open Project', () => {
     const fileInput = page.locator('input[type="file"]')
     await fileInput.setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('not json{') })
 
-    await expect(page.locator('.project-menu-message')).toContainText('not valid JSON')
+    // message renders only in StatusBar (review ruling, Task 16 fix round 1).
+    await expect(page.locator('.status-bar-message')).toContainText('not valid JSON')
     expect(await getProject(page)).toEqual(before)
     expect(await history(page)).toEqual(historyBefore)
+  })
+
+  test('Open on a non-blank project asks to confirm; cancelling leaves project and history untouched', async ({ page }) => {
+    const seeded = project([band('b1', [[0, 40], [80, 40]])])
+    await seed(page, seeded)
+    const before = await getProject(page)
+    const historyBefore = await history(page)
+
+    await page.getByRole('button', { name: 'Open Project', exact: true }).click()
+
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.getByText('Open a project?')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    await expect(page.getByRole('dialog')).toBeHidden()
+    expect(await getProject(page)).toEqual(before)
+    expect(await history(page)).toEqual(historyBefore)
+  })
+
+  test('Open on a blank project reaches the file chooser directly, without a confirmation', async ({ page }) => {
+    await seed(page, project([]))
+
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: 'Open Project', exact: true }).click()])
+
+    expect(chooser.isMultiple()).toBe(false)
+    await expect(page.getByRole('dialog')).toBeHidden()
   })
 })
 
@@ -113,6 +142,24 @@ test.describe('New Project confirmation', () => {
     const after = await getProject(page)
     expect(after.id).not.toBe(before.id) // a fresh project, not the same instance
     expect(after.objects).toEqual({})
+  })
+})
+
+test.describe('Download Project filename', () => {
+  test('sanitises characters outside [A-Za-z0-9 _-]', async ({ page }) => {
+    await seed(page, { ...project([]), name: 'My/Project: "Board" #1?' })
+
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download Project', exact: true }).click()])
+
+    expect(download.suggestedFilename()).toBe('My_Project_ _Board_ _1_.cbpd.json')
+  })
+
+  test('falls back to "project" when the name is empty', async ({ page }) => {
+    await seed(page, { ...project([]), name: '' })
+
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download Project', exact: true }).click()])
+
+    expect(download.suggestedFilename()).toBe('project.cbpd.json')
   })
 })
 
