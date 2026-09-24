@@ -6,9 +6,10 @@ import type { Band, BandRef, Crossing, MotifInstance, Project, RepeatField } fro
 import { band, instance, MAT2, project, record, ref, region, repeat } from '../test-builders.ts'
 import { validateProject } from '../validate.ts'
 import type { CommandResult } from './index.ts'
+import type { IdsResult } from './shared.ts'
 import { createMotif, deleteObjects, detachInstance, makeRepeat, renameMotif } from './index.ts'
 
-function ok(r: CommandResult): Project {
+function ok(r: CommandResult | IdsResult): Project {
   if (!r.ok) throw new Error(r.message)
   return valid(r.project)
 }
@@ -50,6 +51,7 @@ describe('createMotif', () => {
       region('G', [[100, 100], [140, 100], [140, 130]]),
       instance('I', 'Q', { x: 50, y: 60, rotationDeg: 30, mirrorX: true, scale: 1.5 }),
       band('B', [[0, 50], [150, 50]], { materialId: MAT2 }),
+      repeat('F', 'Q', { transform: { x: 180, y: 20, rotationDeg: 15, mirrorX: false, mirrorY: true, scale: 0.5 }, rows: 2, columns: 3, stepXMm: 25, stepYMm: 30, rowOffsetMm: 7, alternateRotationDeg: 90 }),
     ],
     [plus],
   )
@@ -57,14 +59,14 @@ describe('createMotif', () => {
   it('re-bases the selection about its painted-bounds centre and keeps world geometry', () => {
     const before = base
     const centre = (() => {
-      const box = unionBoxes(['A', 'G', 'I', 'B'].map((id) => objectBounds(before, id)!))!
+      const box = unionBoxes(['A', 'G', 'I', 'B', 'F'].map((id) => objectBounds(before, id)!))!
       return { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 }
     })()
 
-    const { project: p, motifId, instanceId } = createMotif(before, null, ['B', 'A', 'I', 'G'])
+    const { project: p, motifId, instanceId } = createMotif(before, null, ['B', 'F', 'A', 'I', 'G'])
     valid(p)
     expect(p.rootChildren).toEqual([instanceId])
-    expect(p.motifs[motifId]!.children).toEqual(['A', 'G', 'I', 'B']) // relative paint order, not selection order
+    expect(p.motifs[motifId]!.children).toEqual(['A', 'G', 'I', 'B', 'F']) // relative paint order, not selection order
     const inst = p.objects[instanceId] as MotifInstance
     expect(inst.motifId).toBe(motifId)
     expect(inst.transform).toEqual({ x: centre.x, y: centre.y, rotationDeg: 0, mirrorX: false, mirrorY: false, scale: 1 })
@@ -77,7 +79,7 @@ describe('createMotif', () => {
 
   it('puts the instance at the topmost selected child and keeps the rest in order', () => {
     const { project: p, instanceId } = createMotif(base, null, ['A', 'I'])
-    expect(p.rootChildren).toEqual(['G', instanceId, 'B'])
+    expect(p.rootChildren).toEqual(['G', instanceId, 'B', 'F'])
     expect(p.motifs[(p.objects[instanceId] as MotifInstance).motifId]!.children).toEqual(['A', 'I'])
   })
 
@@ -172,7 +174,9 @@ describe('detachInstance', () => {
       [band('A', [[0, 0], [5, 0]]), instance('I', 'Q', { x: 40, y: 30, rotationDeg: 20, mirrorY: true, scale: 2 }), band('B', [[0, 9], [5, 9]])],
       [plus],
     )
-    const p = ok(detachInstance(before, 'I'))
+    const result = detachInstance(before, 'I')
+    const p = ok(result)
+    expect(result.ok && result.newIds).toEqual(p.rootChildren.slice(1, 3))
     expect(p.motifs).toEqual({})
     expect(p.rootChildren).toHaveLength(4)
     expect(p.rootChildren[0]).toBe('A')
@@ -233,6 +237,22 @@ describe('detachInstance', () => {
     expect(zRef.bandId).toBe(z!.id)
     expect((z as Band).points.map((q) => q.id)).toContain(zRef.segmentStart)
     expect(hRef).toEqual({ path: [{ instanceId: nested!.id }], bandId: 'H', segmentStart: 'H0' })
+  })
+})
+
+describe('detachInstance refusals', () => {
+  it('refuses when baking at a tiny scale collapses a segment', () => {
+    const tiny = { id: 'T', children: [band('C', [[0, 0], [5, 0], [5, 5]], { closed: true })] }
+    const before = project([instance('I', 'T', { scale: 0.001 })], [tiny])
+    expect(detachInstance(before, 'I')).toEqual({ ok: false, message: 'Detaching at this scale would collapse a segment' })
+  })
+
+  it('checks the closing segment of a closed band', () => {
+    // At scale 0.0008 the segments are 0.016, 0.016, 0.018 mm; only the 10 mm closing one drops to 0.008 mm.
+    const shape = (closed: boolean): Project =>
+      project([instance('I', 'T', { scale: 0.0008 })], [{ id: 'T', children: [band('C', [[0, 0], [20, 0], [20, 20], [0, 10]], { closed })] }])
+    expect(detachInstance(shape(true), 'I').ok).toBe(false)
+    ok(detachInstance(shape(false), 'I'))
   })
 })
 

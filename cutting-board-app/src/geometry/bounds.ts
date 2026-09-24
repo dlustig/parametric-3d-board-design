@@ -1,6 +1,7 @@
 // SPEC §4.5: painted vs. conservative bounds.
 
 import type { Id, Project } from '../domain/model.ts'
+import { stepObjectId } from '../domain/keys.ts'
 import { contextOf } from '../domain/project.ts'
 import type { Occurrence } from './expand.ts'
 import { expandContext, segmentsOf } from './expand.ts'
@@ -97,12 +98,7 @@ export function objectBounds(p: Project, objectId: Id): Box | null {
     const firstStep = occurrence.path[0]
     if (firstStep === undefined) continue
 
-    const originatesHere =
-      obj.type === 'motif-instance'
-        ? 'instanceId' in firstStep && firstStep.instanceId === objectId
-        : 'repeatId' in firstStep && firstStep.repeatId === objectId
-
-    if (originatesHere) boxes.push(paintedBounds(occurrence))
+    if (stepObjectId(firstStep) === objectId) boxes.push(paintedBounds(occurrence))
   }
 
   return unionBoxes(boxes)

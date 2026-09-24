@@ -3,6 +3,7 @@
 // Pure helpers over a Project; no store dependency.
 
 import type { ContextId, Id, Project, Step } from '@/domain/model'
+import { stepObjectId } from '@/domain/keys'
 import { childrenOf } from '@/domain/project'
 
 export interface EditContextLevel {
@@ -21,7 +22,7 @@ function walkPath(p: Project, from: ContextId, path: Step[]): ContextId | undefi
   let ctx = from
   for (const step of path) {
     if (ctx !== null && !Object.hasOwn(p.motifs, ctx)) return undefined
-    const id = 'instanceId' in step ? step.instanceId : step.repeatId
+    const id = stepObjectId(step)
     if (!childrenOf(p, ctx).includes(id)) return undefined
     const obj = p.objects[id]
     if (obj === undefined) return undefined

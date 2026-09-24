@@ -4,28 +4,21 @@
 
 import { canonicalize, canonicalKey, recordsOf, withRecords } from '@/domain/crossings'
 import { newId } from '@/domain/ids'
+import { stepObjectId } from '@/domain/keys'
 import type { BandRef, ContextId, Crossing, DesignObject, Id, MotifInstance, Project, RepeatField, Step, Transform } from '@/domain/model'
 import { childrenOf, contextOf } from '@/domain/project'
 import { apply, fromTransform } from '@/geometry/affine'
 import type { Box } from '@/geometry/bounds'
 import { objectBounds, unionBoxes } from '@/geometry/bounds'
 import type { CommandResult } from './index.ts'
-import { deleteObjects } from './objects.ts'
-import { mapAllRecords, replaceObject, withChildren, withinCap } from './shared.ts'
+import { removeObjects } from './objects.ts'
+import type { IdsResult } from './shared.ts'
+import { fail, mapAllRecords, okIds, replaceObject, tooClose, withChildren, withinCap, wraps } from './shared.ts'
 
 type XY = { x: number; y: number }
 
-function stepObjectId(step: Step): Id {
-  return 'instanceId' in step ? step.instanceId : step.repeatId
-}
-
 function boundsOf(p: Project, ids: Id[]): Box | null {
   return unionBoxes(ids.map((id) => objectBounds(p, id)).filter((b): b is Box => b !== null))
-}
-
-/** SPEC §4.5: the union of a definition's children's painted bounds, in definition space. */
-function definitionBounds(p: Project, motifId: Id): Box | null {
-  return boundsOf(p, p.motifs[motifId]!.children)
 }
 
 function uniqueMotifName(p: Project): string {
@@ -115,7 +108,7 @@ export function createMotif(p: Project, ctx: ContextId, ids: Id[], name?: string
  */
 export function makeRepeat(p: Project, instanceId: Id): CommandResult {
   const inst = p.objects[instanceId] as MotifInstance
-  const box = definitionBounds(p, inst.motifId)
+  const box = boundsOf(p, p.motifs[inst.motifId]!.children) // SPEC §4.5 painted bounds, in definition space
   const field: RepeatField = {
     type: 'repeat',
     id: inst.id,
@@ -163,8 +156,12 @@ function composeTransforms(parent: Transform, child: Transform): Transform {
  * records stepping through the instance lose the step. Every copied id is
  * remapped; a copied record colliding with an existing context record (an
  * override) is dropped. A definition left without instances is deleted.
+ * Refused (SPEC §2.1 invariant 3) when a baked segment is shorter than
+ * MIN_SEGMENT_MM (a small scale), and over the occurrence cap. Returns the
+ * copies' ids for the caller to select. No rematch: world geometry is
+ * unchanged.
  */
-export function detachInstance(p: Project, instanceId: Id): CommandResult {
+export function detachInstance(p: Project, instanceId: Id): IdsResult {
   const inst = p.objects[instanceId] as MotifInstance
   const def = p.motifs[inst.motifId]!
   const ctx = contextOf(p, instanceId)
@@ -188,6 +185,14 @@ export function detachInstance(p: Project, instanceId: Id): CommandResult {
     }
     return { ...obj, id: copyId, transform: composeTransforms(inst.transform, obj.transform) }
   })
+  for (const copy of copies) {
+    if (copy.type !== 'band' && copy.type !== 'region') continue
+    const n = copy.points.length
+    const segments = wraps(copy) ? n : n - 1
+    for (let k = 0; k < segments; k++) {
+      if (tooClose(copy.points[k]!, copy.points[(k + 1) % n]!)) return fail('Detaching at this scale would collapse a segment')
+    }
+  }
 
   /** A definition-relative ref re-addressed to the copies: its first object id (and segment, for a copied band) remapped. */
   const remap = (r: BandRef): BandRef => {
@@ -216,7 +221,8 @@ export function detachInstance(p: Project, instanceId: Id): CommandResult {
   const objects = { ...next.objects }
   for (const copy of copies) objects[copy.id] = copy
   next = withChildren({ ...next, objects }, ctx, childrenOf(next, ctx).flatMap((id) => (id === instanceId ? [id, ...copies.map((c) => c.id)] : [id])))
-  return withinCap(deleteObjects(next, [instanceId]))
+  const capped = withinCap(removeObjects(next, [instanceId]))
+  return capped.ok ? okIds(capped.project, copies.map((c) => c.id)) : capped
 }
 
 export function renameMotif(p: Project, motifId: Id, name: string): Project {

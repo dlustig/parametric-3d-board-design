@@ -2,7 +2,7 @@
 // lists, and the context chain of a common path prefix. Pure data; no geometry.
 
 import type { BandRef, ContextId, Crossing, MotifInstance, Project, RepeatField, Step } from './model.ts'
-import { occurrenceKey, refKey, stepKey } from './keys.ts'
+import { occurrenceKey, refKey, stepKey, stepObjectId } from './keys.ts'
 
 /** Sorts `a`/`b` by `refKey`, swapping `over` with them. Every record write goes through this. */
 export function canonicalize(c: Crossing): Crossing {
@@ -43,6 +43,6 @@ export function contextsAlong(p: Project, prefix: Step[]): ContextId[] {
 
 function motifOfStep(p: Project, step: Step): ContextId {
   // Validated paths name an instance/repeat at every step (SPEC §2.1 invariant 2).
-  const obj = p.objects['instanceId' in step ? step.instanceId : step.repeatId] as MotifInstance | RepeatField
+  const obj = p.objects[stepObjectId(step)] as MotifInstance | RepeatField
   return obj.motifId
 }

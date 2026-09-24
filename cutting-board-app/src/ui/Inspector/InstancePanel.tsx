@@ -7,8 +7,8 @@ import type { JSX } from 'react'
 import { useState } from 'react'
 import { detachInstance, removeRecord, renameMotif, setTransform } from '@/domain/commands'
 import { canonicalKey } from '@/domain/crossings'
-import { stepKey } from '@/domain/keys'
-import type { MotifInstance, Project, RepeatField, Step, Transform } from '@/domain/model'
+import { stepKey, stepObjectId } from '@/domain/keys'
+import type { Id, MotifInstance, Project, RepeatField, Step, Transform } from '@/domain/model'
 import { formatLength } from '@/domain/units'
 import { scaleOf } from '@/geometry/affine'
 import { intersectionKey } from '@/geometry/resolve'
@@ -24,7 +24,7 @@ function firstStep(obj: Placed): Step {
 }
 
 export function MotifNameField({ obj }: { obj: Placed }): JSX.Element {
-  const name = useEditor((s) => s.project.motifs[obj.motifId]?.name ?? '')
+  const name = useEditor((s) => s.project.motifs[obj.motifId]!.name)
   const [text, setText] = useState<string | null>(null) // null while not editing
   const commitName = (): void => {
     if (text !== null && text !== name) useEditor.getState().run((p) => renameMotif(p, obj.motifId, text))
@@ -97,7 +97,7 @@ export function EditMotifButton({ obj }: { obj: Placed }): JSX.Element {
 function throughObject(path: Step[], prefixKeys: string[], obj: Placed): boolean {
   const next = path[prefixKeys.length]
   if (next === undefined || !prefixKeys.every((k, i) => stepKey(path[i]!) === k)) return false
-  return ('instanceId' in next ? next.instanceId : next.repeatId) === obj.id
+  return stepObjectId(next) === obj.id
 }
 
 /** SPEC §5.4/§7.5: the root override records of this instance's/repeat's occurrences, each with Remove. */
@@ -145,9 +145,14 @@ export function InstancePanel({ instance }: { instance: MotifInstance }): JSX.El
   const factor = useEditor((s) => scaleOf(contextMatrix(s))) * instance.transform.scale
   const unit = project.displayUnits
   const detach = (): void => {
-    const s = useEditor.getState()
-    s.run((p) => detachInstance(p, instance.id))
-    if (!Object.hasOwn(useEditor.getState().project.objects, instance.id)) s.select([])
+    let copies: Id[] = []
+    useEditor.getState().run((p) => {
+      const result = detachInstance(p, instance.id)
+      if (!result.ok) return result
+      copies = result.newIds
+      return result.project
+    })
+    if (copies.length > 0) useEditor.getState().select(copies)
   }
   return (
     <section className="panel" aria-label="Instance">

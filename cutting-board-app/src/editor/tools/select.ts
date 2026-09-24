@@ -6,7 +6,7 @@
 // entered context through `invert(contextMatrix)`.
 
 import { rotateObjects, translateObjects } from '@/domain/commands'
-import { stepKey } from '@/domain/keys'
+import { stepKey, stepObjectId } from '@/domain/keys'
 import type { Id, MotifInstance, Project, RepeatField, Step } from '@/domain/model'
 import { childrenOf } from '@/domain/project'
 import { apply, invert, isMirrored } from '@/geometry/affine'
@@ -31,7 +31,7 @@ function ownerIn(o: Occurrence, prefix: Step[], prefixKeys: string[]): Id | null
   for (let k = 0; k < prefix.length; k++) if (stepKey(o.path[k]!) !== prefixKeys[k]) return null
   const next = o.path[prefix.length]
   if (next === undefined) return o.sourceId
-  return 'instanceId' in next ? next.instanceId : next.repeatId
+  return stepObjectId(next)
 }
 
 function occurrencesByOwner(p: Project, editContext: EditContextLevel[]): Array<{ id: Id; o: Occurrence }> {
@@ -109,7 +109,7 @@ function levelAt(p: Project, editContext: EditContextLevel[], world: XY): EditCo
   const hit = occurrenceAt(p, editContext, world)
   const step = hit?.o.path[contextPrefix(editContext).length]
   if (step === undefined) return null // nothing, or a plain Band/Region
-  const placed = p.objects['instanceId' in step ? step.instanceId : step.repeatId] as MotifInstance | RepeatField
+  const placed = p.objects[stepObjectId(step)] as MotifInstance | RepeatField
   return { motifId: placed.motifId, path: [step] }
 }
 

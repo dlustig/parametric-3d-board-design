@@ -16,3 +16,8 @@ export function occurrenceKey(path: Step[], sourceId: Id): string {
 export function refKey(ref: BandRef): string {
   return `${occurrenceKey(ref.path, ref.bandId)}@${ref.segmentStart}`
 }
+
+/** The instance or repeat a step passes through. */
+export function stepObjectId(step: Step): Id {
+  return 'instanceId' in step ? step.instanceId : step.repeatId
+}

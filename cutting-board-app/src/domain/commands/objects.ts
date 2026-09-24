@@ -3,6 +3,7 @@
 import { rematchCrossings } from '@/geometry/resolve'
 import { offsetPolyline } from '@/geometry/offset'
 import { newId } from '@/domain/ids'
+import { stepObjectId } from '@/domain/keys'
 import type { Band, BandRef, ContextId, DesignObject, Id, MotifInstance, Project, Region, RepeatField, Transform } from '@/domain/model'
 import { childrenOf, contextOf } from '@/domain/project'
 import type { CommandResult } from './index.ts'
@@ -41,9 +42,10 @@ function referencedMotifs(p: Project, objectIds: Iterable<Id>): Set<Id> {
 /**
  * Deletes the objects and every record that references one of them (by
  * bandId or path step, in any context). A definition that loses its last
- * instance/repeat is deleted with its children, cascading (SPEC §5.6).
+ * instance/repeat is deleted with its children, cascading (SPEC §5.6). No
+ * rematch: Detach, which preserves world geometry, uses this directly.
  */
-export function deleteObjects(p: Project, ids: Id[]): Project {
+export function removeObjects(p: Project, ids: Id[]): Project {
   const deleted = new Set(ids)
   const deletedMotifs = new Set<Id>()
   const wasReferenced = referencedMotifs(p, Object.keys(p.objects))
@@ -59,7 +61,7 @@ export function deleteObjects(p: Project, ids: Id[]): Project {
   }
 
   const survives = (r: BandRef): boolean =>
-    !deleted.has(r.bandId) && r.path.every((step) => !deleted.has('instanceId' in step ? step.instanceId : step.repeatId))
+    !deleted.has(r.bandId) && r.path.every((step) => !deleted.has(stepObjectId(step)))
   const motifs = Object.fromEntries(
     Object.entries(p.motifs)
       .filter(([id]) => !deletedMotifs.has(id))
@@ -71,7 +73,12 @@ export function deleteObjects(p: Project, ids: Id[]): Project {
     rootChildren: p.rootChildren.filter((id) => !deleted.has(id)),
     motifs,
   }
-  return rematchCrossings(p, filterAllRecords(after, (c) => survives(c.a) && survives(c.b)))
+  return filterAllRecords(after, (c) => survives(c.a) && survives(c.b))
+}
+
+/** `removeObjects`, then SPEC §5.5 rematching. */
+export function deleteObjects(p: Project, ids: Id[]): Project {
+  return rematchCrossings(p, removeObjects(p, ids))
 }
 
 /**

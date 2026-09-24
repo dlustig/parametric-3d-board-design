@@ -3,7 +3,7 @@
 // inserted, every listed world intersection, and unresolved records.
 
 import { canonicalKey, recordsOf } from '@/domain/crossings'
-import { stepKey } from '@/domain/keys'
+import { stepKey, stepObjectId } from '@/domain/keys'
 import type { ContextId, Crossing, Project, Step } from '@/domain/model'
 import { apply } from './affine.ts'
 import type { BandOccurrence, Occurrence, RegionOccurrence } from './expand.ts'
@@ -65,7 +65,7 @@ function placementsOf(p: Project, occurrences: Occurrence[], motifId: string): S
   const seen = new Map<string, Step[]>()
   for (const o of occurrences) {
     for (const [k, step] of o.path.entries()) {
-      const placed = p.objects['instanceId' in step ? step.instanceId : step.repeatId]!
+      const placed = p.objects[stepObjectId(step)]!
       if (placed.type !== 'motif-instance' && placed.type !== 'repeat') continue
       if (placed.motifId !== motifId) continue
       const prefix = o.path.slice(0, k + 1)

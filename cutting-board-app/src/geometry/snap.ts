@@ -10,7 +10,8 @@
 // rotated occurrence, and the definition's grid keeps typed nudge/length
 // values round there.
 
-import type { ContextId, Id, Project, Step } from '@/domain/model'
+import type { ContextId, Id, Project } from '@/domain/model'
+import { stepObjectId } from '@/domain/keys'
 import { childrenOf } from '@/domain/project'
 import type { Mat } from './affine.ts'
 import { apply, IDENTITY, invert } from './affine.ts'
@@ -34,10 +35,6 @@ export type SnapGuide = 'point' | 'line' | 'grid' | null
 export type SnapResult = { point: XY; guide: SnapGuide; line: SnapLine | null }
 
 export type SegmentSnap = SnapResult & { angleDeg: number; lengthMm: number }
-
-function stepId(step: Step): Id {
-  return 'instanceId' in step ? step.instanceId : step.repeatId
-}
 
 function boxLines(b: Box): SnapLine[] {
   return [
@@ -71,7 +68,7 @@ export function collectSnapTargets(
 ): SnapTargets {
   const toCtx = invert(contextMatrix)
   const skip = new Set(exclude)
-  const excluded = (o: Occurrence): boolean => skip.has(o.sourceId) || o.path.some((s) => skip.has(stepId(s)))
+  const excluded = (o: Occurrence): boolean => skip.has(o.sourceId) || o.path.some((s) => skip.has(stepObjectId(s)))
 
   const points: XY[] = []
   for (const o of occurrences) if (!excluded(o)) for (const v of o.worldPoints) points.push(apply(toCtx, v))
@@ -94,7 +91,7 @@ export function collectSnapTargets(
   for (const o of occurrences) {
     if (excluded(o)) continue
     const first = o.path[0]
-    const owner = first === undefined ? o.sourceId : stepId(first)
+    const owner = first === undefined ? o.sourceId : stepObjectId(first)
     rootBoxes.set(owner, [...(rootBoxes.get(owner) ?? []), paintedBounds(o)])
   }
   for (const boxes of rootBoxes.values()) addBounds(unionBoxes(boxes)!, toCtx)
