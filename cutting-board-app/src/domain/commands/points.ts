@@ -72,17 +72,25 @@ export function deletePoint(p: Project, objectId: Id, pointId: Id): CommandResul
 }
 
 /**
- * Replaces every point's coordinates at once, ids kept, no MIN_SEGMENT_MM
- * merge check. For rigid multi-point edits driven from the inspector — a
- * Region's bounds W/H scale, a Band segment's typed length/angle moving its
- * end point and translating the points after it — where `setPoint`'s
- * per-point neighbour check does not apply.
+ * Replaces every point's coordinates at once, ids kept. For rigid
+ * multi-point edits driven from the inspector — a Region's bounds W/H
+ * scale, a Band segment's typed length/angle moving its end point and
+ * translating the points after it — where `setPoint`'s per-point
+ * neighbour-merge behaviour does not apply: unlike `setPoint`, a resulting
+ * segment shorter than MIN_SEGMENT_MM is refused outright, not merged away
+ * (there is no single "the point that moved" to merge here).
  */
-export function setPoints(p: Project, objectId: Id, points: XY[]): Project {
+export function setPoints(p: Project, objectId: Id, points: XY[]): CommandResult {
   const shape = p.objects[objectId] as Band | Region
   const next = shape.points.map((q, k) => ({ id: q.id, x: points[k]!.x, y: points[k]!.y }))
+  const n = next.length
+  const closes = wraps(shape)
+  for (let k = 0; k < n; k++) {
+    if (!closes && k === n - 1) continue // open shape: no segment from the last point back to the first
+    if (tooClose(next[k]!, next[(k + 1) % n]!)) return fail('Two points would be too close together')
+  }
   const after = replaceObject(p, { ...shape, points: next })
-  return shape.type === 'band' ? rematchCrossings(p, after) : after
+  return ok(shape.type === 'band' ? rematchCrossings(p, after) : after)
 }
 
 function rewriteSegmentStart(p: Project, bandId: Id, fromId: Id, toId: Id | null): Project {

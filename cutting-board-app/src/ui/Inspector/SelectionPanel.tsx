@@ -8,6 +8,7 @@ import { mirrorObjects, reorder, rotateObjects, translateObjects } from '@/domai
 import { unionBoxes } from '@/geometry/bounds'
 import { useEditor } from '@/editor/store'
 import { selectableBounds } from '@/editor/tools/select'
+import type { PreviewOutcome } from './NumberField.tsx'
 import { NumberField } from './NumberField.tsx'
 
 export function SelectionPanel(): JSX.Element | null {
@@ -24,8 +25,9 @@ export function SelectionPanel(): JSX.Element | null {
 
   const centre = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
 
-  const previewTranslate = (x: number, y: number): void => {
+  const previewTranslate = (x: number, y: number): PreviewOutcome => {
     useEditor.getState().setPreview(translateObjects(project, selection, x - bounds.minX, y - bounds.minY), 'commit')
+    return undefined
   }
 
   return (
@@ -38,7 +40,10 @@ export function SelectionPanel(): JSX.Element | null {
         value={0}
         unit="deg"
         policy="any"
-        onPreview={(deg) => useEditor.getState().setPreview(rotateObjects(project, selection, deg, centre), 'commit')}
+        onPreview={(deg) => {
+          useEditor.getState().setPreview(rotateObjects(project, selection, deg, centre), 'commit')
+          return undefined
+        }}
         onCommit={commit}
       />
       <div className="button-row">

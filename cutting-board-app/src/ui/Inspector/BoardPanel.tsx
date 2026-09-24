@@ -58,7 +58,10 @@ export function BoardPanel(): JSX.Element {
         value={project.board.widthMm}
         unit={unit}
         policy="positive"
-        onPreview={(v) => useEditor.getState().setPreview(setBoardSize(project, v, project.board.heightMm), 'commit')}
+        onPreview={(v) => {
+          useEditor.getState().setPreview(setBoardSize(project, v, project.board.heightMm), 'commit')
+          return undefined
+        }}
         onCommit={() => useEditor.getState().commit()}
       />
       <NumberField
@@ -66,7 +69,10 @@ export function BoardPanel(): JSX.Element {
         value={project.board.heightMm}
         unit={unit}
         policy="positive"
-        onPreview={(v) => useEditor.getState().setPreview(setBoardSize(project, project.board.widthMm, v), 'commit')}
+        onPreview={(v) => {
+          useEditor.getState().setPreview(setBoardSize(project, project.board.widthMm, v), 'commit')
+          return undefined
+        }}
         onCommit={() => useEditor.getState().commit()}
       />
       <div className="field">
@@ -100,7 +106,10 @@ export function BoardPanel(): JSX.Element {
         value={gridMm}
         unit={unit}
         policy="positive"
-        onPreview={(v) => useEditor.getState().setGridMm(v)}
+        onPreview={(v) => {
+          useEditor.getState().setGridMm(v)
+          return undefined
+        }}
         onCommit={(v) => useEditor.getState().setGridMm(v)}
       />
     </section>

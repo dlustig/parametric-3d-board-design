@@ -11,12 +11,15 @@ import type { FieldPolicy, Unit } from '@/domain/units'
 import { formatAngle, formatLength, parseAngle, parseLength } from '@/domain/units'
 import { useEditor } from '@/editor/store'
 
+/** `onPreview`'s return: `undefined` on success, or a refusal message (a command like `setPoints` can refuse a value the parser and policy both accept) to show as the field's inline error instead of previewing it. */
+export type PreviewOutcome = string | undefined
+
 interface NumberFieldProps {
   label: string
   value: number
   unit: Unit | 'deg' | null
   policy: FieldPolicy
-  onPreview: (value: number) => void
+  onPreview: (value: number) => PreviewOutcome
   onCommit: (value: number) => void
 }
 
@@ -60,9 +63,14 @@ export function NumberField({ label, value, unit, policy, onPreview, onCommit }:
 
   const revert = (): void => {
     setText(focusTextRef.current)
-    setError(null)
     const parsed = parseText(focusTextRef.current, unit)
-    if (parsed.ok) onPreview(parsed.value) // undo any effect this field applied live
+    // Re-preview the value at focus: for a field with no backing store value
+    // (Rotate by, or grid spacing which applies live with no preview/commit
+    // split) this is what actually undoes the live effect; for a
+    // project-backed field it recomputes a no-op preview that the
+    // cancelPreview() below discards anyway.
+    const outcome = parsed.ok ? onPreview(parsed.value) : undefined
+    setError(outcome ?? null)
     useEditor.getState().cancelPreview() // discard a pending project-backed preview, if any
   }
 
@@ -96,19 +104,26 @@ export function NumberField({ label, value, unit, policy, onPreview, onCommit }:
             setError('Out of range')
             return
           }
-          setError(null)
-          onPreview(parsed.value)
+          setError(onPreview(parsed.value) ?? null)
         }}
         onBlur={() => {
           setEditing(false)
-          if (text === focusTextRef.current) return
-          const parsed = parseText(text, unit)
-          if (parsed.ok && satisfiesPolicy(parsed.value, policy)) {
-            setError(null)
-            onCommit(parsed.value)
-          } else {
-            revert()
+          if (text === focusTextRef.current) {
+            // Nothing to commit, but a keystroke earlier in this focus session
+            // (typed away and back to the original text) may have left a live
+            // preview pending — e.g. retype "1/2" then back to "1/4". Left
+            // alone, the NEXT command's settlePreview() would commit that
+            // stale preview as its own spurious history entry.
+            useEditor.getState().cancelPreview()
+            return
           }
+          if (error !== null) {
+            revert()
+            return
+          }
+          const parsed = parseText(text, unit)
+          if (parsed.ok) onCommit(parsed.value)
+          else revert() // defensive: `error` should already reflect this, but never commit unparsed text
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {

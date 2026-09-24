@@ -3,11 +3,12 @@
 // translates the points after it), insert-after and delete.
 
 import type { JSX } from 'react'
-import { deletePoint, insertPoint, setBandClosed, setBandWidth, setMaterial, setPoints } from '@/domain/commands'
+import { setBandClosed, setBandWidth, setMaterial } from '@/domain/commands'
 import type { Band } from '@/domain/model'
 import { useEditor } from '@/editor/store'
 import { NumberField } from './NumberField.tsx'
-import { insertAfterXY, previewSetPoint } from './shared.ts'
+import { PointRow } from './PointRow.tsx'
+import { previewSetPoints } from './shared.ts'
 
 type XY = { x: number; y: number }
 
@@ -58,9 +59,6 @@ export function BandPanel({ band }: Props): JSX.Element {
   const project = useEditor((s) => s.project)
   const unit = project.displayUnits
   const commit = (): void => useEditor.getState().commit()
-  const previewPoints = (points: XY[]): void => {
-    useEditor.getState().setPreview(setPoints(project, band.id, points), 'commit')
-  }
 
   const n = band.points.length
 
@@ -86,7 +84,10 @@ export function BandPanel({ band }: Props): JSX.Element {
         value={band.widthMm}
         unit={unit}
         policy="positive"
-        onPreview={(v) => useEditor.getState().setPreview(setBandWidth(project, band.id, v), 'commit')}
+        onPreview={(v) => {
+          useEditor.getState().setPreview(setBandWidth(project, band.id, v), 'commit')
+          return undefined
+        }}
         onCommit={commit}
       />
       <div className="field field-checkbox">
@@ -101,33 +102,7 @@ export function BandPanel({ band }: Props): JSX.Element {
 
       <h3>Points</h3>
       {band.points.map((pt, k) => (
-        <div className="point-row" key={pt.id}>
-          <NumberField
-            label={`Point ${k + 1} X`}
-            value={pt.x}
-            unit={unit}
-            policy="any"
-            onPreview={(v) => previewSetPoint(project, band.id, pt.id, { x: v, y: pt.y })}
-            onCommit={commit}
-          />
-          <NumberField
-            label={`Point ${k + 1} Y`}
-            value={pt.y}
-            unit={unit}
-            policy="any"
-            onPreview={(v) => previewSetPoint(project, band.id, pt.id, { x: pt.x, y: v })}
-            onCommit={commit}
-          />
-          <button
-            type="button"
-            onClick={() => useEditor.getState().run((p) => insertPoint(p, band.id, pt.id, insertAfterXY(band.points, band.closed, k)))}
-          >
-            Insert after
-          </button>
-          <button type="button" onClick={() => useEditor.getState().run((p) => deletePoint(p, band.id, pt.id))}>
-            Delete
-          </button>
-        </div>
+        <PointRow key={pt.id} project={project} objectId={band.id} points={band.points} wraps={band.closed} index={k} unit={unit} />
       ))}
 
       <h3>Segments</h3>
@@ -148,7 +123,7 @@ export function BandPanel({ band }: Props): JSX.Element {
               value={segLength}
               unit={unit}
               policy="positive"
-              onPreview={(v) => previewPoints(movedPoints(band, i, endpointAt(v, segAngle)))}
+              onPreview={(v) => previewSetPoints(project, band.id, movedPoints(band, i, endpointAt(v, segAngle)))}
               onCommit={commit}
             />
             <NumberField
@@ -156,7 +131,7 @@ export function BandPanel({ band }: Props): JSX.Element {
               value={segAngle}
               unit="deg"
               policy="any"
-              onPreview={(deg) => previewPoints(movedPoints(band, i, endpointAt(segLength, deg)))}
+              onPreview={(deg) => previewSetPoints(project, band.id, movedPoints(band, i, endpointAt(segLength, deg)))}
               onCommit={commit}
             />
           </div>
