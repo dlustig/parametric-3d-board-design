@@ -77,4 +77,25 @@ test.describe('inspector numeric fields', () => {
     expect(await history(page)).toEqual({ past: 0, future: 0 })
     expect(bandOf(await getProject(page), 'b1').widthMm).toBe(6.35)
   })
+
+  test('retyping back to the original text then blurring leaves no stale preview for a later action', async ({ page }) => {
+    await seed(page, inchProject(6.35)) // 0.25in = "1/4"
+    await select(page, ['b1'])
+
+    const width = page.getByLabel('Width', { exact: true })
+    await expect(width).toHaveValue('1/4')
+
+    await width.fill('1/2') // live-previews a different value...
+    await width.fill('1/4') // ...then back to the value at focus
+    await page.keyboard.press('Tab') // blur: text === focus text, so the field itself commits nothing
+
+    expect(await history(page)).toEqual({ past: 0, future: 0 })
+
+    // A later, unrelated action must be its own single history entry. Without
+    // cancelling the leftover preview on the no-op blur above, this button's
+    // run() would first settle that stale preview (a spurious entry) and
+    // then push its own — two entries instead of one.
+    await page.getByRole('button', { name: 'Mirror X' }).click()
+    expect(await history(page)).toEqual({ past: 1, future: 0 })
+  })
 })
