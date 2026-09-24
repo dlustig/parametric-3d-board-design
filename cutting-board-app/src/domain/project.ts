@@ -34,20 +34,24 @@ export function newProject(displayUnits: 'in' | 'mm'): Project {
   }
 }
 
-/** The ordered child ids of a context: the Project root, or one Motif definition. */
+/**
+ * The ordered child ids of a context: the Project root, or one Motif
+ * definition. `p.motifs` is keyed by import-controlled strings, so existence
+ * is checked with `Object.hasOwn` — a plain `p.motifs[ctx] === undefined`
+ * check would resolve inherited `Object.prototype` members (`toString`,
+ * `constructor`, ...) for a matching `ctx` and never throw.
+ */
 export function childrenOf(p: Project, ctx: ContextId): Id[] {
   if (ctx === null) return p.rootChildren
-  const motif = p.motifs[ctx]
-  if (motif === undefined) throw new Error(`No motif definition with id "${ctx}"`)
-  return motif.children
+  if (!Object.hasOwn(p.motifs, ctx)) throw new Error(`No motif definition with id "${ctx}"`)
+  return p.motifs[ctx]!.children
 }
 
 /** The context that owns `objectId`: `null` for the root, a motif id otherwise. Throws if unowned. */
 export function contextOf(p: Project, objectId: Id): ContextId {
   if (p.rootChildren.includes(objectId)) return null
-  for (const motifId of Object.keys(p.motifs)) {
-    const motif = p.motifs[motifId]
-    if (motif !== undefined && motif.children.includes(objectId)) return motifId
+  for (const [motifId, motif] of Object.entries(p.motifs)) {
+    if (motif.children.includes(objectId)) return motifId
   }
   throw new Error(`Object "${objectId}" is not owned by any context`)
 }

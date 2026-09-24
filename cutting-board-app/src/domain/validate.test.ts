@@ -14,8 +14,8 @@ import type {
   Transform,
 } from './model.ts'
 import { newId } from './ids.ts'
+import { importProject } from './migrate.ts'
 import { newProject } from './project.ts'
-import { projectSchema } from './schema.ts'
 import { countOccurrences, refKey, validateProject } from './validate.ts'
 
 // ---------------------------------------------------------------------------
@@ -98,6 +98,23 @@ describe('validateProject — invariant 1: ownership', () => {
     }
     const err = validateProject(next)
     expect(err?.path).toBe(`motifs.${motifId}.children`)
+  })
+
+  it('rejects an object whose key does not match its own id', () => {
+    const p = newProject('mm')
+    const materialId = p.materials[0]!.id
+    const obj = band(materialId, [pt(0, 0), pt(10, 0)])
+    // Stored key 'zzz' is also claimed via rootChildren, so — absent the
+    // key === id check — ownership alone would consider this project valid;
+    // only the id-mismatch itself should reject it.
+    const next: Project = { ...p, objects: { zzz: { ...obj, id: 'b2' } }, rootChildren: ['zzz'] }
+    expect(validateProject(next)?.path).toBe('objects.zzz')
+  })
+
+  it('rejects a motif whose key does not match its own id', () => {
+    const p = newProject('mm')
+    const next: Project = { ...p, motifs: { zzz: { id: 'm2', name: 'M', children: [], crossings: [] } } }
+    expect(validateProject(next)?.path).toBe('motifs.zzz')
   })
 })
 
@@ -271,6 +288,8 @@ describe('validateProject — crossing records', () => {
     repeat: RepeatField
     refA: BandRef
     refB: BandRef
+    foreignBand: Band
+    foreignInstance: MotifInstance
   } {
     const p = newProject('mm')
     const materialId = p.materials[0]!.id
@@ -281,17 +300,41 @@ describe('validateProject — crossing records', () => {
     const repeat = repeatField(motifId, { rows: 2, columns: 2 })
     const motif: MotifDefinition = { id: motifId, name: 'M', children: [], crossings: [] }
 
+    // Real, correctly-typed objects owned by a *different* context than the
+    // root crossings below will reference them from — for the "not in the
+    // context" / "unknown bandId" tests, so a weakened membership check
+    // (e.g. `id in p.objects` instead of `children.includes(id)`) would
+    // still fail them.
+    const targetMotifId = newId()
+    const targetMotif: MotifDefinition = { id: targetMotifId, name: 'Target', children: [], crossings: [] }
+    const foreignBand = band(materialId, [pt(0, 40), pt(10, 40)])
+    const foreignInstance = makeInstance(targetMotifId)
+    const motifOwnerId = newId()
+    const motifOwner: MotifDefinition = {
+      id: motifOwnerId,
+      name: 'Owner',
+      children: [foreignBand.id, foreignInstance.id],
+      crossings: [],
+    }
+
     const base: Project = {
       ...p,
-      objects: { [b1.id]: b1, [b2.id]: b2, [r1.id]: r1, [repeat.id]: repeat },
+      objects: {
+        [b1.id]: b1,
+        [b2.id]: b2,
+        [r1.id]: r1,
+        [repeat.id]: repeat,
+        [foreignBand.id]: foreignBand,
+        [foreignInstance.id]: foreignInstance,
+      },
       rootChildren: [b1.id, b2.id, r1.id, repeat.id],
-      motifs: { [motifId]: motif },
+      motifs: { [motifId]: motif, [targetMotifId]: targetMotif, [motifOwnerId]: motifOwner },
     }
 
     const refA: BandRef = { path: [], bandId: b1.id, segmentStart: b1.points[0]!.id }
     const refB: BandRef = { path: [], bandId: b2.id, segmentStart: b2.points[0]!.id }
 
-    return { base, b1, b2, r1, repeat, refA, refB }
+    return { base, b1, b2, r1, repeat, refA, refB, foreignBand, foreignInstance }
   }
 
   it('accepts the bare fixture (no crossings yet)', () => {
@@ -324,9 +367,9 @@ describe('validateProject — crossing records', () => {
     )
   })
 
-  it('rejects a crossing with an unknown bandId', () => {
-    const { base, refA, refB } = crossingFixture()
-    const badRef: BandRef = { ...refA, bandId: newId() }
+  it('rejects a bandId that exists only in a different context', () => {
+    const { base, foreignBand, refA, refB } = crossingFixture()
+    const badRef: BandRef = { ...refA, bandId: foreignBand.id }
     const { a, b, over } = canonicalPair(badRef, refB)
     const next: Project = { ...base, crossings: [{ id: newId(), a, b, over, hint: { x: 0, y: 0 } }] }
     expect(validateProject(next)?.path).toMatch(/^crossings\[0\]\.(a|b)\.bandId$/)
@@ -340,9 +383,9 @@ describe('validateProject — crossing records', () => {
     expect(validateProject(next)?.path).toMatch(/^crossings\[0\]\.(a|b)\.bandId$/)
   })
 
-  it('rejects a path step naming an instance not in the context', () => {
-    const { base, refA, refB } = crossingFixture()
-    const badRef: BandRef = { ...refA, path: [{ instanceId: newId() }] }
+  it('rejects a path step naming an instance owned by a different context', () => {
+    const { base, foreignInstance, refA, refB } = crossingFixture()
+    const badRef: BandRef = { ...refA, path: [{ instanceId: foreignInstance.id }] }
     const { a, b, over } = canonicalPair(badRef, refB)
     const next: Project = { ...base, crossings: [{ id: newId(), a, b, over, hint: { x: 0, y: 0 } }] }
     expect(validateProject(next)?.path).toMatch(/^crossings\[0\]\.(a|b)\.path\[0\]$/)
@@ -401,10 +444,16 @@ describe('validateProject — crossing records', () => {
   })
 })
 
-describe('projectSchema — enum and format rejections', () => {
+describe('importProject — schema enum and format rejections', () => {
+  function expectRejectedAt(raw: unknown, path: string): void {
+    const result = importProject(JSON.stringify(raw))
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.path).toBe(path)
+  }
+
   it('rejects an invalid displayUnits value', () => {
     const raw = { ...newProject('mm'), displayUnits: 'cm' }
-    expect(projectSchema.safeParse(raw).success).toBe(false)
+    expectRejectedAt(raw, 'displayUnits')
   })
 
   it('rejects an invalid alternateRotationDeg value', () => {
@@ -417,20 +466,20 @@ describe('projectSchema — enum and format rejections', () => {
       rootChildren: [repeat.id],
       motifs: { [motifId]: { id: motifId, name: 'M', children: [], crossings: [] } },
     }
-    expect(projectSchema.safeParse(raw).success).toBe(false)
+    expectRejectedAt(raw, `objects.${repeat.id}.alternateRotationDeg`)
   })
 
   it('rejects an invalid material colour', () => {
     const p = newProject('mm')
     const [first, ...rest] = p.materials
     const raw = { ...p, materials: [{ ...first!, color: '#GGGGGG' }, ...rest] }
-    expect(projectSchema.safeParse(raw).success).toBe(false)
+    expectRejectedAt(raw, 'materials[0].color')
   })
 
   it('rejects an id containing a colon', () => {
     const p = newProject('mm')
     const [first, ...rest] = p.materials
     const raw = { ...p, materials: [{ ...first!, id: 'bad:id' }, ...rest] }
-    expect(projectSchema.safeParse(raw).success).toBe(false)
+    expectRejectedAt(raw, 'materials[0].id')
   })
 })

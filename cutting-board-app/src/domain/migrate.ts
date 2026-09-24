@@ -1,7 +1,7 @@
 import type { Project } from './model.ts'
 import { projectSchema } from './schema.ts'
 import type { ValidationError } from './validate.ts'
-import { validateProject } from './validate.ts'
+import { formatPath, validateProject } from './validate.ts'
 
 export type ImportResult = { ok: true; project: Project } | { ok: false; error: ValidationError }
 
@@ -36,14 +36,9 @@ export function importProject(text: string): ImportResult {
 
   const parseResult = projectSchema.safeParse(migrated.value)
   if (!parseResult.success) {
-    const issue = parseResult.error.issues[0]
-    return {
-      ok: false,
-      error: {
-        path: issue !== undefined ? issue.path.join('.') : '',
-        message: issue !== undefined ? issue.message : 'invalid project',
-      },
-    }
+    // A failed safeParse always reports at least one issue.
+    const issue = parseResult.error.issues[0]!
+    return { ok: false, error: { path: formatPath(issue.path), message: issue.message } }
   }
 
   const invalid = validateProject(parseResult.data)

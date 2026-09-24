@@ -1,9 +1,25 @@
-import type { BandRef, ContextId, Crossing, Id, Project, Step } from './model.ts'
+import type { BandRef, ContextId, Crossing, DesignObject, Id, Project, Step } from './model.ts'
+import { childrenOf } from './project.ts'
 import { MAX_OCCURRENCES, MIN_SEGMENT_MM } from './limits.ts'
 
 export interface ValidationError {
   path: string
   message: string
+}
+
+/**
+ * Renders path segments in the one dialect every `ValidationError.path`
+ * uses: dot-joined for string (record key / field name) segments, bracketed
+ * for number (array index) segments — e.g. `objects.x.points[1].x`,
+ * `materials[0].color`. Also used to format Zod issue paths in migrate.ts,
+ * so schema errors and invariant errors share the same dialect.
+ */
+export function formatPath(segments: readonly PropertyKey[]): string {
+  let out = ''
+  for (const segment of segments) {
+    out += typeof segment === 'number' ? `[${segment}]` : out === '' ? String(segment) : `.${String(segment)}`
+  }
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -26,40 +42,56 @@ export function refKey(ref: BandRef): string {
 }
 
 // ---------------------------------------------------------------------------
-// Invariant 1 — every object id is owned by exactly one context, and every
-// id a context lists exists in `objects`.
+// Invariant 1 — every key in `objects`/`motifs` matches its value's own id;
+// every object id is owned by exactly one context; every id a context lists
+// exists in `objects`.
+//
+// Record lookups below use `Object.hasOwn` rather than `in` or `!== undefined`:
+// `p.objects`/`p.motifs` are keyed by attacker-controllable strings (import
+// data), and both `in` and bracket access resolve inherited `Object.prototype`
+// members (`toString`, `constructor`, `hasOwnProperty`, ...), which would
+// otherwise let a reference to e.g. `"constructor"` silently "resolve".
 // ---------------------------------------------------------------------------
 
 function checkOwnership(p: Project): ValidationError | null {
+  for (const [key, obj] of Object.entries(p.objects)) {
+    if (obj.id !== key) {
+      return { path: formatPath(['objects', key]), message: `key "${key}" does not match object id "${obj.id}"` }
+    }
+  }
+  for (const [key, motif] of Object.entries(p.motifs)) {
+    if (motif.id !== key) {
+      return { path: formatPath(['motifs', key]), message: `key "${key}" does not match motif id "${motif.id}"` }
+    }
+  }
+
   const owned = new Set<Id>()
 
-  function claim(id: Id, arrayPath: string): ValidationError | null {
-    if (!(id in p.objects)) {
-      return { path: arrayPath, message: `references unknown object id "${id}"` }
+  function claim(id: Id, path: string): ValidationError | null {
+    if (!Object.hasOwn(p.objects, id)) {
+      return { path, message: `references unknown object id "${id}"` }
     }
     if (owned.has(id)) {
-      return { path: arrayPath, message: `object "${id}" is owned by more than one context` }
+      return { path, message: `object "${id}" is owned by more than one context` }
     }
     owned.add(id)
     return null
   }
 
   for (const id of p.rootChildren) {
-    const err = claim(id, 'rootChildren')
+    const err = claim(id, formatPath(['rootChildren']))
     if (err !== null) return err
   }
-  for (const motifId of Object.keys(p.motifs)) {
-    const motif = p.motifs[motifId]
-    if (motif === undefined) continue
+  for (const [motifId, motif] of Object.entries(p.motifs)) {
     for (const id of motif.children) {
-      const err = claim(id, `motifs.${motifId}.children`)
+      const err = claim(id, formatPath(['motifs', motifId, 'children']))
       if (err !== null) return err
     }
   }
 
   for (const id of Object.keys(p.objects)) {
     if (!owned.has(id)) {
-      return { path: `objects.${id}`, message: `object "${id}" is not owned by any context` }
+      return { path: formatPath(['objects', id]), message: `object "${id}" is not owned by any context` }
     }
   }
 
@@ -75,15 +107,13 @@ function checkOwnership(p: Project): ValidationError | null {
 interface CrossingContext {
   ctx: ContextId
   crossings: Crossing[]
-  basePath: string
+  baseSegments: PropertyKey[]
 }
 
 function crossingContexts(p: Project): CrossingContext[] {
-  const contexts: CrossingContext[] = [{ ctx: null, crossings: p.crossings, basePath: 'crossings' }]
-  for (const motifId of Object.keys(p.motifs)) {
-    const motif = p.motifs[motifId]
-    if (motif === undefined) continue
-    contexts.push({ ctx: motifId, crossings: motif.crossings, basePath: `motifs.${motifId}.crossings` })
+  const contexts: CrossingContext[] = [{ ctx: null, crossings: p.crossings, baseSegments: ['crossings'] }]
+  for (const [motifId, motif] of Object.entries(p.motifs)) {
+    contexts.push({ ctx: motifId, crossings: motif.crossings, baseSegments: ['motifs', motifId, 'crossings'] })
   }
   return contexts
 }
@@ -98,62 +128,62 @@ function checkReferences(p: Project): ValidationError | null {
 
   if (p.board.backgroundMaterialId !== null && !materialIds.has(p.board.backgroundMaterialId)) {
     return {
-      path: 'board.backgroundMaterialId',
+      path: formatPath(['board', 'backgroundMaterialId']),
       message: `unknown material "${p.board.backgroundMaterialId}"`,
     }
   }
 
-  for (const id of Object.keys(p.objects)) {
-    const obj = p.objects[id]
-    if (obj === undefined) continue
+  for (const [id, obj] of Object.entries(p.objects)) {
     if ((obj.type === 'band' || obj.type === 'region') && !materialIds.has(obj.materialId)) {
-      return { path: `objects.${id}.materialId`, message: `unknown material "${obj.materialId}"` }
+      return { path: formatPath(['objects', id, 'materialId']), message: `unknown material "${obj.materialId}"` }
     }
-    if ((obj.type === 'motif-instance' || obj.type === 'repeat') && p.motifs[obj.motifId] === undefined) {
-      return { path: `objects.${id}.motifId`, message: `unknown motif "${obj.motifId}"` }
+    if ((obj.type === 'motif-instance' || obj.type === 'repeat') && !Object.hasOwn(p.motifs, obj.motifId)) {
+      return { path: formatPath(['objects', id, 'motifId']), message: `unknown motif "${obj.motifId}"` }
     }
   }
 
-  for (const { ctx, crossings, basePath } of crossingContexts(p)) {
-    const err = checkCrossingRefs(p, crossings, ctx, basePath)
+  for (const { ctx, crossings, baseSegments } of crossingContexts(p)) {
+    const err = checkCrossingRefs(p, crossings, ctx, baseSegments)
     if (err !== null) return err
   }
 
   return null
 }
 
+// By the time this runs, invariant 1 has confirmed every id in
+// `childrenOf(p, ctx)` (for any ctx reachable here) exists in `p.objects`,
+// and the object loop above has confirmed every motif-instance/repeat's
+// `motifId` exists in `p.motifs` — so the non-null assertions below and the
+// unguarded `childrenOf` calls (which throw only for a *missing* motif) are
+// backed by invariants already checked, not unchecked assumptions.
 function checkCrossingRefs(
   p: Project,
   crossings: Crossing[],
   baseCtx: ContextId,
-  basePath: string,
+  baseSegments: PropertyKey[],
 ): ValidationError | null {
-  for (let i = 0; i < crossings.length; i++) {
-    const crossing = crossings[i]
-    if (crossing === undefined) continue
-    const recordPath = `${basePath}[${i}]`
-    const aErr = checkBandRef(p, baseCtx, crossing.a, `${recordPath}.a`)
+  for (const [i, crossing] of crossings.entries()) {
+    const recordSegments = [...baseSegments, i]
+    const aErr = checkBandRef(p, baseCtx, crossing.a, [...recordSegments, 'a'])
     if (aErr !== null) return aErr
-    const bErr = checkBandRef(p, baseCtx, crossing.b, `${recordPath}.b`)
+    const bErr = checkBandRef(p, baseCtx, crossing.b, [...recordSegments, 'b'])
     if (bErr !== null) return bErr
   }
   return null
 }
 
-function checkBandRef(p: Project, baseCtx: ContextId, ref: BandRef, refPath: string): ValidationError | null {
+function checkBandRef(p: Project, baseCtx: ContextId, ref: BandRef, refSegments: PropertyKey[]): ValidationError | null {
   let ctx = baseCtx
-  for (let i = 0; i < ref.path.length; i++) {
-    const step = ref.path[i]
-    if (step === undefined) continue
-    const children = ctx === null ? p.rootChildren : (p.motifs[ctx]?.children ?? [])
-    const stepPath = `${refPath}.path[${i}]`
+  for (const [i, step] of ref.path.entries()) {
+    const children = childrenOf(p, ctx)
+    const stepPath = formatPath([...refSegments, 'path', i])
 
     if ('instanceId' in step) {
       if (!children.includes(step.instanceId)) {
         return { path: stepPath, message: `instance "${step.instanceId}" is not in the context` }
       }
-      const instance = p.objects[step.instanceId]
-      if (instance === undefined || instance.type !== 'motif-instance') {
+      const instance = p.objects[step.instanceId]!
+      if (instance.type !== 'motif-instance') {
         return { path: stepPath, message: `"${step.instanceId}" is not a motif instance` }
       }
       ctx = instance.motifId
@@ -161,8 +191,8 @@ function checkBandRef(p: Project, baseCtx: ContextId, ref: BandRef, refPath: str
       if (!children.includes(step.repeatId)) {
         return { path: stepPath, message: `repeat "${step.repeatId}" is not in the context` }
       }
-      const repeat = p.objects[step.repeatId]
-      if (repeat === undefined || repeat.type !== 'repeat') {
+      const repeat = p.objects[step.repeatId]!
+      if (repeat.type !== 'repeat') {
         return { path: stepPath, message: `"${step.repeatId}" is not a repeat field` }
       }
       if (step.row < 0 || step.row >= repeat.rows || step.column < 0 || step.column >= repeat.columns) {
@@ -172,16 +202,19 @@ function checkBandRef(p: Project, baseCtx: ContextId, ref: BandRef, refPath: str
     }
   }
 
-  const finalChildren = ctx === null ? p.rootChildren : (p.motifs[ctx]?.children ?? [])
+  const finalChildren = childrenOf(p, ctx)
   if (!finalChildren.includes(ref.bandId)) {
-    return { path: `${refPath}.bandId`, message: `unknown band "${ref.bandId}"` }
+    return { path: formatPath([...refSegments, 'bandId']), message: `unknown band "${ref.bandId}"` }
   }
-  const band = p.objects[ref.bandId]
-  if (band === undefined || band.type !== 'band') {
-    return { path: `${refPath}.bandId`, message: `"${ref.bandId}" is not a band` }
+  const band = p.objects[ref.bandId]!
+  if (band.type !== 'band') {
+    return { path: formatPath([...refSegments, 'bandId']), message: `"${ref.bandId}" is not a band` }
   }
   if (!band.points.some((point) => point.id === ref.segmentStart)) {
-    return { path: `${refPath}.segmentStart`, message: `"${ref.segmentStart}" is not a point of the band` }
+    return {
+      path: formatPath([...refSegments, 'segmentStart']),
+      message: `"${ref.segmentStart}" is not a point of the band`,
+    }
   }
 
   return null
@@ -193,10 +226,9 @@ function checkBandRef(p: Project, baseCtx: ContextId, ref: BandRef, refPath: str
 // ---------------------------------------------------------------------------
 
 function checkPointGeometry(p: Project): ValidationError | null {
-  for (const id of Object.keys(p.objects)) {
-    const obj = p.objects[id]
-    if (obj === undefined || (obj.type !== 'band' && obj.type !== 'region')) continue
-    const path = `objects.${id}.points`
+  for (const [id, obj] of Object.entries(p.objects)) {
+    if (obj.type !== 'band' && obj.type !== 'region') continue
+    const path = formatPath(['objects', id, 'points'])
     const wraps = obj.type === 'region' || obj.closed
     const minPoints = wraps ? 3 : 2
 
@@ -212,33 +244,25 @@ function checkPointGeometry(p: Project): ValidationError | null {
       seen.add(point.id)
     }
 
+    // `i < length - 1` and `length - 1 >= 0` (checked above) keep both
+    // indices in bounds, so the lookups below cannot be `undefined`.
     for (let i = 0; i < obj.points.length - 1; i++) {
-      const err = checkSegmentLength(obj.points[i], obj.points[i + 1], path)
+      const err = checkSegmentLength(obj.points[i]!, obj.points[i + 1]!, path)
       if (err !== null) return err
     }
     if (wraps) {
-      const first = obj.points[0]
-      const last = obj.points[obj.points.length - 1]
-      const err = checkSegmentLength(last, first, path)
+      const err = checkSegmentLength(obj.points[obj.points.length - 1]!, obj.points[0]!, path)
       if (err !== null) return err
     }
   }
   return null
 }
 
-function checkSegmentLength(
-  from: { x: number; y: number } | undefined,
-  to: { x: number; y: number } | undefined,
-  path: string,
-): ValidationError | null {
-  if (from === undefined || to === undefined) return null
+function checkSegmentLength(from: { x: number; y: number }, to: { x: number; y: number }, path: string): ValidationError | null {
   const dx = to.x - from.x
   const dy = to.y - from.y
   const distance = Math.sqrt(dx * dx + dy * dy)
-  if (distance < MIN_SEGMENT_MM) {
-    return { path, message: `consecutive points closer than ${MIN_SEGMENT_MM}mm` }
-  }
-  return null
+  return distance < MIN_SEGMENT_MM ? { path, message: `consecutive points closer than ${MIN_SEGMENT_MM}mm` } : null
 }
 
 // ---------------------------------------------------------------------------
@@ -248,13 +272,14 @@ function checkSegmentLength(
 function checkAcyclicMotifs(p: Project): ValidationError | null {
   const state = new Map<Id, 'visiting' | 'done'>()
 
+  // Safe per invariant 2 (already passed): every motif-instance/repeat's
+  // `motifId` reached here exists in `p.motifs`, and every child id in a
+  // motif's `children` exists in `p.objects` (invariant 1).
   function childMotifIds(motifId: Id): Id[] {
-    const motif = p.motifs[motifId]
-    if (motif === undefined) return []
     const ids: Id[] = []
-    for (const childId of motif.children) {
-      const child = p.objects[childId]
-      if (child !== undefined && (child.type === 'motif-instance' || child.type === 'repeat')) {
+    for (const childId of childrenOf(p, motifId)) {
+      const child = p.objects[childId]!
+      if (child.type === 'motif-instance' || child.type === 'repeat') {
         ids.push(child.motifId)
       }
     }
@@ -275,7 +300,7 @@ function checkAcyclicMotifs(p: Project): ValidationError | null {
 
   for (const motifId of Object.keys(p.motifs)) {
     if (visit(motifId)) {
-      return { path: 'motifs', message: 'motif reference graph contains a cycle' }
+      return { path: formatPath(['motifs']), message: 'motif reference graph contains a cycle' }
     }
   }
   return null
@@ -294,93 +319,92 @@ function positive(value: number, path: string): ValidationError | null {
   return finite(value, path) ?? (value > 0 ? null : { path, message: 'must be greater than 0' })
 }
 
+function integerInRange(value: number, min: number, max: number, path: string): ValidationError | null {
+  return Number.isInteger(value) && value >= min && value <= max
+    ? null
+    : { path, message: `must be an integer between ${min} and ${max}` }
+}
+
 function checkNumericLimits(p: Project): ValidationError | null {
-  let err: ValidationError | null
+  return (
+    positive(p.board.widthMm, formatPath(['board', 'widthMm'])) ??
+    positive(p.board.heightMm, formatPath(['board', 'heightMm'])) ??
+    checkObjectsNumericLimits(p) ??
+    checkAllCrossingHints(p) ??
+    checkOccurrenceCount(p)
+  )
+}
 
-  err = positive(p.board.widthMm, 'board.widthMm')
-  if (err !== null) return err
-  err = positive(p.board.heightMm, 'board.heightMm')
-  if (err !== null) return err
-
-  for (const id of Object.keys(p.objects)) {
-    const obj = p.objects[id]
-    if (obj === undefined) continue
-    const base = `objects.${id}`
-
-    if (obj.type === 'band') {
-      err = positive(obj.widthMm, `${base}.widthMm`)
-      if (err !== null) return err
-    }
-    if (obj.type === 'band' || obj.type === 'region') {
-      for (let i = 0; i < obj.points.length; i++) {
-        const point = obj.points[i]
-        if (point === undefined) continue
-        err = finite(point.x, `${base}.points[${i}].x`)
-        if (err !== null) return err
-        err = finite(point.y, `${base}.points[${i}].y`)
-        if (err !== null) return err
-      }
-    }
-
-    if (obj.type === 'motif-instance' || obj.type === 'repeat') {
-      err = finite(obj.transform.x, `${base}.transform.x`)
-      if (err !== null) return err
-      err = finite(obj.transform.y, `${base}.transform.y`)
-      if (err !== null) return err
-      err = finite(obj.transform.rotationDeg, `${base}.transform.rotationDeg`)
-      if (err !== null) return err
-      err = positive(obj.transform.scale, `${base}.transform.scale`)
-      if (err !== null) return err
-    }
-
-    if (obj.type === 'repeat') {
-      err = finite(obj.stepXMm, `${base}.stepXMm`)
-      if (err !== null) return err
-      err = finite(obj.stepYMm, `${base}.stepYMm`)
-      if (err !== null) return err
-      err = finite(obj.rowOffsetMm, `${base}.rowOffsetMm`)
-      if (err !== null) return err
-      err = finite(obj.columnOffsetMm, `${base}.columnOffsetMm`)
-      if (err !== null) return err
-
-      if (!Number.isInteger(obj.rows) || obj.rows < 1 || obj.rows > 50) {
-        return { path: `${base}.rows`, message: 'must be an integer between 1 and 50' }
-      }
-      if (!Number.isInteger(obj.columns) || obj.columns < 1 || obj.columns > 50) {
-        return { path: `${base}.columns`, message: 'must be an integer between 1 and 50' }
-      }
-    }
-  }
-
-  for (const { crossings, basePath } of crossingContexts(p)) {
-    err = checkCrossingHints(crossings, basePath)
+function checkObjectsNumericLimits(p: Project): ValidationError | null {
+  for (const [id, obj] of Object.entries(p.objects)) {
+    const err = checkObjectNumericLimits(id, obj)
     if (err !== null) return err
   }
-
-  const total = countOccurrences(p)
-  if (total > MAX_OCCURRENCES) {
-    return { path: 'objects', message: `expanded occurrence count ${total} exceeds ${MAX_OCCURRENCES}` }
-  }
-
   return null
 }
 
-function checkCrossingHints(crossings: Crossing[], basePath: string): ValidationError | null {
-  for (let i = 0; i < crossings.length; i++) {
-    const crossing = crossings[i]
-    if (crossing === undefined) continue
-    const err =
-      finite(crossing.hint.x, `${basePath}[${i}].hint.x`) ?? finite(crossing.hint.y, `${basePath}[${i}].hint.y`)
+function checkObjectNumericLimits(id: Id, obj: DesignObject): ValidationError | null {
+  const path = (...segments: PropertyKey[]): string => formatPath(['objects', id, ...segments])
+
+  if (obj.type === 'band' || obj.type === 'region') {
+    const widthErr = obj.type === 'band' ? positive(obj.widthMm, path('widthMm')) : null
+    if (widthErr !== null) return widthErr
+    for (const [i, point] of obj.points.entries()) {
+      const err = finite(point.x, path('points', i, 'x')) ?? finite(point.y, path('points', i, 'y'))
+      if (err !== null) return err
+    }
+    return null
+  }
+
+  const transformErr =
+    finite(obj.transform.x, path('transform', 'x')) ??
+    finite(obj.transform.y, path('transform', 'y')) ??
+    finite(obj.transform.rotationDeg, path('transform', 'rotationDeg')) ??
+    positive(obj.transform.scale, path('transform', 'scale'))
+  if (transformErr !== null || obj.type === 'motif-instance') return transformErr
+
+  return (
+    finite(obj.stepXMm, path('stepXMm')) ??
+    finite(obj.stepYMm, path('stepYMm')) ??
+    finite(obj.rowOffsetMm, path('rowOffsetMm')) ??
+    finite(obj.columnOffsetMm, path('columnOffsetMm')) ??
+    integerInRange(obj.rows, 1, 50, path('rows')) ??
+    integerInRange(obj.columns, 1, 50, path('columns'))
+  )
+}
+
+function checkAllCrossingHints(p: Project): ValidationError | null {
+  for (const { crossings, baseSegments } of crossingContexts(p)) {
+    const err = checkCrossingHints(crossings, baseSegments)
     if (err !== null) return err
   }
   return null
+}
+
+function checkCrossingHints(crossings: Crossing[], baseSegments: PropertyKey[]): ValidationError | null {
+  for (const [i, crossing] of crossings.entries()) {
+    const hintSegments = [...baseSegments, i, 'hint']
+    const err =
+      finite(crossing.hint.x, formatPath([...hintSegments, 'x'])) ??
+      finite(crossing.hint.y, formatPath([...hintSegments, 'y']))
+    if (err !== null) return err
+  }
+  return null
+}
+
+function checkOccurrenceCount(p: Project): ValidationError | null {
+  const total = countOccurrences(p)
+  return total > MAX_OCCURRENCES
+    ? { path: formatPath(['objects']), message: `expanded occurrence count ${total} exceeds ${MAX_OCCURRENCES}` }
+    : null
 }
 
 /**
  * Total expanded occurrence count without expanding geometry: band/region
  * children count per definition, multiplied through instances (x1) and
- * repeats (x rows x columns), memoised per definition. Assumes invariant 4
- * (acyclic motif graph) already passed — run invariant 4 before this.
+ * repeats (x rows x columns), memoised per definition. Assumes invariants 1
+ * (ownership), 2 (references) and 4 (acyclic motif graph) already passed —
+ * run those invariants before this.
  */
 export function countOccurrences(p: Project): number {
   const memo = new Map<ContextId, number>()
@@ -389,11 +413,9 @@ export function countOccurrences(p: Project): number {
     const cached = memo.get(ctx)
     if (cached !== undefined) return cached
 
-    const children = ctx === null ? p.rootChildren : (p.motifs[ctx]?.children ?? [])
     let count = 0
-    for (const childId of children) {
-      const child = p.objects[childId]
-      if (child === undefined) continue
+    for (const childId of childrenOf(p, ctx)) {
+      const child = p.objects[childId]!
       if (child.type === 'band' || child.type === 'region') {
         count += 1
       } else if (child.type === 'motif-instance') {
@@ -416,19 +438,17 @@ export function countOccurrences(p: Project): number {
 // ---------------------------------------------------------------------------
 
 function checkCanonicalCrossings(p: Project): ValidationError | null {
-  for (const { crossings, basePath } of crossingContexts(p)) {
-    const err = checkCanonicalCrossingsIn(crossings, basePath)
+  for (const { crossings, baseSegments } of crossingContexts(p)) {
+    const err = checkCanonicalCrossingsIn(crossings, baseSegments)
     if (err !== null) return err
   }
   return null
 }
 
-function checkCanonicalCrossingsIn(crossings: Crossing[], basePath: string): ValidationError | null {
+function checkCanonicalCrossingsIn(crossings: Crossing[], baseSegments: PropertyKey[]): ValidationError | null {
   const seenKeys = new Set<string>()
-  for (let i = 0; i < crossings.length; i++) {
-    const crossing = crossings[i]
-    if (crossing === undefined) continue
-    const recordPath = `${basePath}[${i}]`
+  for (const [i, crossing] of crossings.entries()) {
+    const recordPath = formatPath([...baseSegments, i])
     const keyA = refKey(crossing.a)
     const keyB = refKey(crossing.b)
 
