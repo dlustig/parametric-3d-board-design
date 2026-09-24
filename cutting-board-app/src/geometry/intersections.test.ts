@@ -6,6 +6,7 @@ import { newProject } from '../domain/project.ts'
 import { expand, expandContext } from './expand.ts'
 import type { Intersection } from './intersections.ts'
 import { findIntersections } from './intersections.ts'
+import { footprint } from './footprint.ts'
 import { CLASSIFY_EXTEND_MM } from './tolerance.ts'
 
 const MATERIAL = newId()
@@ -89,6 +90,9 @@ describe('findIntersections — basic classes', () => {
 
     expect(classes(list)).toEqual(['eligible'])
     const x = list[0]!
+    // Task 6 rebuilds footprints from the Intersection with its own enlargement.
+    const extend = 2 * CLASSIFY_EXTEND_MM
+    expect(footprint(x.a.seg, x.a.occ.worldWidth + extend, x.b.seg, x.b.occ.worldWidth + extend)).toEqual(x.classificationFootprint)
     expect(x.point.x).toBeCloseTo(50, 9)
     expect(x.point.y).toBeCloseTo(50, 9)
     expect(x.reason).toBe('')
@@ -322,56 +326,42 @@ describe('findIntersections — crowded', () => {
   })
 })
 
-describe('findIntersections — lattice with touching classification footprints (G4)', () => {
-  // Spec §5.2/§6.1: `crowded` compares classification footprints (widths enlarged by
-  // 2 × CLASSIFY_EXTEND_MM). They touch exactly when the centreline step is w + 2 × CLASSIFY_EXTEND_MM.
+describe('findIntersections — lattice with touching footprints (G4)', () => {
+  // Spec §5.2 (rev 4): `crowded` compares plain footprints; they touch exactly when the
+  // centreline step equals the width. Paint order B1, A, B2 so nothing lies between either
+  // crossing pair (`occluded` still uses the enlarged classification footprint).
   const w = 6.35
-  const step = w + 2 * CLASSIFY_EXTEND_MM
-  const lattice = (): Band[] => [
-    band([
-      [-50, 0],
-      [50, 0],
-    ]),
+  const lattice = (step: number): Band[] => [
     band([
       [0, -50],
       [0, 50],
+    ]),
+    band([
+      [-50, 0],
+      [50, 0],
     ]),
     band([
       [step, -50],
       [step, 50],
     ]),
   ]
+  const rotatedInstance = (step: number): { p: Project; motifId: string } =>
+    motifProject(lattice(step), (id) => ({ type: 'motif-instance', id: newId(), motifId: id, transform: transform({ x: 100, y: 100, rotationDeg: 30 }) }))
 
-  it('definition space: footprints touch, penetration 0 → both eligible', () => {
-    const { p, motifId } = motifProject(lattice(), (id) => ({ type: 'motif-instance', id: newId(), motifId: id, transform: transform({ x: 100, y: 100, rotationDeg: 30 }) }))
+  it('definition space: spacing = width, footprints touch, penetration 0 → both eligible', () => {
+    const { p, motifId } = rotatedInstance(w)
 
     expect(classes(findIntersections(expandContext(p, motifId)))).toEqual(['eligible', 'eligible'])
   })
 
   it('world space, rotated 30° via an instance → same classes', () => {
-    const { p } = motifProject(lattice(), (id) => ({ type: 'motif-instance', id: newId(), motifId: id, transform: transform({ x: 100, y: 100, rotationDeg: 30 }) }))
+    const { p } = rotatedInstance(w)
 
     expect(classes(findIntersections(expand(p)))).toEqual(['eligible', 'eligible'])
   })
 
-  it('step equal to the plain width (plain footprints touch) → classification footprints overlap → crowded', () => {
-    // B1, A, B2 in paint order so the result is not decided by `occluded`.
-    const list = classify([
-      band([
-        [0, -50],
-        [0, 50],
-      ]),
-      band([
-        [-50, 0],
-        [50, 0],
-      ]),
-      band([
-        [w, -50],
-        [w, 50],
-      ]),
-    ])
-
-    expect(classes(list)).toEqual(['crowded', 'crowded'])
+  it('spacing slightly less than width (plain footprints overlap by 0.05 mm) → both crowded', () => {
+    expect(classes(classify(lattice(w - 0.05)))).toEqual(['crowded', 'crowded'])
   })
 })
 

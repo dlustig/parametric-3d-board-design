@@ -25,7 +25,7 @@ export type Intersection = {
   classificationFootprint: XY[] | null // null for collinear/endpoint
 }
 
-/** An intersection plus the footprint the `crowded` pass compares: the classification footprint, or a collinear/endpoint proxy. */
+/** An intersection plus the footprint the `crowded` pass compares: the plain footprint, or a collinear/endpoint proxy (SPEC §5.2). */
 type Found = { intersection: Intersection; crowdingFootprint: XY[] }
 
 type BandSegment = { startId: Id; a: XY; b: XY }
@@ -166,20 +166,22 @@ function classifyContact(occA: BandOccurrence, sA: BandSegment, occB: BandOccurr
   if (endA && endB) return null
   if (endA || endB) return found(point, 'endpoint', null, octagon(point, maxWidth))
 
+  // Built from the canonical a/b sides, so `footprint(x.a.seg, …, x.b.seg, …)` reproduces them exactly.
   const extend = 2 * CLASSIFY_EXTEND_MM
-  const cf = footprint(sA, occA.worldWidth + extend, sB, occB.worldWidth + extend)
-  if (crossingAngleDeg(sA, sB) < MIN_CROSSING_ANGLE_DEG) return found(point, 'near-parallel', cf, cf)
+  const cf = footprint(a.seg, a.occ.worldWidth + extend, b.seg, b.occ.worldWidth + extend)
+  const plain = footprint(a.seg, a.occ.worldWidth, b.seg, b.occ.worldWidth)
+  if (crossingAngleDeg(sA, sB) < MIN_CROSSING_ANGLE_DEG) return found(point, 'near-parallel', cf, plain)
 
   const halfDiagonal = Math.max(...cf.map((corner) => distance(corner, point)))
-  if (nearJoint(occA, point, halfDiagonal) || nearJoint(occB, point, halfDiagonal)) return found(point, 'near-joint', cf, cf)
+  if (nearJoint(occA, point, halfDiagonal) || nearJoint(occB, point, halfDiagonal)) return found(point, 'near-joint', cf, plain)
 
   for (const element of between) {
     for (const polygon of paintedPolygons(element)) {
-      if (polygonsPenetrate(polygon, cf, EPS_OVERLAP_MM)) return found(point, 'occluded', cf, cf)
+      if (polygonsPenetrate(polygon, cf, EPS_OVERLAP_MM)) return found(point, 'occluded', cf, plain)
     }
   }
 
-  return found(point, 'eligible', cf, cf)
+  return found(point, 'eligible', cf, plain)
 }
 
 function sharesOccurrence(x: Intersection, y: Intersection): boolean {
@@ -213,7 +215,7 @@ export function findIntersections(occurrences: Occurrence[]): Intersection[] {
     }
   }
 
-  // `crowded` pass: compares each still-eligible intersection against every other listed one from the first pass.
+  // `crowded` pass: compares each still-eligible intersection's plain footprint against every other listed one from the first pass.
   return found.map((f) => {
     const crowded =
       f.intersection.cls === 'eligible' &&
