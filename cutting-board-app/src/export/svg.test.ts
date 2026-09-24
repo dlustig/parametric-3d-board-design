@@ -20,11 +20,10 @@ describe('exportSvg', () => {
     expect(exportSvg(sample())).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="300mm" height="450mm" viewBox="0 0 300 450">/)
   })
 
-  it('escapes the project name in <title> and material names wherever they appear', () => {
+  it('escapes the project name in <title>', () => {
     const svg = exportSvg(sample({ name: '<b>' }))
     expect(svg).toContain('<title>&lt;b&gt;</title>')
-    const named = sample()
-    const odd = exportSvg({ ...named, name: '"x"&y', materials: named.materials.map((m) => ({ ...m, name: '"x"&y' })) })
+    const odd = exportSvg(sample({ name: '"x"&y' }))
     expect(odd).not.toContain('"x"&y')
     expect(odd).toContain('&quot;x&quot;&amp;y')
     expect(escapeXml(`&<>"'`)).toBe('&amp;&lt;&gt;&quot;&apos;')

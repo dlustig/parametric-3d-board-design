@@ -1,7 +1,7 @@
 // Document model — exactly the shapes in SPEC §2 (schemaVersion: 1).
 // This module is pure data types: no React, no DOM, no geometry library.
 
-export type Id = string // crypto.randomUUID(); validated as /^[A-Za-z0-9_-]{1,64}$/
+export type Id = string // newId(): 32 random hex chars; validated as /^[A-Za-z0-9_-]{1,64}$/
 
 /** An object's owning context: a Motif definition id, or `null` for the Project root. */
 export type ContextId = Id | null

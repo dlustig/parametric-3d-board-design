@@ -1,6 +1,7 @@
 // SPEC §10: standalone SVG export — serialises `buildScene(project,
 // EXPORT_CLIP_EXTEND_MM)` with no classes, CSS, or external references.
 
+import { newId } from '@/domain/ids'
 import type { Project } from '@/domain/model'
 import type { SceneElement } from '@/geometry/scene'
 import { buildScene, formatNumber, pathD } from '@/geometry/scene'
@@ -12,7 +13,7 @@ export function escapeXml(s: string): string {
 
 /** A fresh id prefix, so several exported SVGs can be inlined in one document. */
 function newPrefix(): string {
-  return `cb${crypto.randomUUID().slice(0, 8)}`
+  return `cb${newId().slice(0, 8)}`
 }
 
 function bandAttrs(color: string, width: number): string {

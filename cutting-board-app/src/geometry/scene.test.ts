@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Crossing, Project } from '@/domain/model'
-import { band, instance, project, record, ref } from '@/domain/test-builders'
+import { band, instance, project, record, ref, repeat } from '@/domain/test-builders'
 import { footprint } from './footprint.ts'
 import type { Scene } from './scene.ts'
 import { buildScene, pathD } from './scene.ts'
@@ -109,6 +109,18 @@ describe('buildScene intersections and unresolved records', () => {
     const lost = record('lost', ref('O', 'O0'), ref('V', 'V0'), 'a', { x: 7, y: 8 })
     const q = project([band('O', [[0, 50], [100, 50]]), band('V', [[0, 60], [100, 60]])], [], [lost])
     expect(buildScene(q, E).unresolved).toEqual([{ record: lost, contextId: null, occurrenceKey: '', worldHint: { x: 7, y: 8 } }])
+  })
+})
+
+describe('buildScene unresolved records under a repeat', () => {
+  it('maps a definition record’s hint through each repeat cell', () => {
+    const lost = record('lost', ref('A', 'A0'), ref('B', 'B0'), 'a', { x: 3, y: 4 })
+    const motif = { id: 'M', children: [band('A', [[0, 0], [10, 0]]), band('B', [[0, 20], [10, 20]])], crossings: [lost] }
+    const p = project([repeat('rep', 'M', { rows: 2, columns: 1, stepXMm: 50, stepYMm: 50 })], [motif])
+    expect(buildScene(p, E).unresolved).toEqual([
+      { record: lost, contextId: 'M', occurrenceKey: 'r:rep:0:0', worldHint: { x: 3, y: 4 } },
+      { record: lost, contextId: 'M', occurrenceKey: 'r:rep:1:0', worldHint: { x: 3, y: 54 } },
+    ])
   })
 })
 

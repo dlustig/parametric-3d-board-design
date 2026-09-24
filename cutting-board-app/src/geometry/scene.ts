@@ -39,20 +39,24 @@ function xy(pt: XY): XY {
  * is painted before the under one, keyed by the under occurrence's key and
  * ordered by the intersection's canonical key.
  */
-function patchesByUnder(intersections: Array<{ i: Intersection; over: 'a' | 'b' }>, paintIndex: Map<string, number>, clipExtendMm: number): Map<string, PatchElement[]> {
+function patchesByUnder(intersections: Array<{ i: Intersection; over: 'a' | 'b' }>, paintIndex: (key: string) => number, clipExtendMm: number): Map<string, PatchElement[]> {
   const keyed: Array<{ underKey: string; key: string; patch: PatchElement }> = []
   for (const { i, over } of intersections) {
     if (i.cls !== 'eligible') continue
     const o = over === 'a' ? i.a : i.b
     const u = over === 'a' ? i.b : i.a
-    if (paintIndex.get(o.occ.key)! > paintIndex.get(u.occ.key)!) continue
+    if (paintIndex(o.occ.key) > paintIndex(u.occ.key)) continue
     const clip = footprint(o.seg, o.occ.worldWidth + 2 * clipExtendMm, u.seg, u.occ.worldWidth)
     keyed.push({ underKey: u.occ.key, key: intersectionKey(i), patch: { kind: 'patch', over: o.occ, segment: [xy(o.seg.a), xy(o.seg.b)], clip } })
   }
   keyed.sort((m, n) => (m.key < n.key ? -1 : m.key > n.key ? 1 : 0))
 
   const byUnder = new Map<string, PatchElement[]>()
-  for (const { underKey, patch } of keyed) byUnder.set(underKey, [...(byUnder.get(underKey) ?? []), patch])
+  for (const { underKey, patch } of keyed) {
+    const list = byUnder.get(underKey)
+    if (list === undefined) byUnder.set(underKey, [patch])
+    else list.push(patch)
+  }
   return byUnder
 }
 
@@ -103,7 +107,7 @@ export function buildScene(p: Project, clipExtendMm: number): Scene {
     const { over, source } = resolveIntersection(p, i, byKey)
     return { i, over, source }
   })
-  const patches = patchesByUnder(resolved, paintIndex, clipExtendMm)
+  const patches = patchesByUnder(resolved, byKey, clipExtendMm)
 
   const elements: SceneElement[] = []
   for (const o of occurrences) {
