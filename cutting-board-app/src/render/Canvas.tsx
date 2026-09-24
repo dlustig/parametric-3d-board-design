@@ -24,12 +24,14 @@ import { screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
 import { useScene } from '@/editor/scene'
 import { contextMatrix, useEditor } from '@/editor/store'
+import { crossingPointerCancel, crossingPointerDown, crossingPointerMove, crossingPointerUp, resetCrossingInput } from '@/editor/tools/crossing'
 import { drawPointerCancel, drawPointerDown, drawPointerMove, drawPointerUp, isDrawTool, resetDrawInput } from '@/editor/tools/draw'
 import type { Gesture } from '@/editor/tools/select'
 import { clickSelect, contextPrefix, endGesture, enterAt, objectAt, retargetAt, selectableBounds, startRotate, startTranslate, toggleSelection } from '@/editor/tools/select'
 import { Proxies } from './Proxies.tsx'
 import { SceneSvg } from './SceneSvg.tsx'
 import { ContextScrim } from './overlays/ContextScrim.tsx'
+import { CrossingMarkers } from './overlays/CrossingMarkers.tsx'
 import { DrawPreview } from './overlays/DrawPreview.tsx'
 import { Grid } from './overlays/Grid.tsx'
 import { PivotMarkers } from './overlays/Pivot.tsx'
@@ -278,6 +280,24 @@ export function Canvas(): JSX.Element {
     }
   }, [tool, wrapper, svgEl])
 
+  // The Crossing tool owns single-pointer taps the same way (SPEC §7.4).
+  useEffect(() => {
+    if (tool !== 'crossing' || wrapper === null || svgEl === null) return
+    const onDown = (e: PointerEvent): void => crossingPointerDown(e, spaceRef.current)
+    const onUp = (e: PointerEvent): void => crossingPointerUp(svgEl, e)
+    wrapper.addEventListener('pointerdown', onDown)
+    wrapper.addEventListener('pointermove', crossingPointerMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', crossingPointerCancel)
+    return () => {
+      wrapper.removeEventListener('pointerdown', onDown)
+      wrapper.removeEventListener('pointermove', crossingPointerMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', crossingPointerCancel)
+      resetCrossingInput()
+    }
+  }, [tool, wrapper, svgEl])
+
   return (
     <div className="canvas" ref={setWrapper}>
       <svg ref={setSvgEl} className="canvas-svg" viewBox={viewBoxFor(camera, view)} width={view.w} height={view.h}>
@@ -290,6 +310,7 @@ export function Canvas(): JSX.Element {
         <SelectionOverlay boxes={selectedBoxes} zoom={camera.zoom} />
         <PivotMarkers project={shown} selection={selection} matrix={ctxMatrix} zoom={camera.zoom} />
         {drawing !== null && <DrawPreview drawing={drawing} matrix={ctxMatrix} zoom={camera.zoom} unit={project.displayUnits} />}
+        {tool === 'crossing' && <CrossingMarkers scene={scene} zoom={camera.zoom} />}
         {drawing?.cursor != null && <SnapGuide snap={drawing.cursor} matrix={ctxMatrix} zoom={camera.zoom} />}
       </svg>
       {selecting && (

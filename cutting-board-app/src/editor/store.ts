@@ -61,6 +61,7 @@ export interface EditorState {
   gridMm: number
   addToSelection: boolean
   crossingScope: 'all' | 'occurrence'
+  crossingNotice: string | null // Crossing tool read-out: an unsupported marker's reason, a scope fallback (SPEC §7.4)
   currentMaterialId: Id
   saveStatus: 'saved' | 'saving' | 'unsaved' | 'other-tab'
   message: string | null // last command failure / notice
@@ -115,6 +116,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       gridMm: gridMmFor(INITIAL_PROJECT),
       addToSelection: false,
       crossingScope: 'all',
+      crossingNotice: null,
       currentMaterialId: INITIAL_PROJECT.materials[0]!.id,
       saveStatus: 'saved',
       message: null,
@@ -177,7 +179,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       },
 
       setTool(t) {
-        set({ tool: t, drawing: null })
+        set({ tool: t, drawing: null, crossingNotice: null })
       },
 
       enterContext(c) {

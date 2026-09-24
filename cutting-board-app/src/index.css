@@ -55,7 +55,8 @@ body {
   min-height: 36px;
 }
 
-.toolbar button[aria-pressed='true'] {
+.toolbar button[aria-pressed='true'],
+.tool-options button[aria-pressed='true'] {
   font-weight: 700;
 }
 

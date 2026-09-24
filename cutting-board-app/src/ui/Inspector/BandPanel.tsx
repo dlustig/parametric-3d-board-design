@@ -1,12 +1,14 @@
 // SPEC §7.5 Band panel: material, width, closed, per-point X/Y with
 // per-segment length/angle (editing a segment moves its end point and
-// translates the points after it), insert-after and delete.
+// translates the points after it), insert-after and delete; the crossings
+// list with unresolved records (CrossingList.tsx).
 
 import type { JSX } from 'react'
 import { useState } from 'react'
 import { offsetCopyBand, setBandClosed, setBandWidth, setMaterial } from '@/domain/commands'
 import type { Band } from '@/domain/model'
 import { useEditor } from '@/editor/store'
+import { CrossingList } from './CrossingList.tsx'
 import { NumberField } from './NumberField.tsx'
 import { PointRow } from './PointRow.tsx'
 import { previewSetPoints } from './shared.ts'
@@ -166,6 +168,8 @@ export function BandPanel({ band }: Props): JSX.Element {
           </div>
         )
       })}
+
+      <CrossingList bandId={band.id} />
     </section>
   )
 }

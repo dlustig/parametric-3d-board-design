@@ -7,14 +7,16 @@ import type { JSX } from 'react'
 import { useState } from 'react'
 import { detachInstance, removeRecord, renameMotif, setTransform } from '@/domain/commands'
 import { canonicalKey } from '@/domain/crossings'
-import { stepKey, stepObjectId } from '@/domain/keys'
-import type { Id, MotifInstance, Project, RepeatField, Step, Transform } from '@/domain/model'
+import { stepKey } from '@/domain/keys'
+import type { BandRef, Id, MotifInstance, Project, RepeatField, Step, Transform } from '@/domain/model'
 import { formatLength } from '@/domain/units'
 import { scaleOf } from '@/geometry/affine'
 import { intersectionKey } from '@/geometry/resolve'
+import type { UnresolvedMarker } from '@/geometry/scene'
 import { useScene } from '@/editor/scene'
 import { contextMatrix, useEditor } from '@/editor/store'
 import { contextPrefix } from '@/editor/tools/select'
+import { UnresolvedList } from './CrossingList.tsx'
 import { NumberField } from './NumberField.tsx'
 
 type Placed = MotifInstance | RepeatField
@@ -93,41 +95,46 @@ export function EditMotifButton({ obj }: { obj: Placed }): JSX.Element {
   )
 }
 
-/** Whether `path` passes through `obj` placed in the current context (whose world prefix is `prefixKeys`). */
-function throughObject(path: Step[], prefixKeys: string[], obj: Placed): boolean {
-  const next = path[prefixKeys.length]
-  if (next === undefined || !prefixKeys.every((k, i) => stepKey(path[i]!) === k)) return false
-  return stepObjectId(next) === obj.id
+/** Whether the world step keys `keys` pass through `obj` placed in the current context (whose world prefix is `prefixKeys`). */
+function throughObject(keys: string[], prefixKeys: string[], obj: Placed): boolean {
+  const next = keys[prefixKeys.length]
+  if (next === undefined || !prefixKeys.every((k, i) => keys[i] === k)) return false
+  return next === `i:${obj.id}` || next.startsWith(`r:${obj.id}:`)
 }
 
-/** SPEC §5.4/§7.5: the root override records of this instance's/repeat's occurrences, each with Remove. */
+/** The world step keys of an unresolved record's `ref`: its context's placement, then its own path. */
+function refWorldKeys(u: UnresolvedMarker, ref: BandRef): string[] {
+  return [...(u.occurrenceKey === '' ? [] : u.occurrenceKey.split('/')), ...ref.path.map(stepKey)]
+}
+
+/** SPEC §5.4/§7.5: the root override records of this instance's/repeat's occurrences, and its unresolved records, each with Remove. */
 export function OverridesList({ obj }: { obj: Placed }): JSX.Element {
   const project = useEditor((s) => s.project)
   const editContext = useEditor((s) => s.editContext)
   const scene = useScene()
   const prefixKeys = contextPrefix(editContext).map(stepKey)
-  const overrides = scene.intersections.filter(
-    (i) => i.source === 'override' && (throughObject(i.a.occ.path, prefixKeys, obj) || throughObject(i.b.occ.path, prefixKeys, obj)),
-  )
+  const through = (path: Step[]): boolean => throughObject(path.map(stepKey), prefixKeys, obj)
+  const overrides = scene.intersections.flatMap((i) => {
+    if (i.source !== 'override' || !(through(i.a.occ.path) || through(i.b.occ.path))) return []
+    const record = project.crossings.find((c) => canonicalKey(c) === intersectionKey(i))
+    return record === undefined ? [] : [{ i, record }]
+  })
   const unit = project.displayUnits
   return (
     <>
       <h3>Overrides</h3>
       {overrides.length === 0 && <p className="panel-note">None</p>}
       <ul className="overrides">
-        {overrides.map((i) => {
-          const record = project.crossings.find((c) => canonicalKey(c) === intersectionKey(i))
-          if (record === undefined) return null // the scene shows a preview that record is not in yet
-          return (
-            <li key={record.id}>
-              Crossing at {formatLength(i.point.x, unit)}, {formatLength(i.point.y, unit)}
-              <button type="button" onClick={() => useEditor.getState().run((p) => removeRecord(p, null, record.id))}>
-                Remove
-              </button>
-            </li>
-          )
-        })}
+        {overrides.map(({ i, record }) => (
+          <li key={record.id}>
+            Crossing at {formatLength(i.point.x, unit)}, {formatLength(i.point.y, unit)}
+            <button type="button" onClick={() => useEditor.getState().run((p) => removeRecord(p, null, record.id))}>
+              Remove
+            </button>
+          </li>
+        ))}
       </ul>
+      <UnresolvedList matches={(u) => [u.record.a, u.record.b].some((r) => throughObject(refWorldKeys(u, r), prefixKeys, obj))} />
     </>
   )
 }
