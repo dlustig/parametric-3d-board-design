@@ -1,8 +1,8 @@
 // SPEC §9: New / Open / Download Project. New and Open confirm (Radix
 // Dialog) unless the current project is blank; Open reads a `<input
 // type="file">` via `File.text()` and `importProject`, leaving project and
-// history untouched on failure. Export SVG is a placeholder, wired in
-// Task 17.
+// history untouched on failure. Export SVG (SPEC §10) downloads the
+// standalone SVG serialisation of the committed project.
 //
 // Review ruling (Task 16 fix round 1): the store's `message` is rendered in
 // exactly one place — StatusBar — so this component only ever sets it (on
@@ -17,6 +17,7 @@ import type { Project } from '@/domain/model'
 import { newProject } from '@/domain/project'
 import { useEditor } from '@/editor/store'
 import { downloadText } from '@/export/download'
+import { exportSvg } from '@/export/svg'
 
 /** SPEC §9: the blank starter — no objects (root or definition-owned) — is silently replaceable. */
 export function isBlankProject(project: Project): boolean {
@@ -31,6 +32,10 @@ export function sanitizeFilenamePart(name: string): string {
 
 export function downloadProject(project: Project): void {
   downloadText(`${sanitizeFilenamePart(project.name)}.cbpd.json`, JSON.stringify(project, null, 2), 'application/json')
+}
+
+export function downloadExportSvg(project: Project): void {
+  downloadText(`${sanitizeFilenamePart(project.name)}.svg`, exportSvg(project), 'image/svg+xml')
 }
 
 type PendingAction = 'new' | 'open' | null
@@ -78,6 +83,10 @@ export function ProjectMenu(): JSX.Element {
     downloadProject(useEditor.getState().project)
   }
 
+  const onExportSvg = (): void => {
+    downloadExportSvg(useEditor.getState().project)
+  }
+
   return (
     <div className="project-menu">
       <button type="button" onClick={onNewClick}>
@@ -90,7 +99,7 @@ export function ProjectMenu(): JSX.Element {
       <button type="button" onClick={onDownload}>
         Download Project
       </button>
-      <button type="button" disabled title="Coming in a later release">
+      <button type="button" onClick={onExportSvg}>
         Export SVG
       </button>
       <Dialog.Root open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>

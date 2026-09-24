@@ -14,8 +14,8 @@ import type { Scene, SceneIntersection } from '../src/geometry/scene.ts'
 import { MAX_CLIP_EXTEND_MM } from '../src/geometry/tolerance.ts'
 import type { XY } from './helpers.ts'
 import { seed } from './helpers.ts'
-import type { Raster, RGB } from './raster.ts'
-import { blendDistance, colorEquals, pixelAt, pxPerMmOf, rasterizeEditorBoard, rasterizeSvg, samplePixel } from './raster.ts'
+import type { Raster, Side } from './raster.ts'
+import { blendDistance, colorEquals, edgeDistances, hex, interiorSamples, near, pixelAt, pxPerMmOf, rasterizeEditorBoard, rasterizeSvg, samplePixel, sides, unit } from './raster.ts'
 
 const WALNUT = '#5C3A21'
 const MAPLE = '#E8D4A8'
@@ -66,56 +66,8 @@ function crossingProject(): Project {
 
 const COLORS: Record<string, string> = { maple: MAPLE, walnut: WALNUT, cherry: CHERRY }
 
-type Side = SceneIntersection['a']
-
-function sides(i: SceneIntersection): { over: Side; under: Side } {
-  return i.a.occ.key === i.overKey ? { over: i.a, under: i.b } : { over: i.b, under: i.a }
-}
-
 function colorOf(side: Side): string {
   return COLORS[side.occ.materialId]!
-}
-
-function unit(s: { a: XY; b: XY }): XY {
-  const l = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y)
-  return { x: (s.b.x - s.a.x) / l, y: (s.b.y - s.a.y) / l }
-}
-
-function near(p: XY, q: XY, tol = 0.01): boolean {
-  return Math.hypot(p.x - q.x, p.y - q.y) <= tol
-}
-
-/** Signed distances (positive inside) from `c` to each edge line of the convex polygon `poly`. */
-function edgeDistances(poly: XY[], c: XY): number[] {
-  const centroid = { x: poly.reduce((s, p) => s + p.x, 0) / poly.length, y: poly.reduce((s, p) => s + p.y, 0) / poly.length }
-  return poly.map((p, k) => {
-    const q = poly[(k + 1) % poly.length]!
-    const u = unit({ a: p, b: q })
-    const n = { x: -u.y, y: u.x }
-    const sign = Math.sign((centroid.x - p.x) * n.x + (centroid.y - p.y) * n.y)
-    return sign * ((c.x - p.x) * n.x + (c.y - p.y) * n.y)
-  })
-}
-
-/** The intersection point, and ±25% of the footprint's extent along each band's direction from it. */
-function interiorSamples(i: SceneIntersection): XY[] {
-  const uA = unit(i.a.seg)
-  const uB = unit(i.b.seg)
-  const sin = Math.abs(uA.x * uB.y - uA.y * uB.x)
-  const alongA = i.b.occ.worldWidth / 2 / sin // half-extent of the footprint along A through the point
-  const alongB = i.a.occ.worldWidth / 2 / sin
-  const p = i.point
-  return [
-    p,
-    { x: p.x + 0.5 * alongA * uA.x, y: p.y + 0.5 * alongA * uA.y },
-    { x: p.x - 0.5 * alongA * uA.x, y: p.y - 0.5 * alongA * uA.y },
-    { x: p.x + 0.5 * alongB * uB.x, y: p.y + 0.5 * alongB * uB.y },
-    { x: p.x - 0.5 * alongB * uB.x, y: p.y - 0.5 * alongB * uB.y },
-  ]
-}
-
-function hex(rgb: RGB): string {
-  return `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`
 }
 
 type Source = 'editor' | 'export'
