@@ -23,6 +23,7 @@ import type { Mat } from '@/geometry/affine'
 import { IDENTITY, multiply } from '@/geometry/affine'
 import { pathMatrix } from '@/geometry/expand'
 import { rematchCrossings } from '@/geometry/resolve'
+import type { SegmentSnap } from '@/geometry/snap'
 import type { EditContextLevel } from './selection.ts'
 import { pruneEditContext, pruneSelection } from './selection.ts'
 
@@ -33,8 +34,16 @@ export interface Preview {
   onInterrupt: 'commit' | 'cancel'
 }
 
-/** Drawing-tool progress (Band/Polygon). Plain field: tool code reads/writes it directly, no dedicated actions. */
-export type Drawing = { tool: 'band' | 'polygon'; points: Array<{ x: number; y: number }> } | null
+/** The snapped pointer position while drawing, in the current context's space, with the pending segment's length/angle. */
+export type DrawCursor = SegmentSnap
+
+/**
+ * Drawing-tool progress (Band/Polygon points placed so far; Rectangle's first
+ * corner while dragging) and the live snapped cursor, all in the current
+ * context's space. Plain field: tool code (`tools/draw.ts`) reads/writes it
+ * directly, no dedicated actions.
+ */
+export type Drawing = { tool: 'band' | 'polygon' | 'rect'; points: Array<{ x: number; y: number }>; cursor: DrawCursor | null } | null
 
 export interface Camera {
   x: number
@@ -59,6 +68,7 @@ export interface EditorState {
   saveStatus: 'saved' | 'saving' | 'unsaved' | 'other-tab'
   message: string | null // last command failure / notice
   drawing: Drawing
+  lastBandWidthMm: number // width for new Bands: the last one set (SPEC §7.4)
 
   run(cmd: (p: Project) => Project | CommandResult): void
   setPreview(next: Project, onInterrupt: 'commit' | 'cancel'): void
@@ -109,6 +119,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       saveStatus: 'saved',
       message: null,
       drawing: null,
+      lastBandWidthMm: 6.35,
 
       run(cmd) {
         get().settlePreview()
@@ -165,7 +176,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       },
 
       setTool(t) {
-        set({ tool: t })
+        set({ tool: t, drawing: null })
       },
 
       enterContext(c) {

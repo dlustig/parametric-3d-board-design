@@ -88,7 +88,10 @@ export function BandPanel({ band }: Props): JSX.Element {
           useEditor.getState().setPreview(setBandWidth(project, band.id, v), 'commit')
           return undefined
         }}
-        onCommit={commit}
+        onCommit={(v) => {
+          commit()
+          useEditor.setState({ lastBandWidthMm: v })
+        }}
       />
       <div className="field field-checkbox">
         <label htmlFor="band-closed">Closed</label>

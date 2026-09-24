@@ -181,3 +181,47 @@ body {
 .moveable-control-box .moveable-rotation-control {
   pointer-events: auto;
 }
+
+/* SPEC §7.4 drawing tools' options bar, over the top of the canvas. */
+.tool-options {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--page-bg);
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-radius: 6px;
+}
+
+.tool-options button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.tool-options-fields {
+  display: flex;
+  gap: 8px;
+}
+
+.tool-options-fields .field {
+  margin-bottom: 0;
+}
+
+.tool-options-fields .field label {
+  min-width: 0;
+}
+
+.tool-options-fields .field input {
+  width: 6rem;
+}
+
+.tool-options-message {
+  font-size: 0.8rem;
+  color: #c0392b;
+}

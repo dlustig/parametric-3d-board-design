@@ -17,15 +17,20 @@ import Moveable from 'react-moveable'
 import type { OnDragEnd, OnRotateEnd } from 'react-moveable'
 import Selecto from 'react-selecto'
 import type { OnDragStart as OnSelectoDragStart, OnSelectEnd } from 'react-selecto'
+import { useShallow } from 'zustand/react/shallow'
 import { unionBoxes } from '@/geometry/bounds'
 import { editorClipExtendMm, screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
-import { useEditor } from '@/editor/store'
+import { contextMatrix, useEditor } from '@/editor/store'
+import { drawPointerCancel, drawPointerDown, drawPointerMove, drawPointerUp, isDrawTool } from '@/editor/tools/draw'
 import type { Gesture } from '@/editor/tools/select'
 import { clickSelect, endGesture, objectAt, selectableBounds, startRotate, startTranslate, toggleSelection } from '@/editor/tools/select'
 import { Proxies } from './Proxies.tsx'
 import { SceneSvg } from './SceneSvg.tsx'
+import { DrawPreview } from './overlays/DrawPreview.tsx'
+import { Grid } from './overlays/Grid.tsx'
 import { SelectionOverlay } from './overlays/Selection.tsx'
+import { SnapGuide } from './overlays/SnapGuide.tsx'
 
 type XY = { x: number; y: number }
 
@@ -48,6 +53,10 @@ export function Canvas(): JSX.Element {
   const selection = useEditor((s) => s.selection)
   const tool = useEditor((s) => s.tool)
   const editContext = useEditor((s) => s.editContext)
+  const drawing = useEditor((s) => s.drawing)
+  const showGrid = useEditor((s) => s.showGrid)
+  const gridMm = useEditor((s) => s.gridMm)
+  const ctxMatrix = useEditor(useShallow(contextMatrix))
 
   const [wrapper, setWrapper] = useState<HTMLDivElement | null>(null)
   const [svgEl, setSvgEl] = useState<SVGSVGElement | null>(null)
@@ -219,6 +228,28 @@ export function Canvas(): JSX.Element {
   const vh = view.h / camera.zoom
   const matD = `M ${vx - vw} ${vy - vh} H ${vx + 2 * vw} V ${vy + 2 * vh} H ${vx - vw} Z M 0 0 H ${bw} V ${bh} H 0 Z`
   const selecting = tool === 'select' && wrapper !== null && svgEl !== null
+  const drawTool = isDrawTool(tool) && svgEl !== null
+
+  // Drawing tools own single-pointer input (SPEC §7.2). Ups and cancels are
+  // read on window so a pointer released off the canvas is never left "down".
+  const spaceRef = useRef(spaceDown)
+  spaceRef.current = spaceDown
+  useEffect(() => {
+    if (!drawTool || wrapper === null || svgEl === null) return
+    const onDown = (e: PointerEvent): void => drawPointerDown(svgEl, e, spaceRef.current)
+    const onMove = (e: PointerEvent): void => drawPointerMove(svgEl, e)
+    const onUp = (e: PointerEvent): void => drawPointerUp(svgEl, e)
+    wrapper.addEventListener('pointerdown', onDown)
+    wrapper.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', drawPointerCancel)
+    return () => {
+      wrapper.removeEventListener('pointerdown', onDown)
+      wrapper.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', drawPointerCancel)
+    }
+  }, [drawTool, wrapper, svgEl])
 
   return (
     <div className="canvas" ref={setWrapper}>
@@ -226,8 +257,11 @@ export function Canvas(): JSX.Element {
         <rect className="board" width={bw} height={bh} fill={boardFill} />
         <SceneSvg project={shown} clipExtendMm={clipExtendMm} />
         <path className="board-mat" d={matD} fillRule="evenodd" pointerEvents="none" />
+        {showGrid && <Grid gridMm={gridMm} matrix={ctxMatrix} zoom={camera.zoom} view={{ x: vx, y: vy, w: vw, h: vh }} />}
         <Proxies bounds={bounds} />
         <SelectionOverlay boxes={selectedBoxes} zoom={camera.zoom} />
+        {drawing !== null && <DrawPreview drawing={drawing} matrix={ctxMatrix} zoom={camera.zoom} unit={project.displayUnits} />}
+        {drawing?.cursor != null && <SnapGuide snap={drawing.cursor} matrix={ctxMatrix} zoom={camera.zoom} />}
       </svg>
       {selecting && (
         <Moveable
