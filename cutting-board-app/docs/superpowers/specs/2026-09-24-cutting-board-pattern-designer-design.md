@@ -323,7 +323,7 @@ Entering a definition (double-tap an instance/cell, or **Edit Motif**) pushes `{
 
 ### 7.7 Snapping
 
-Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`ed); the rail toggle persists. Grid spacing is an editor setting (not in the document), defaulting to 3.175 mm for inch projects and 5 mm for mm projects; the grid is drawn when **Show grid** is on.
+Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`ed); the rail toggle persists. Grid spacing is an editor setting (not in the document), defaulting to 3.175 mm for inch projects and 5 mm for mm projects; the grid is drawn when **Show grid** is on. The grid is drawn and snapped in the current context's space (definition axes while editing a motif), like the length and angle labels.
 
 - **Targets** (computed once at gesture start from `project`, excluding the moving selection; inside an edit context they include the other occurrences of the entered definition and its siblings, mapped into definition space): grid points; Board edges and centre lines; Band endpoints and vertices; Region vertices; listed intersection points; painted-bounds edges and centres of other objects.
 - **Sources** while moving: the selection's vertices, endpoints, and bounds edges/centres. The nearest source–target pair within tolerance wins; point targets beat line targets beat grid. A guide overlay shows the active snap.
