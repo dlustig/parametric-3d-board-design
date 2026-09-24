@@ -3,6 +3,7 @@
 // is derived from it at the wrapper's client aspect, so screen→world is the
 // svg's `getScreenCTM().inverse()` with no letterboxing.
 
+import { EDITOR_CLIP_EXTEND_PX, MAX_CLIP_EXTEND_MM } from '@/geometry/tolerance'
 import type { Camera } from './store.ts'
 
 type XY = { x: number; y: number }
@@ -11,6 +12,11 @@ export const MIN_ZOOM = 0.05
 export const MAX_ZOOM = 50
 /** Fit margin on each side, as a fraction of the Board dimension (SPEC §7.2 "Board bounds + 5% margin"). */
 const FIT_MARGIN = 0.05
+
+/** SPEC §6.2: the editor's patch clip enlargement at `zoom`, in mm. */
+export function editorClipExtendMm(zoom: number): number {
+  return Math.min(EDITOR_CLIP_EXTEND_PX / zoom, MAX_CLIP_EXTEND_MM)
+}
 
 export function clampZoom(zoom: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))

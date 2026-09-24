@@ -18,8 +18,7 @@ import type { OnDragEnd, OnRotateEnd } from 'react-moveable'
 import Selecto from 'react-selecto'
 import type { OnDragStart as OnSelectoDragStart, OnSelectEnd } from 'react-selecto'
 import { unionBoxes } from '@/geometry/bounds'
-import { EDITOR_CLIP_EXTEND_PX, MAX_CLIP_EXTEND_MM } from '@/geometry/tolerance'
-import { screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
+import { editorClipExtendMm, screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
 import { useEditor } from '@/editor/store'
 import type { Gesture } from '@/editor/tools/select'
@@ -211,7 +210,7 @@ export function Canvas(): JSX.Element {
     s.select(toggle ? [...s.selection.filter((id) => !ids.includes(id)), ...ids.filter((id) => !s.selection.includes(id))] : ids)
   }
 
-  const clipExtendMm = Math.min(EDITOR_CLIP_EXTEND_PX / camera.zoom, MAX_CLIP_EXTEND_MM)
+  const clipExtendMm = editorClipExtendMm(camera.zoom)
   const { widthMm: bw, heightMm: bh, backgroundMaterialId } = project.board
   const boardFill = project.materials.find((m) => m.id === backgroundMaterialId)?.color ?? '#ffffff'
   const vx = camera.x
