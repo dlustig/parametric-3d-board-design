@@ -1,6 +1,7 @@
-import type { BandRef, ContextId, Crossing, DesignObject, Id, Project, Step } from './model.ts'
+import type { BandRef, ContextId, Crossing, DesignObject, Id, Project } from './model.ts'
 import { childrenOf } from './project.ts'
 import { MAX_OCCURRENCES, MIN_SEGMENT_MM } from './limits.ts'
+import { refKey } from './keys.ts'
 
 export interface ValidationError {
   path: string
@@ -20,25 +21,6 @@ export function formatPath(segments: readonly PropertyKey[]): string {
     out += typeof segment === 'number' ? `[${segment}]` : out === '' ? String(segment) : `.${String(segment)}`
   }
   return out
-}
-
-// ---------------------------------------------------------------------------
-// SPEC §5.1 key encoding (minimal local copy; Task 3 moves this to
-// `src/geometry/keys.ts`). Ids cannot contain `:/#@|`, so these keys are
-// unambiguous string encodings of a path through the document.
-// ---------------------------------------------------------------------------
-
-function stepKey(step: Step): string {
-  return 'instanceId' in step ? `i:${step.instanceId}` : `r:${step.repeatId}:${step.row}:${step.column}`
-}
-
-function occurrenceKey(path: Step[], sourceId: Id): string {
-  return `${path.map(stepKey).join('/')}#${sourceId}`
-}
-
-/** SPEC §5.1: a canonical string key for a `BandRef`, used to order and dedupe crossings. */
-export function refKey(ref: BandRef): string {
-  return `${occurrenceKey(ref.path, ref.bandId)}@${ref.segmentStart}`
 }
 
 // ---------------------------------------------------------------------------

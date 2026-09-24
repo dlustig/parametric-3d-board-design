@@ -14,9 +14,10 @@ import type {
   Transform,
 } from './model.ts'
 import { newId } from './ids.ts'
+import { refKey } from './keys.ts'
 import { importProject } from './migrate.ts'
 import { newProject } from './project.ts'
-import { countOccurrences, refKey, validateProject } from './validate.ts'
+import { countOccurrences, validateProject } from './validate.ts'
 
 // ---------------------------------------------------------------------------
 // Small hand-built object factories (per the task brief: build small
