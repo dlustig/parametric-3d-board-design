@@ -99,16 +99,21 @@ export function objectAt(p: Project, editContext: EditContextLevel[], world: XY)
   return null
 }
 
-/** Click/tap select: the topmost object; `toggle` (Shift or Add-to-selection) adds/removes it. */
+/**
+ * SPEC §7.4 tap: the topmost object replaces the selection (nothing clears it);
+ * with `toggle` (Shift or Add-to-selection) the object is added or removed and
+ * a tap on nothing keeps the selection.
+ */
+export function toggleSelection(selection: Id[], id: Id | null, toggle: boolean): Id[] {
+  if (!toggle) return id === null ? [] : [id]
+  if (id === null) return selection
+  return selection.includes(id) ? selection.filter((x) => x !== id) : [...selection, id]
+}
+
+/** Click/tap select at a client point, from domain geometry. */
 export function clickSelect(svg: SVGSVGElement, client: XY, toggle: boolean): void {
   const s = useEditor.getState()
-  const id = objectAt(s.project, s.editContext, screenToWorld(svg, client))
-  if (!toggle) {
-    s.select(id === null ? [] : [id])
-    return
-  }
-  if (id === null) return
-  s.select(s.selection.includes(id) ? s.selection.filter((x) => x !== id) : [...s.selection, id])
+  s.select(toggleSelection(s.selection, objectAt(s.project, s.editContext, screenToWorld(svg, client)), toggle))
 }
 
 export interface Gesture {
