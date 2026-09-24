@@ -6,7 +6,7 @@
   "board": {
     "widthMm": 300,
     "heightMm": 450,
-    "backgroundMaterialId": null
+    "backgroundMaterialId": "ash"
   },
   "materials": [
     {

@@ -6,7 +6,7 @@
   "board": {
     "widthMm": 399,
     "heightMm": 399,
-    "backgroundMaterialId": null
+    "backgroundMaterialId": "maple"
   },
   "materials": [
     {
@@ -236,6 +236,45 @@
         "scale": 1
       }
     },
+    "accent-inst-2": {
+      "type": "motif-instance",
+      "id": "accent-inst-2",
+      "motifId": "accent-unit",
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "rotationDeg": 0,
+        "mirrorX": false,
+        "mirrorY": true,
+        "scale": 1
+      }
+    },
+    "accent-inst-3": {
+      "type": "motif-instance",
+      "id": "accent-inst-3",
+      "motifId": "accent-unit",
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "rotationDeg": 90,
+        "mirrorX": false,
+        "mirrorY": false,
+        "scale": 1
+      }
+    },
+    "accent-inst-4": {
+      "type": "motif-instance",
+      "id": "accent-inst-4",
+      "motifId": "accent-unit",
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "rotationDeg": -90,
+        "mirrorX": false,
+        "mirrorY": false,
+        "scale": 1
+      }
+    },
     "interlace-field": {
       "type": "repeat",
       "id": "interlace-field",
@@ -301,7 +340,10 @@
         "n0",
         "n1",
         "n2",
-        "accent-inst"
+        "accent-inst",
+        "accent-inst-2",
+        "accent-inst-3",
+        "accent-inst-4"
       ],
       "crossings": [
         {
