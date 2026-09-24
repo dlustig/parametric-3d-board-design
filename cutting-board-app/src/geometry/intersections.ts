@@ -10,7 +10,7 @@ import type { BandOccurrence, Occurrence } from './expand.ts'
 import { segmentsOf } from './expand.ts'
 import type { Seg, XY } from './footprint.ts'
 import { footprint, polygonsPenetrate } from './footprint.ts'
-import { CLASSIFY_EXTEND_MM, EPS_GEOMETRY, EPS_OVERLAP_MM, MIN_CROSSING_ANGLE_DEG } from './tolerance.ts'
+import { EPS_GEOMETRY, EPS_OVERLAP_MM, MAX_CLIP_EXTEND_MM, MIN_CROSSING_ANGLE_DEG } from './tolerance.ts'
 
 export type IntersectionClass = 'eligible' | 'collinear' | 'endpoint' | 'near-parallel' | 'near-joint' | 'occluded' | 'crowded'
 
@@ -22,7 +22,7 @@ export type Intersection = {
   point: XY
   cls: IntersectionClass
   reason: string // '' when eligible
-  classificationFootprint: XY[] | null // null for collinear/endpoint
+  footprint: XY[] | null // plain footprint (SPEC §6.1); null for collinear/endpoint
 }
 
 /** An intersection plus the footprint the `crowded` pass compares: the plain footprint, or a collinear/endpoint proxy (SPEC §5.2). */
@@ -116,10 +116,45 @@ function nearJoint(occ: BandOccurrence, point: XY, halfDiagonal: number): boolea
   return false
 }
 
-/** SPEC §4.5 painted geometry: a Band's segment stroke rectangles, or a Region's polygon. */
+/**
+ * The miter-join triangle at `vertex`: the two stroke rectangles' outer
+ * corners plus the miter tip at `w / (2 sin(φ/2))`, or the vertex itself
+ * (bevel) where that exceeds `5w` (stroke-miterlimit 10). Null for a straight joint.
+ */
+function jointTriangle(prev: XY, vertex: XY, next: XY, w: number): XY[] | null {
+  const l1 = distance(prev, vertex)
+  const l2 = distance(next, vertex)
+  const u1 = { x: (prev.x - vertex.x) / l1, y: (prev.y - vertex.y) / l1 }
+  const u2 = { x: (next.x - vertex.x) / l2, y: (next.y - vertex.y) / l2 }
+  // The miter points away from both edges, along −(u1 + u2); |u1 + u2| = 2 cos(φ/2).
+  const bx = -(u1.x + u2.x)
+  const by = -(u1.y + u2.y)
+  const bLength = Math.hypot(bx, by)
+  if (bLength < EPS_GEOMETRY) return null
+
+  // Each edge's outer corner is offset w/2 along the edge normal on the miter's side.
+  const outer = (u: XY): XY => {
+    const sign = -u.y * bx + u.x * by > 0 ? 1 : -1
+    return { x: vertex.x + sign * -u.y * (w / 2), y: vertex.y + sign * u.x * (w / 2) }
+  }
+  const sinHalf = Math.sqrt(Math.max(0, 1 - (bLength / 2) ** 2))
+  const miter = w / (2 * sinHalf)
+  const tip = miter > 5 * w ? vertex : { x: vertex.x + (bx / bLength) * miter, y: vertex.y + (by / bLength) * miter }
+  return [outer(u1), tip, outer(u2)]
+}
+
+/** SPEC §4.5 painted geometry: a Band's stroke rectangles and miter triangles, or a Region's polygon. */
 function paintedPolygons(o: Occurrence): XY[][] {
   if (o.kind === 'region') return [o.worldPoints]
-  return segmentsOf(o).map((s) => strip(s.a, s.b, o.worldWidth))
+
+  const polygons = segmentsOf(o).map((s) => strip(s.a, s.b, o.worldWidth))
+  const points = o.worldPoints
+  const n = points.length
+  for (let i = o.closed ? 0 : 1; i <= (o.closed ? n - 1 : n - 2); i++) {
+    const triangle = jointTriangle(points[(i - 1 + n) % n]!, points[i]!, points[(i + 1) % n]!, o.worldWidth)
+    if (triangle !== null) polygons.push(triangle)
+  }
+  return polygons
 }
 
 function flattenSegment(s: Seg): Flatten.Segment {
@@ -148,8 +183,8 @@ function classifyContact(occA: BandOccurrence, sA: BandSegment, occB: BandOccurr
   const sideB = side(occB, sB)
   const [a, b] = sideKey(sideA) < sideKey(sideB) ? [sideA, sideB] : [sideB, sideA]
   const maxWidth = Math.max(occA.worldWidth, occB.worldWidth)
-  const found = (point: XY, cls: IntersectionClass, classificationFootprint: XY[] | null, crowdingFootprint: XY[]): Found => ({
-    intersection: { a, b, point, cls, reason: REASONS[cls], classificationFootprint },
+  const found = (point: XY, cls: IntersectionClass, plainFootprint: XY[] | null, crowdingFootprint: XY[]): Found => ({
+    intersection: { a, b, point, cls, reason: REASONS[cls], footprint: plainFootprint },
     crowdingFootprint,
   })
 
@@ -166,22 +201,23 @@ function classifyContact(occA: BandOccurrence, sA: BandSegment, occB: BandOccurr
   if (endA && endB) return null
   if (endA || endB) return found(point, 'endpoint', null, octagon(point, maxWidth))
 
-  // Built from the canonical a/b sides, so `footprint(x.a.seg, …, x.b.seg, …)` reproduces them exactly.
-  const extend = 2 * CLASSIFY_EXTEND_MM
-  const cf = footprint(a.seg, a.occ.worldWidth + extend, b.seg, b.occ.worldWidth + extend)
+  // Built from the canonical a/b sides, so `footprint(x.a.seg, …, x.b.seg, …)` reproduces it exactly.
   const plain = footprint(a.seg, a.occ.worldWidth, b.seg, b.occ.worldWidth)
-  if (crossingAngleDeg(sA, sB) < MIN_CROSSING_ANGLE_DEG) return found(point, 'near-parallel', cf, plain)
+  if (crossingAngleDeg(sA, sB) < MIN_CROSSING_ANGLE_DEG) return found(point, 'near-parallel', plain, plain)
 
-  const halfDiagonal = Math.max(...cf.map((corner) => distance(corner, point)))
-  if (nearJoint(occA, point, halfDiagonal) || nearJoint(occB, point, halfDiagonal)) return found(point, 'near-joint', cf, plain)
+  // Both widths enlarged: the long corner moves by e / sin(θ/2), so this bounds any renderer's clip.
+  const extend = 2 * MAX_CLIP_EXTEND_MM
+  const clipBound = footprint(a.seg, a.occ.worldWidth + extend, b.seg, b.occ.worldWidth + extend)
+  const halfDiagonal = Math.max(...clipBound.map((corner) => distance(corner, point)))
+  if (nearJoint(occA, point, halfDiagonal) || nearJoint(occB, point, halfDiagonal)) return found(point, 'near-joint', plain, plain)
 
   for (const element of between) {
     for (const polygon of paintedPolygons(element)) {
-      if (polygonsPenetrate(polygon, cf, EPS_OVERLAP_MM)) return found(point, 'occluded', cf, plain)
+      if (polygonsPenetrate(polygon, plain, EPS_OVERLAP_MM)) return found(point, 'occluded', plain, plain)
     }
   }
 
-  return found(point, 'eligible', cf, plain)
+  return found(point, 'eligible', plain, plain)
 }
 
 function sharesOccurrence(x: Intersection, y: Intersection): boolean {

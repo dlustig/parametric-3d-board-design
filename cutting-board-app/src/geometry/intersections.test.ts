@@ -7,7 +7,6 @@ import { expand, expandContext } from './expand.ts'
 import type { Intersection } from './intersections.ts'
 import { findIntersections } from './intersections.ts'
 import { footprint } from './footprint.ts'
-import { CLASSIFY_EXTEND_MM } from './tolerance.ts'
 
 const MATERIAL = newId()
 
@@ -90,13 +89,12 @@ describe('findIntersections — basic classes', () => {
 
     expect(classes(list)).toEqual(['eligible'])
     const x = list[0]!
-    // Task 6 rebuilds footprints from the Intersection with its own enlargement.
-    const extend = 2 * CLASSIFY_EXTEND_MM
-    expect(footprint(x.a.seg, x.a.occ.worldWidth + extend, x.b.seg, x.b.occ.worldWidth + extend)).toEqual(x.classificationFootprint)
+    // Task 6 rebuilds the clip polygon from the Intersection's sides with its own enlargement.
+    expect(footprint(x.a.seg, x.a.occ.worldWidth, x.b.seg, x.b.occ.worldWidth)).toEqual(x.footprint)
     expect(x.point.x).toBeCloseTo(50, 9)
     expect(x.point.y).toBeCloseTo(50, 9)
     expect(x.reason).toBe('')
-    expect(x.classificationFootprint).toHaveLength(4)
+    expect(x.footprint).toHaveLength(4)
     const keyA = refKey({ path: x.a.occ.path, bandId: x.a.occ.sourceId, segmentStart: x.a.segmentStart })
     const keyB = refKey({ path: x.b.occ.path, bandId: x.b.occ.sourceId, segmentStart: x.b.segmentStart })
     expect(keyA < keyB).toBe(true)
@@ -116,7 +114,7 @@ describe('findIntersections — basic classes', () => {
 
     expect(classes(list)).toEqual(['endpoint'])
     expect(list[0]!.reason).not.toBe('')
-    expect(list[0]!.classificationFootprint).toBeNull()
+    expect(list[0]!.footprint).toBeNull()
   })
 
   it('both ends meet (collinear seam) → not listed (ignored)', () => {
@@ -147,7 +145,7 @@ describe('findIntersections — basic classes', () => {
     ])
 
     expect(classes(list)).toEqual(['collinear'])
-    expect(list[0]!.classificationFootprint).toBeNull()
+    expect(list[0]!.footprint).toBeNull()
   })
 
   it('5° → near-parallel', () => {
@@ -235,6 +233,34 @@ describe('findIntersections — near-joint', () => {
     expect(classes(list)).toEqual(['near-joint'])
   })
 
+  it('10° crossing, w = 10: U joint (miter extent 20) 78 mm along U → near-joint via the both-enlarged half-diagonal', () => {
+    // Plain half-diagonal = 5/sin10° · 2cos5° ≈ 57.36 (radius 77.36 < 78, would pass);
+    // both widths + 2·MAX_CLIP_EXTEND_MM: 5.5/sin10° · 2cos5° ≈ 63.10 (radius 83.10 ≥ 78, caught).
+    const theta = (10 * Math.PI) / 180
+    const phi = 2 * Math.asin(0.25) // 10 / (2 sin(φ/2)) = 20
+    const vertex: [number, number] = [78 * Math.cos(theta), 78 * Math.sin(theta)]
+    const back = Math.PI + theta - phi // turns away from O, so U does not cross it again
+    const list = classify([
+      band(
+        [
+          [-100, 0],
+          [100, 0],
+        ],
+        10,
+      ),
+      band(
+        [
+          [-100 * Math.cos(theta), -100 * Math.sin(theta)],
+          vertex,
+          [vertex[0] + 30 * Math.cos(back), vertex[1] + 30 * Math.sin(back)],
+        ],
+        10,
+      ),
+    ])
+
+    expect(classes(list)).toEqual(['near-joint'])
+  })
+
   it('joint 40 mm away with 6.35 mm bands → eligible', () => {
     const list = classify([
       horizontal(),
@@ -274,6 +300,26 @@ describe('findIntersections — occluded', () => {
     ])
 
     expect(classes(classify([a(), r, b()]))).toEqual(['eligible'])
+  })
+
+  it('band painted between O and U whose 30° miter tip (not its rectangles) enters the footprint → occluded', () => {
+    // Footprint: [46.825, 53.175]². V's vertex sits 15 mm out along the diagonal with arms at
+    // 30° and 60°; its rectangles stay beyond x, y ≥ 57.8, but the miter tip reaches
+    // 15 − 6.35 / (2 sin 15°) ≈ 2.73 mm from the crossing.
+    const v = 50 + 15 / Math.SQRT2
+    const arm = (deg: number): [number, number] => [v + 40 * Math.cos((deg * Math.PI) / 180), v + 40 * Math.sin((deg * Math.PI) / 180)]
+    const joint = band([arm(30), [v, v], arm(60)])
+
+    expect(classes(classify([a(), joint, b()]))).toEqual(['occluded'])
+  })
+
+  it('the same 30° band without its joint (two separate arms) → eligible', () => {
+    const v = 50 + 15 / Math.SQRT2
+    const arm = (deg: number): [number, number] => [v + 40 * Math.cos((deg * Math.PI) / 180), v + 40 * Math.sin((deg * Math.PI) / 180)]
+    const arm30 = band([[v, v], arm(30)])
+    const arm60 = band([[v, v], arm(60)])
+
+    expect(classes(classify([a(), arm30, arm60, b()]))).toEqual(['eligible'])
   })
 
   it('the same region painted above both bands → eligible', () => {

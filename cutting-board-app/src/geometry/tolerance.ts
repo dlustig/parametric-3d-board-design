@@ -22,8 +22,8 @@ export const REGION_SEAM_MM = 0.1
 /** Conservative-bounds padding factor: the miter-limit-10 tip extent (SPEC §4.5). */
 export const MITER_EXTENT_FACTOR = 2.5
 
-/** Footprint enlargement for the `occluded`/`crowded` classes, in mm. */
-export const CLASSIFY_EXTEND_MM = 0.5
+/** Upper bound of any renderer's patch clip enlargement, in mm; also used by `near-joint` (SPEC §5.2). */
+export const MAX_CLIP_EXTEND_MM = 0.5
 
 /** SPEC §6.2 patch clip enlargement in export, in mm. */
 export const EXPORT_CLIP_EXTEND_MM = 0.2
