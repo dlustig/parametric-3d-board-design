@@ -13,11 +13,10 @@
 import type { ContextId, Id, Project, Step } from '@/domain/model'
 import { childrenOf } from '@/domain/project'
 import type { Mat } from './affine.ts'
-import { apply, invert } from './affine.ts'
+import { apply, IDENTITY, invert } from './affine.ts'
 import type { Box } from './bounds.ts'
-import { objectBounds } from './bounds.ts'
+import { objectBounds, paintedBounds, unionBoxes } from './bounds.ts'
 import type { Occurrence } from './expand.ts'
-import { expand } from './expand.ts'
 import type { Intersection } from './intersections.ts'
 import { ANGLE_SNAP_CAPTURE_DEG, ANGLE_SNAP_DEG } from './tolerance.ts'
 
@@ -49,32 +48,70 @@ function boxLines(b: Box): SnapLine[] {
   ]
 }
 
-export function collectSnapTargets(p: Project, ctx: ContextId, contextMatrix: Mat, exclude: Id[], intersections: Intersection[], gridMm: number): SnapTargets {
+/** Painted-bounds edges (lines) and centre (point) of `b`, mapped by `m`. */
+function boundsTargets(b: Box, m: Mat): { lines: SnapLine[]; centre: XY } {
+  return {
+    lines: boxLines(b).map((l) => ({ a: apply(m, l.a), b: apply(m, l.b) })),
+    centre: apply(m, { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }),
+  }
+}
+
+/**
+ * `occurrences` is `expand(p)` (world, paint order) and `intersections` its
+ * listed intersections — passed in so the caller expands once.
+ */
+export function collectSnapTargets(
+  p: Project,
+  ctx: ContextId,
+  contextMatrix: Mat,
+  exclude: Id[],
+  occurrences: Occurrence[],
+  intersections: Intersection[],
+  gridMm: number,
+): SnapTargets {
   const toCtx = invert(contextMatrix)
   const skip = new Set(exclude)
   const excluded = (o: Occurrence): boolean => skip.has(o.sourceId) || o.path.some((s) => skip.has(stepId(s)))
 
   const points: XY[] = []
-  for (const o of expand(p)) if (!excluded(o)) for (const v of o.worldPoints) points.push(apply(toCtx, v))
+  for (const o of occurrences) if (!excluded(o)) for (const v of o.worldPoints) points.push(apply(toCtx, v))
   for (const i of intersections) if (!excluded(i.a.occ) && !excluded(i.b.occ)) points.push(apply(toCtx, i.point))
 
   const { widthMm: w, heightMm: h } = p.board
   const board = { minX: 0, minY: 0, maxX: w, maxY: h }
   const boardLines = [...boxLines(board), { a: { x: w / 2, y: 0 }, b: { x: w / 2, y: h } }, { a: { x: 0, y: h / 2 }, b: { x: w, y: h / 2 } }]
   const lines = boardLines.map((l) => ({ a: apply(toCtx, l.a), b: apply(toCtx, l.b) }))
+  const addBounds = (b: Box, m: Mat): void => {
+    const t = boundsTargets(b, m)
+    lines.push(...t.lines)
+    points.push(t.centre)
+  }
 
-  for (const id of childrenOf(p, ctx)) {
-    if (skip.has(id)) continue
-    const b = objectBounds(p, id) // already in the context's space
-    if (b === null) continue
-    lines.push(...boxLines(b))
-    points.push({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 })
+  // World painted bounds of each root object (at the root: the context's other
+  // objects; inside a definition: its siblings and the definition's other
+  // occurrences), mapped into the context.
+  const rootBoxes = new Map<Id, Box[]>()
+  for (const o of occurrences) {
+    if (excluded(o)) continue
+    const first = o.path[0]
+    const owner = first === undefined ? o.sourceId : stepId(first)
+    rootBoxes.set(owner, [...(rootBoxes.get(owner) ?? []), paintedBounds(o)])
+  }
+  for (const boxes of rootBoxes.values()) addBounds(unionBoxes(boxes)!, toCtx)
+
+  // Inside a definition, its own children's bounds are axis-aligned in definition space.
+  if (ctx !== null) {
+    for (const id of childrenOf(p, ctx)) {
+      if (skip.has(id)) continue
+      const b = objectBounds(p, id)
+      if (b !== null) addBounds(b, IDENTITY)
+    }
   }
 
   return { points, lines, gridMm, board }
 }
 
-function dist(p: XY, q: XY): number {
+export function dist(p: XY, q: XY): number {
   return Math.hypot(p.x - q.x, p.y - q.y)
 }
 
@@ -125,6 +162,11 @@ function angleOf(from: XY, to: XY): number {
   return (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI
 }
 
+/** A segment's length and angle (degrees in (−180, 180], y-down so clockwise-positive). */
+export function segmentMeasure(start: XY, end: XY): { angleDeg: number; lengthMm: number } {
+  return { angleDeg: normalizeDeg(angleOf(start, end)), lengthMm: dist(start, end) }
+}
+
 /** Normalises degrees to (−180, 180]. */
 function normalizeDeg(deg: number): number {
   const d = deg % 360
@@ -148,7 +190,10 @@ function rayMeets(start: XY, dir: XY, line: SnapLine): XY | null {
  * length; else the free end snaps like `snapPoint`.
  */
 export function snapSegmentEnd(start: XY, pt: XY, targets: SnapTargets, toleranceMm: number, angleSnap: boolean): SegmentSnap {
-  const measured = (r: SnapResult, angleDeg = normalizeDeg(angleOf(start, r.point))): SegmentSnap => ({ ...r, angleDeg, lengthMm: dist(start, r.point) })
+  const measured = (r: SnapResult, angleDeg?: number): SegmentSnap => {
+    const m = segmentMeasure(start, r.point)
+    return { ...r, lengthMm: m.lengthMm, angleDeg: angleDeg ?? m.angleDeg }
+  }
 
   const point = nearestPoint(pt, targets.points, toleranceMm)
   if (point !== null) return measured({ point, guide: 'point', line: null })

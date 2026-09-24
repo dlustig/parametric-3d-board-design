@@ -22,7 +22,7 @@ import { unionBoxes } from '@/geometry/bounds'
 import { editorClipExtendMm, screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
 import { contextMatrix, useEditor } from '@/editor/store'
-import { drawPointerCancel, drawPointerDown, drawPointerMove, drawPointerUp, isDrawTool } from '@/editor/tools/draw'
+import { drawPointerCancel, drawPointerDown, drawPointerMove, drawPointerUp, isDrawTool, resetDrawInput } from '@/editor/tools/draw'
 import type { Gesture } from '@/editor/tools/select'
 import { clickSelect, endGesture, objectAt, selectableBounds, startRotate, startTranslate, toggleSelection } from '@/editor/tools/select'
 import { Proxies } from './Proxies.tsx'
@@ -228,17 +228,17 @@ export function Canvas(): JSX.Element {
   const vh = view.h / camera.zoom
   const matD = `M ${vx - vw} ${vy - vh} H ${vx + 2 * vw} V ${vy + 2 * vh} H ${vx - vw} Z M 0 0 H ${bw} V ${bh} H 0 Z`
   const selecting = tool === 'select' && wrapper !== null && svgEl !== null
-  const drawTool = isDrawTool(tool) && svgEl !== null
 
   // Drawing tools own single-pointer input (SPEC §7.2). Ups and cancels are
-  // read on window so a pointer released off the canvas is never left "down".
+  // read on window so a pointer released off the canvas is never left "down";
+  // unbinding (any tool switch) resets the tool's pointer bookkeeping.
   const spaceRef = useRef(spaceDown)
   spaceRef.current = spaceDown
   useEffect(() => {
-    if (!drawTool || wrapper === null || svgEl === null) return
-    const onDown = (e: PointerEvent): void => drawPointerDown(svgEl, e, spaceRef.current)
-    const onMove = (e: PointerEvent): void => drawPointerMove(svgEl, e)
-    const onUp = (e: PointerEvent): void => drawPointerUp(svgEl, e)
+    if (!isDrawTool(tool) || wrapper === null || svgEl === null) return
+    const onDown = (e: PointerEvent): void => drawPointerDown(svgEl, e, tool, spaceRef.current)
+    const onMove = (e: PointerEvent): void => drawPointerMove(svgEl, e, tool)
+    const onUp = (e: PointerEvent): void => drawPointerUp(svgEl, e, tool)
     wrapper.addEventListener('pointerdown', onDown)
     wrapper.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -248,8 +248,9 @@ export function Canvas(): JSX.Element {
       wrapper.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', drawPointerCancel)
+      resetDrawInput()
     }
-  }, [drawTool, wrapper, svgEl])
+  }, [tool, wrapper, svgEl])
 
   return (
     <div className="canvas" ref={setWrapper}>

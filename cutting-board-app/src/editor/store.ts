@@ -34,16 +34,13 @@ export interface Preview {
   onInterrupt: 'commit' | 'cancel'
 }
 
-/** The snapped pointer position while drawing, in the current context's space, with the pending segment's length/angle. */
-export type DrawCursor = SegmentSnap
-
 /**
  * Drawing-tool progress (Band/Polygon points placed so far; Rectangle's first
- * corner while dragging) and the live snapped cursor, all in the current
+ * corner while dragging) and the live snapped cursor with the pending segment's length/angle, all in the current
  * context's space. Plain field: tool code (`tools/draw.ts`) reads/writes it
  * directly, no dedicated actions.
  */
-export type Drawing = { tool: 'band' | 'polygon' | 'rect'; points: Array<{ x: number; y: number }>; cursor: DrawCursor | null } | null
+export type Drawing = { tool: 'band' | 'polygon' | 'rect'; points: Array<{ x: number; y: number }>; cursor: SegmentSnap | null } | null
 
 export interface Camera {
   x: number

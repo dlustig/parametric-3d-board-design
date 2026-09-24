@@ -7,7 +7,7 @@
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useEditor } from '@/editor/store'
-import { cancelDrawing, finishDrawing, placeTyped, undoPoint } from '@/editor/tools/draw'
+import { cancelDrawing, finishDrawing, isDrawTool, placeTyped, undoPoint } from '@/editor/tools/draw'
 import { NumberField } from './Inspector/NumberField.tsx'
 
 function isTextTarget(t: EventTarget | null): boolean {
@@ -57,7 +57,7 @@ export function ToolOptions(): JSX.Element | null {
   // A new segment (tapped, undone, or a new drawing) starts from the live values again.
   useEffect(() => setTypedBoth({ length: null, angle: null }), [points])
 
-  if (tool !== 'band' && tool !== 'polygon' && tool !== 'rect') return null
+  if (!isDrawTool(tool)) return null
   const segmenting = tool !== 'rect'
   const liveLength = drawing?.cursor?.lengthMm ?? 0
   const liveAngle = drawing?.cursor?.angleDeg ?? 0

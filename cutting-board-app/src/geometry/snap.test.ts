@@ -75,6 +75,16 @@ describe('snapSegmentEnd', () => {
     expectXY(r.point, { x: len * Math.cos(Math.PI / 6), y: len * Math.sin(Math.PI / 6) })
   })
 
+  it('captures across ±180°: −178° and 178° both snap to 180°', () => {
+    for (const deg of [-178, 178]) {
+      const rad = (deg * Math.PI) / 180
+      const r = snapSegmentEnd(start, { x: 10.3 * Math.cos(rad), y: 10.3 * Math.sin(rad) }, targets({ gridMm: 100 }), 0.01, true)
+      expect(r.angleDeg).toBe(180)
+      expect(r.guide).toBeNull()
+      expectXY(r.point, { x: -10.3 * Math.cos((2 * Math.PI) / 180), y: 0 })
+    }
+  })
+
   it('does not capture outside ±4°', () => {
     const rad = (35 * Math.PI) / 180
     const pt = { x: 12.3 * Math.cos(rad), y: 12.3 * Math.sin(rad) }
@@ -110,7 +120,7 @@ describe('snapSegmentEnd', () => {
 describe('collectSnapTargets', () => {
   it('gathers band endpoints/vertices, region vertices, board edges/centre lines, bounds, and intersections', () => {
     const p = project([band('b1', [[10, 50], [110, 50]]), band('b2', [[60, 0], [60, 80]]), region('r1', [[200, 200], [240, 200], [240, 260]])])
-    const t = collectSnapTargets(p, null, IDENTITY, [], findIntersections(expand(p)), 5)
+    const t = collectSnapTargets(p, null, IDENTITY, [], expand(p), findIntersections(expand(p)), 5)
     for (const q of [{ x: 10, y: 50 }, { x: 110, y: 50 }, { x: 240, y: 260 }, { x: 60, y: 50 }]) expect(hasPoint(t.points, q)).toBe(true)
     expect(t.gridMm).toBe(5)
     expect(t.board).toEqual(BOARD)
@@ -124,7 +134,7 @@ describe('collectSnapTargets', () => {
 
   it('excludes the moving selection: its vertices, bounds, and intersections', () => {
     const p = project([band('b1', [[10, 50], [110, 50]]), band('b2', [[60, 0], [60, 80]])])
-    const t = collectSnapTargets(p, null, IDENTITY, ['b1'], findIntersections(expand(p)), 5)
+    const t = collectSnapTargets(p, null, IDENTITY, ['b1'], expand(p), findIntersections(expand(p)), 5)
     expect(hasPoint(t.points, { x: 10, y: 50 })).toBe(false)
     expect(hasPoint(t.points, { x: 60, y: 50 })).toBe(false) // the b1×b2 intersection and b1's bounds centre
     expect(t.lines.some((l) => l.a.y === 47 && l.b.y === 47)).toBe(false)
@@ -136,7 +146,7 @@ describe('collectSnapTargets', () => {
       [instance('i1', 'm', { x: 100, y: 100 }), instance('i2', 'm', { x: 200, y: 100, rotationDeg: 90 }), band('b', [[0, 300], [50, 300]])],
       [{ id: 'm', children: [band('mb', [[-10, 0], [10, 0]])] }],
     )
-    const t = collectSnapTargets(p, 'm', fromTransform(transform({ x: 100, y: 100 })), [], findIntersections(expand(p)), 5)
+    const t = collectSnapTargets(p, 'm', fromTransform(transform({ x: 100, y: 100 })), [], expand(p), findIntersections(expand(p)), 5)
     // The entered occurrence's own vertices, in definition space.
     expect(hasPoint(t.points, { x: -10, y: 0 })).toBe(true)
     // i2's occurrence: world (200, 90) and (200, 110) → definition space via invert(M(i1)).
@@ -148,12 +158,21 @@ describe('collectSnapTargets', () => {
     expect(t.lines.some((l) => Math.abs(l.a.x + 100) < 1e-9 && Math.abs(l.b.x + 100) < 1e-9)).toBe(true)
   })
 
+  it('inside an edit context includes siblings’ painted-bounds edges and centres mapped into definition space', () => {
+    const p = project([instance('i1', 'm', { x: 100, y: 100 }), band('b', [[0, 300], [50, 300]])], [{ id: 'm', children: [band('mb', [[-10, 0], [10, 0]])] }])
+    const t = collectSnapTargets(p, 'm', fromTransform(transform({ x: 100, y: 100 })), [], expand(p), [], 5)
+    // b's world bounds 0..50 × 297..303 (width 6) → definition space −100..−50 × 197..203.
+    expect(t.lines.some((l) => Math.abs(l.a.y - 197) < 1e-9 && Math.abs(l.b.y - 197) < 1e-9)).toBe(true)
+    expect(t.lines.some((l) => Math.abs(l.a.x + 50) < 1e-9 && Math.abs(l.b.x + 50) < 1e-9)).toBe(true)
+    expect(hasPoint(t.points, { x: -75, y: 200 })).toBe(true)
+  })
+
   it('excluding a definition child drops it from every occurrence of the definition', () => {
     const p = project(
       [instance('i1', 'm', { x: 100, y: 100 }), instance('i2', 'm', { x: 200, y: 100 })],
       [{ id: 'm', children: [band('mb', [[-10, 0], [10, 0]])] }],
     )
-    const t = collectSnapTargets(p, 'm', fromTransform(transform({ x: 100, y: 100 })), ['mb'], [], 5)
+    const t = collectSnapTargets(p, 'm', fromTransform(transform({ x: 100, y: 100 })), ['mb'], expand(p), [], 5)
     expect(hasPoint(t.points, { x: -10, y: 0 })).toBe(false)
     expect(hasPoint(t.points, { x: 90, y: 0 })).toBe(false)
   })
