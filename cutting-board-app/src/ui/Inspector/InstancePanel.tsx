@@ -12,7 +12,7 @@ import type { Id, MotifInstance, Project, RepeatField, Step, Transform } from '@
 import { formatLength } from '@/domain/units'
 import { scaleOf } from '@/geometry/affine'
 import { intersectionKey } from '@/geometry/resolve'
-import { buildScene } from '@/geometry/scene'
+import { useScene } from '@/editor/scene'
 import { contextMatrix, useEditor } from '@/editor/store'
 import { contextPrefix } from '@/editor/tools/select'
 import { NumberField } from './NumberField.tsx'
@@ -104,8 +104,9 @@ function throughObject(path: Step[], prefixKeys: string[], obj: Placed): boolean
 export function OverridesList({ obj }: { obj: Placed }): JSX.Element {
   const project = useEditor((s) => s.project)
   const editContext = useEditor((s) => s.editContext)
+  const scene = useScene()
   const prefixKeys = contextPrefix(editContext).map(stepKey)
-  const overrides = buildScene(project, 0).intersections.filter(
+  const overrides = scene.intersections.filter(
     (i) => i.source === 'override' && (throughObject(i.a.occ.path, prefixKeys, obj) || throughObject(i.b.occ.path, prefixKeys, obj)),
   )
   const unit = project.displayUnits
@@ -115,7 +116,8 @@ export function OverridesList({ obj }: { obj: Placed }): JSX.Element {
       {overrides.length === 0 && <p className="panel-note">None</p>}
       <ul className="overrides">
         {overrides.map((i) => {
-          const record = project.crossings.find((c) => canonicalKey(c) === intersectionKey(i))!
+          const record = project.crossings.find((c) => canonicalKey(c) === intersectionKey(i))
+          if (record === undefined) return null // the scene shows a preview that record is not in yet
           return (
             <li key={record.id}>
               Crossing at {formatLength(i.point.x, unit)}, {formatLength(i.point.y, unit)}

@@ -19,10 +19,10 @@ import Selecto from 'react-selecto'
 import type { OnDragStart as OnSelectoDragStart, OnSelectEnd } from 'react-selecto'
 import { useShallow } from 'zustand/react/shallow'
 import { unionBoxes } from '@/geometry/bounds'
-import { buildScene } from '@/geometry/scene'
 import { DOUBLE_TAP_MS } from '@/geometry/tolerance'
-import { editorClipExtendMm, screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
+import { screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
+import { useScene } from '@/editor/scene'
 import { contextMatrix, useEditor } from '@/editor/store'
 import { drawPointerCancel, drawPointerDown, drawPointerMove, drawPointerUp, isDrawTool, resetDrawInput } from '@/editor/tools/draw'
 import type { Gesture } from '@/editor/tools/select'
@@ -245,8 +245,7 @@ export function Canvas(): JSX.Element {
     s.select(toggle ? [...s.selection.filter((id) => !ids.includes(id)), ...ids.filter((id) => !s.selection.includes(id))] : ids)
   }
 
-  const clipExtendMm = editorClipExtendMm(camera.zoom)
-  const scene = buildScene(shown, clipExtendMm)
+  const scene = useScene()
   const { widthMm: bw, heightMm: bh, backgroundMaterialId } = project.board
   const boardFill = project.materials.find((m) => m.id === backgroundMaterialId)?.color ?? '#ffffff'
   const vx = camera.x
