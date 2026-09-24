@@ -1,6 +1,6 @@
 # Cutting Board Pattern Designer — V1 SPEC
 
-Status: revision 3 after four independent reviews and two slop audits (slop audit; geometry/crossing/export; editor/tablet/persistence; product/authorability). Resolutions are logged in §16. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
+Status: revision 4 (rev 3 plus one implementation-time correction, §16 last row) (slop audit; geometry/crossing/export; editor/tablet/persistence; product/authorability). Resolutions are logged in §16. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
 
 This document is the contract for V1: document model, geometry semantics, crossing identity and compositing, editor behaviour, persistence, export, and acceptance gates. Product intent, scope, and non-goals come from the research packet and are not restated except where a rule depends on them.
 
@@ -164,7 +164,7 @@ Every intersection point between segments `sA` (occurrence A, width `wA`) and `s
 | `near-parallel` | angle between directions outside `[MIN_CROSSING_ANGLE_DEG, 180 − MIN_CROSSING_ANGLE_DEG]` |
 | `near-joint` | an interior vertex of either Band lies within `halfDiagonal(footprint) + miterExtent(vertex)` of the point, where `miterExtent = w / (2 sin(φ/2))` capped at `5w` for joint angle φ |
 | `occluded` | some element strictly between A and B in paint order has painted geometry (segment stroke rectangles or Region polygon) penetrating the classification footprint (§6.1) by more than `EPS_OVERLAP_MM` |
-| `crowded` | the classification footprint penetrates another listed intersection's footprint on either occurrence by more than `EPS_OVERLAP_MM`. Proxy footprints: `collinear` uses the overlap strip; `endpoint` uses a disc of radius `max(w)`. Triple points and adjacent crossings land here. |
+| `crowded` | the plain (unenlarged) footprint penetrates another listed intersection's plain footprint on either occurrence by more than `EPS_OVERLAP_MM`. Proxy footprints: `collinear` uses the overlap strip; `endpoint` uses a disc of radius `max(w)`. Triple points land here; flush-packed neighbours whose footprints only touch do not. |
 | `eligible` | everything else |
 
 Unsupported classes carry their reason. They are drawn with a distinct marker in the Crossing tool and get no toggle; tapping one shows the reason in the tool options bar. **Render eligibility is always decided per world intersection.** A definition record can be resolved in its own space while a particular world occurrence of it is additionally `unsupported (world)` because of neighbouring cells or root objects; that occurrence renders by paint order and is marked.
@@ -226,7 +226,7 @@ Let `O` be the effective over occurrence and `U` the under at an eligible inters
 <path d="M x1 y1 L x2 y2" fill="none" stroke="{O colour}" stroke-width="{wO}" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt" clip-path="url(#{prefix}-c{n})"/>
 ```
 
-The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach, so O's segment stroke equals O's real paint there). Enlarging across both Bands' edges removes anti-aliasing seams: across O's edges the extra area is limited by O's own stroke; across U's edges it overpaints O's own colour on O's path. The `occluded` class guarantees nothing painted between U and O meets the classification footprint, which contains every clip polygon, so the overpaint is invisible. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
+The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach, so O's segment stroke equals O's real paint there). Enlarging across both Bands' edges removes anti-aliasing seams: across O's edges the extra area is limited by O's own stroke; across U's edges it overpaints O's own colour on O's path. The `occluded` class guarantees no occurrence painted between U and O meets the classification footprint, which contains every clip polygon. A *patch* already placed between O and U whose clip polygon penetrates this crossing's classification footprint is the one remaining way the overpaint could show (two flush-packed unders with opposite decisions); the scene builder checks patches placed so far, in paint order, and demotes such a crossing to `occluded` (no patch, marked) instead. Because patches are emitted in paint order, this is one deterministic pass. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
 
 ### 6.3 Scene
 
@@ -458,6 +458,7 @@ src/
 | Slop rev 2 F2 | Duplicate-with-last-offset duplicates Repeat | Removed |
 | Slop rev 2 F3 | Download hash for dirty tracking exceeds the objection | Confirm unless blank |
 | Slop rev 2 F4 | `preview.base` duplicated `project` | Removed |
+| Task 4 implementation | Enlarged-footprint `crowded` made flush-packed weaves unsupported | `crowded` compares plain footprints; the scene builder treats a patch between O and U as an occluder (§5.2, §6.2) |
 | Editor 23, 24, 25 | Touch marker reason/size, keyboard paths, touch emulation limits | §7.4, §11, G7 |
 | Editor 28, 29 | Grid details, hand tool, aspect | §7.7, §7.2 |
 | Product 2 | Repeat command unspecified; default step leaves gaps | §7.4 Repeat; painted bounds |
