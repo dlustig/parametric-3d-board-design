@@ -20,6 +20,12 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+      zundo:
+        specifier: ^2.3.0
+        version: 2.3.0(zustand@5.0.15(@types/react@19.3.0)(react@19.3.0))
+      zustand:
+        specifier: ^5.0.15
+        version: 5.0.15(@types/react@19.3.0)(react@19.3.0)
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -496,6 +502,29 @@ packages:
   zod@4.6.5:
     resolution: {integrity: sha1-468+29wmAjnFL3PKrQXbv/5ugs0=}
 
+  zundo@2.3.0:
+    resolution: {integrity: sha1-QjzO9ZySxwhMgJqWeijzTUHSil8=}
+    peerDependencies:
+      zustand: ^4.3.0 || ^5.0.0
+
+  zustand@5.0.15:
+    resolution: {integrity: sha1-Qr3fNWR8uAqBiolDpp9mGMEm/P4=}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: '>=18.0.0'
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
+
 snapshots:
 
   '@flatten-js/core@1.6.14':
@@ -782,3 +811,12 @@ snapshots:
       stackback: 0.0.2
 
   zod@4.6.5: {}
+
+  zundo@2.3.0(zustand@5.0.15(@types/react@19.3.0)(react@19.3.0)):
+    dependencies:
+      zustand: 5.0.15(@types/react@19.3.0)(react@19.3.0)
+
+  zustand@5.0.15(@types/react@19.3.0)(react@19.3.0):
+    optionalDependencies:
+      '@types/react': 19.3.0
+      react: 19.3.0
