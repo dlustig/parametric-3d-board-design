@@ -1,7 +1,16 @@
 import type { JSX } from 'react'
+import { Canvas } from '@/render/Canvas'
+import { Toolbar } from './Toolbar.tsx'
 
 function App(): JSX.Element {
-  return <main>Cutting Board Pattern Designer</main>
+  return (
+    <div className="app">
+      <Toolbar />
+      <main className="canvas-host">
+        <Canvas />
+      </main>
+    </div>
+  )
 }
 
 export default App

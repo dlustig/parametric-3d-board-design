@@ -11,12 +11,21 @@ importers:
       '@flatten-js/core':
         specifier: ^1.6.14
         version: 1.6.14
+      '@use-gesture/react':
+        specifier: ^10.3.1
+        version: 10.3.1(react@19.3.0)
       react:
         specifier: ^19.2.8
         version: 19.3.0
       react-dom:
         specifier: ^19.2.8
         version: 19.3.0(react@19.3.0)
+      react-moveable:
+        specifier: ^0.56.0
+        version: 0.56.0
+      react-selecto:
+        specifier: ^1.26.3
+        version: 1.26.3
       zod:
         specifier: ^4.6.5
         version: 4.6.5
@@ -27,6 +36,9 @@ importers:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.3.0)(react@19.3.0)
     devDependencies:
+      '@playwright/test':
+        specifier: ^1.63.0
+        version: 1.63.0
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.6
@@ -51,6 +63,24 @@ importers:
 
 packages:
 
+  '@cfcs/core@0.0.6':
+    resolution: {integrity: sha1-n4SZ3NKtKf2W2PpyBVQRzUokkSE=}
+
+  '@daybrush/utils@1.13.0':
+    resolution: {integrity: sha1-6nCmCGQTDaR2QG/dHUZeMGiuoP8=}
+
+  '@egjs/agent@2.4.4':
+    resolution: {integrity: sha1-vS70oXQn1CUzKwHz55lTzUE7Uy0=}
+
+  '@egjs/children-differ@1.0.1':
+    resolution: {integrity: sha1-VGX6gGcdXKNWTr6RL0iwWz6KFP0=}
+
+  '@egjs/component@3.0.5':
+    resolution: {integrity: sha1-Lchug11dxQVc30bHzXlOtFMw4bY=}
+
+  '@egjs/list-differ@1.0.1':
+    resolution: {integrity: sha1-V3Kw+Lh5c7tngn9sfX341/ZKIus=}
+
   '@flatten-js/core@1.6.14':
     resolution: {integrity: sha1-mVPFVFhkz+iyZfcssnT8iNqTmUo=}
     engines: {node: '>=4.2.4'}
@@ -71,6 +101,11 @@ packages:
 
   '@oxc-project/types@0.151.0':
     resolution: {integrity: sha1-NyBu0/3ruMTF/EmuINU9m07tK/4=}
+
+  '@playwright/test@1.63.0':
+    resolution: {integrity: sha1-gIAgxG6La5H51ijNDry7Mr39i2w=}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@rolldown/binding-android-arm-eabi@1.2.11':
     resolution: {integrity: sha1-iYscDAxN4f+1mXBQpwXwTMECtOs=}
@@ -171,6 +206,15 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha1-4/zuCT+7XOdl4a0Ij/TeKIn2+b4=}
 
+  '@scena/dragscroll@1.4.0':
+    resolution: {integrity: sha1-IgskMMFhGc0+cARO5TOluaQ8/9c=}
+
+  '@scena/event-emitter@1.0.5':
+    resolution: {integrity: sha1-BH46zvk88jjXzjqMxaEuxr2cO7E=}
+
+  '@scena/matrix@1.1.1':
+    resolution: {integrity: sha1-Upf3GCXHLiwsj4Avkk9ILtIAxDw=}
+
   '@types/chai@5.2.3':
     resolution: {integrity: sha1-jpzZ4cNYH6azQaWu1ViOsoW+C0o=}
 
@@ -190,6 +234,14 @@ packages:
 
   '@types/react@19.3.0':
     resolution: {integrity: sha1-Ozzo2MFif7XM1NrdV+9EXFoVO3c=}
+
+  '@use-gesture/core@10.3.1':
+    resolution: {integrity: sha1-l2yUIekF8AedSYIs/VwuVrgI/FY=}
+
+  '@use-gesture/react@10.3.1':
+    resolution: {integrity: sha1-F6dDqJTZvZoNGYDGGPN/AWRGmGc=}
+    peerDependencies:
+      react: '>= 16.8.0'
 
   '@vitejs/plugin-react@6.1.1':
     resolution: {integrity: sha1-R/oaL5VuiOr3eOv2Xdzo4rNll+c=}
@@ -229,6 +281,12 @@ packages:
     resolution: {integrity: sha1-rkG1LJrKh3NFBTYnF/MlX6zaNg4=}
     engines: {node: '>=18'}
 
+  css-styled@1.0.8:
+    resolution: {integrity: sha1-ycBdxKve9VcQMwkL+4z8XhlCmXQ=}
+
+  css-to-mat@1.1.1:
+    resolution: {integrity: sha1-DdENz57BffFXCMj/B6dPvQuaP+U=}
+
   csstype@3.2.3:
     resolution: {integrity: sha1-7EjA8+mT5QZIyG2lWeJhCZXPmJo=}
 
@@ -255,10 +313,22 @@ packages:
       picomatch:
         optional: true
 
+  framework-utils@1.1.0:
+    resolution: {integrity: sha1-o7UovOg439YjFIhH3JI3GwnQ2i0=}
+
   fsevents@2.3.3:
     resolution: {integrity: sha1-ysZAd4XQNnWipeGlMFxpezR9kNY=}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  gesto@1.19.4:
+    resolution: {integrity: sha1-FJIcqJ5OcMFDB8TZQt8E9Z6wB0k=}
+
+  keycode@2.2.1:
+    resolution: {integrity: sha1-CcI7K+BhHSYRfqJQHCw5GgHznv8=}
+
+  keycon@1.4.0:
+    resolution: {integrity: sha1-vypjPzw7ZZ6lZARZOM/zPlhM69U=}
 
   lightningcss-android-arm64@1.33.0:
     resolution: {integrity: sha1-mmhB+IrlD8g1ApA4krQa9BvCuQc=}
@@ -346,6 +416,9 @@ packages:
     resolution: {integrity: sha1-nEU+/u2oIgUOuXdCQulpx4TWTXg=}
     engines: {node: '>=12.20.0'}
 
+  overlap-area@1.1.0:
+    resolution: {integrity: sha1-H8qiG9ucsazpc9mqKZrmtWVXpMI=}
+
   picocolors@1.1.1:
     resolution: {integrity: sha1-PTIa8+q5ObCDyPkpodEs2oHCa2s=}
 
@@ -353,14 +426,33 @@ packages:
     resolution: {integrity: sha1-YxM2ADTMs2s9xh7L3/eBIfkP4h8=}
     engines: {node: '>=12'}
 
+  playwright-core@1.63.0:
+    resolution: {integrity: sha1-5XZlvDKEbCE6w5oeTVvGIo52s3Y=}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.63.0:
+    resolution: {integrity: sha1-mbVvn2mxtwxE8Av4Sy/lI0iuJRE=}
+    engines: {node: '>=20'}
+    hasBin: true
+
   postcss@8.5.28:
     resolution: {integrity: sha1-2kVjqZoG5i1sHNGsrjYyJLyu1uk=}
     engines: {node: ^10 || ^12 || >=14}
+
+  react-css-styled@1.1.9:
+    resolution: {integrity: sha1-p8yUjkn3Ky9/sTk72FQWqCk6+rM=}
 
   react-dom@19.3.0:
     resolution: {integrity: sha1-oP8ZFh1/TpvlRpoHJ4sMBuAPkAE=}
     peerDependencies:
       react: ^19.3.0
+
+  react-moveable@0.56.0:
+    resolution: {integrity: sha1-NTdWUHlGiqnSQcF9Cl54xWpWKEM=}
+
+  react-selecto@1.26.3:
+    resolution: {integrity: sha1-+QgcAGzuLi/thawYEc/hcTbPgaU=}
 
   react@19.3.0:
     resolution: {integrity: sha1-4gqjoUaHB1zoYzUbWHiwYIw/v7I=}
@@ -373,6 +465,9 @@ packages:
 
   scheduler@0.28.0:
     resolution: {integrity: sha1-A9PKNIrq+LdQL2RGjyF7J1I/lpU=}
+
+  selecto@1.26.3:
+    resolution: {integrity: sha1-EvJZESuUPTlXMVJOO7ARXac3IhI=}
 
   siginfo@2.0.0:
     resolution: {integrity: sha1-MudscLeXJOO7Vny51UPrhYzPrzA=}
@@ -527,6 +622,22 @@ packages:
 
 snapshots:
 
+  '@cfcs/core@0.0.6':
+    dependencies:
+      '@egjs/component': 3.0.5
+
+  '@daybrush/utils@1.13.0': {}
+
+  '@egjs/agent@2.4.4': {}
+
+  '@egjs/children-differ@1.0.1':
+    dependencies:
+      '@egjs/list-differ': 1.0.1
+
+  '@egjs/component@3.0.5': {}
+
+  '@egjs/list-differ@1.0.1': {}
+
   '@flatten-js/core@1.6.14':
     dependencies:
       '@flatten-js/interval-tree': 2.0.3
@@ -545,6 +656,10 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.6.0
 
   '@oxc-project/types@0.151.0': {}
+
+  '@playwright/test@1.63.0':
+    dependencies:
+      playwright: 1.63.0
 
   '@rolldown/binding-android-arm-eabi@1.2.11':
     optional: true
@@ -593,6 +708,19 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
+  '@scena/dragscroll@1.4.0':
+    dependencies:
+      '@daybrush/utils': 1.13.0
+      '@scena/event-emitter': 1.0.5
+
+  '@scena/event-emitter@1.0.5':
+    dependencies:
+      '@daybrush/utils': 1.13.0
+
+  '@scena/matrix@1.1.1':
+    dependencies:
+      '@daybrush/utils': 1.13.0
+
   '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
@@ -614,6 +742,13 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
+  '@use-gesture/core@10.3.1': {}
+
+  '@use-gesture/react@10.3.1(react@19.3.0)':
+    dependencies:
+      '@use-gesture/core': 10.3.1
+      react: 19.3.0
+
   '@vitejs/plugin-react@6.1.1(vite@8.3.1(@types/node@24.13.6))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
@@ -634,6 +769,15 @@ snapshots:
 
   chai@6.2.2: {}
 
+  css-styled@1.0.8:
+    dependencies:
+      '@daybrush/utils': 1.13.0
+
+  css-to-mat@1.1.1:
+    dependencies:
+      '@daybrush/utils': 1.13.0
+      '@scena/matrix': 1.1.1
+
   csstype@3.2.3: {}
 
   detect-libc@2.1.2: {}
@@ -650,8 +794,24 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.7
 
+  framework-utils@1.1.0: {}
+
   fsevents@2.3.3:
     optional: true
+
+  gesto@1.19.4:
+    dependencies:
+      '@daybrush/utils': 1.13.0
+      '@scena/event-emitter': 1.0.5
+
+  keycode@2.2.1: {}
+
+  keycon@1.4.0:
+    dependencies:
+      '@cfcs/core': 0.0.6
+      '@daybrush/utils': 1.13.0
+      '@scena/event-emitter': 1.0.5
+      keycode: 2.2.1
 
   lightningcss-android-arm64@1.33.0:
     optional: true
@@ -710,9 +870,19 @@ snapshots:
 
   obug@2.2.1: {}
 
+  overlap-area@1.1.0:
+    dependencies:
+      '@daybrush/utils': 1.13.0
+
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  playwright-core@1.63.0: {}
+
+  playwright@1.63.0:
+    dependencies:
+      playwright-core: 1.63.0
 
   postcss@8.5.28:
     dependencies:
@@ -720,10 +890,35 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
+  react-css-styled@1.1.9:
+    dependencies:
+      css-styled: 1.0.8
+      framework-utils: 1.1.0
+
   react-dom@19.3.0(react@19.3.0):
     dependencies:
       react: 19.3.0
       scheduler: 0.28.0
+
+  react-moveable@0.56.0:
+    dependencies:
+      '@daybrush/utils': 1.13.0
+      '@egjs/agent': 2.4.4
+      '@egjs/children-differ': 1.0.1
+      '@egjs/list-differ': 1.0.1
+      '@scena/dragscroll': 1.4.0
+      '@scena/event-emitter': 1.0.5
+      '@scena/matrix': 1.1.1
+      css-to-mat: 1.1.1
+      framework-utils: 1.1.0
+      gesto: 1.19.4
+      overlap-area: 1.1.0
+      react-css-styled: 1.1.9
+      react-selecto: 1.26.3
+
+  react-selecto@1.26.3:
+    dependencies:
+      selecto: 1.26.3
 
   react@19.3.0: {}
 
@@ -749,6 +944,19 @@ snapshots:
       '@rolldown/binding-win32-x64-msvc': 1.2.11
 
   scheduler@0.28.0: {}
+
+  selecto@1.26.3:
+    dependencies:
+      '@daybrush/utils': 1.13.0
+      '@egjs/children-differ': 1.0.1
+      '@scena/dragscroll': 1.4.0
+      '@scena/event-emitter': 1.0.5
+      css-styled: 1.0.8
+      css-to-mat: 1.1.1
+      framework-utils: 1.1.0
+      gesto: 1.19.4
+      keycon: 1.4.0
+      overlap-area: 1.1.0
 
   siginfo@2.0.0: {}
 
