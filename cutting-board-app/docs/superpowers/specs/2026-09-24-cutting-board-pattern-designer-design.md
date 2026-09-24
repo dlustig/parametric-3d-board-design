@@ -1,25 +1,22 @@
 # Cutting Board Pattern Designer — V1 SPEC
 
-Status: draft for review. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
+Status: revision 2 after four independent reviews (slop audit; geometry/crossing/export; editor/tablet/persistence; product/authorability). Resolutions are logged in §16. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
 
-This document is the contract for V1. It defines the document model, geometry semantics, crossing identity and compositing, editor behaviour, persistence, export, and acceptance gates. Product intent, scope, and non-goals come from the research packet and are not restated except where a rule depends on them.
+This document is the contract for V1: document model, geometry semantics, crossing identity and compositing, editor behaviour, persistence, export, and acceptance gates. Product intent, scope, and non-goals come from the research packet and are not restated except where a rule depends on them.
 
-## 1. Vocabulary and coordinate conventions
+## 1. Vocabulary and conventions
 
-- **mm** is the only stored unit. All numbers in the document are millimetres or degrees. Display units are `in` or `mm`.
-- **World space**: Board top-left is `(0, 0)`, +X right, +Y down. The Board occupies `[0, widthMm] × [0, heightMm]`. Objects may extend outside the Board and are clipped visually.
-- **Context**: the ordered list that owns an object. Either the Project root or one Motif definition. Objects inside a definition are in **definition space**, whose origin is the definition's pivot.
-- **Occurrence**: one visible copy of a source object after expanding instances and repeats. Addressed by a path (§5.1).
-- **Paint order**: within a context, children are drawn in list order; later children are on top.
-- Angles are degrees in the document and UI; geometry helpers may use radians internally and convert at their boundary.
-- Comparisons of computed geometry always use tolerances (§4.6). `===` on computed coordinates is a defect.
+- **mm** is the only stored unit; angles are degrees. Display units are `in` or `mm`.
+- **World space**: Board top-left is `(0, 0)`, +X right, +Y down. Positive rotation is visually clockwise. Objects may extend outside the Board and are clipped in the finished view.
+- **Context**: the ordered list that owns an object: the Project root or one Motif definition. Objects inside a definition are in **definition space**, whose origin is the definition's pivot.
+- **Occurrence**: one visible copy of a source object after expanding instances and repeats, addressed by a path (§5.1).
+- **Paint order**: within a context, later children are on top. Expansion (§4.4) flattens this to one world list.
+- Computed geometry is compared with tolerances (§4.6), never `===`.
 
 ## 2. Document schema (`schemaVersion: 1`)
 
-Types are shown as TypeScript for precision. The Zod schema in code mirrors this exactly.
-
 ```ts
-type Id = string                          // crypto.randomUUID()
+type Id = string                          // crypto.randomUUID(); validated as /^[A-Za-z0-9_-]{1,64}$/
 
 type Project = {
   schemaVersion: 1
@@ -27,19 +24,18 @@ type Project = {
   name: string
   displayUnits: 'in' | 'mm'
   board: { widthMm: number; heightMm: number; backgroundMaterialId: Id | null }
-  materials: Material[]                   // ordered as shown in the palette
+  materials: Material[]                   // palette order
   objects: Record<Id, DesignObject>       // all source objects, any context
   rootChildren: Id[]                      // paint order, back to front
   motifs: Record<Id, MotifDefinition>
   crossings: Crossing[]                   // records whose context is root
 }
 
-type Material = { id: Id; name: string; color: string }   // color: '#rrggbb'
+type Material = { id: Id; name: string; color: string }   // color matches /^#[0-9a-fA-F]{6}$/
+type Point = { id: Id; x: number; y: number }             // in the owning context's space
 
-type Point = { id: Id; x: number; y: number }             // coordinates in the owning context's space
-
-type Band = { type: 'band'; id: Id; materialId: Id; widthMm: number; points: Point[] }   // ≥ 2 points
-type Region = { type: 'region'; id: Id; materialId: Id; points: Point[] }               // ≥ 3 points
+type Band = { type: 'band'; id: Id; materialId: Id; widthMm: number; closed: boolean; points: Point[] }  // ≥ 2 points; closed needs ≥ 3
+type Region = { type: 'region'; id: Id; materialId: Id; points: Point[] }                                // ≥ 3 points
 
 type Transform = { x: number; y: number; rotationDeg: number; mirrorX: boolean; mirrorY: boolean; scale: number }  // scale > 0
 
@@ -47,332 +43,427 @@ type MotifInstance = { type: 'motif-instance'; id: Id; motifId: Id; transform: T
 
 type RepeatField = {
   type: 'repeat'; id: Id; motifId: Id; transform: Transform
-  rows: number; columns: number          // integers, 1..50 each, rows × columns ≤ 400
-  stepXMm: number; stepYMm: number       // may be negative or zero
-  rowOffsetMm: number                    // X shift applied to odd rows
-  columnOffsetMm: number                 // Y shift applied to odd columns
+  rows: number; columns: number          // integers 1..50
+  stepXMm: number; stepYMm: number       // any finite value
+  rowOffsetMm: number                    // X shift on odd rows
+  columnOffsetMm: number                 // Y shift on odd columns
   alternateMirrorX: boolean              // mirror X on odd columns
   alternateMirrorY: boolean              // mirror Y on odd rows
-  alternateRotationDeg: 0 | 90 | 180     // rotation on cells where (row + column) is odd
+  alternateRotationDeg: 0 | 90 | 180     // rotation where (row + column) is odd
 }
 
 type DesignObject = Band | Region | MotifInstance | RepeatField
-
 type MotifDefinition = { id: Id; name: string; children: Id[]; crossings: Crossing[] }
 
 type Crossing = {                        // §5
   id: Id
-  a: BandRef; b: BandRef                 // canonical order: refKey(a) < refKey(b)
+  a: BandRef; b: BandRef                 // stored in canonical order: refKey(a) < refKey(b)
   over: 'a' | 'b'
-  hint: { x: number; y: number }         // last known intersection point, in the record's context space
+  hint: { x: number; y: number }         // last resolved intersection point, in the record's context space
 }
 type BandRef = { path: Step[]; bandId: Id; segmentStart: Id }
 type Step = { instanceId: Id } | { repeatId: Id; row: number; column: number }
 ```
 
-### 2.1 Ownership and invariants (validated on import and asserted in tests)
+### 2.1 Invariants (validated on import; every command preserves them — tested by a property test over the fixtures)
 
-1. Every object id appears in exactly one of `rootChildren` or one `motifs[*].children`, and every id in those lists exists in `objects`.
-2. Every `materialId`, `motifId`, `backgroundMaterialId` (when non-null), and crossing `bandId` references an existing record. Crossing `bandId` must be a Band. Crossing `path` steps must reference instances or repeats that exist and whose walk from the record's context is consistent (each step's object is a child of the context reached so far; a repeat step's `row`/`column` are within the field's grid).
-3. Point ids are unique within an object. Band ≥ 2 points, Region ≥ 3 points. Consecutive duplicate points (distance < `EPS_GEOMETRY`) are invalid.
-4. Motif reference graph (definition → instances/repeats it contains → their definitions) is acyclic.
-5. All numbers finite. `widthMm > 0`, board dimensions `> 0`, `scale > 0`, repeat limits as above. Total expanded occurrence count for the project ≤ 5000 (§4.4).
-6. Crossing records are unique per context by canonical key (§5.3). `over` refers to the canonical pair.
+1. Every object id appears in exactly one of `rootChildren` or one `motifs[*].children`; every listed id exists in `objects`.
+2. Every `materialId`, `motifId`, non-null `backgroundMaterialId`, and crossing `bandId` references an existing record of the right type. Each crossing `path` walks consistently from the record's context (each step's object is a child of the context reached so far; repeat `row`/`column` are inside the field's grid). `segmentStart` is a point id of that Band. A ref that walks correctly but names the last point of an open Band is valid and simply resolves to nothing.
+3. Point ids are unique within an object. Consecutive points (and first/last of a closed Band or Region) are at least `MIN_SEGMENT_MM` apart.
+4. The motif reference graph is acyclic.
+5. All numbers finite; `widthMm > 0`; board dimensions `> 0`; `scale > 0`; rows/columns integers 1..50; total expanded occurrences ≤ `MAX_OCCURRENCES` (5000).
+6. Within a context, crossing records are unique by canonical key (§5.3), `a ≠ b`, and stored in canonical order.
 
-Invalid documents are rejected whole. Nothing is silently repaired.
+Invalid documents are rejected whole with the first failing path. Nothing is repaired.
 
-### 2.2 Removed from the research model
+### 2.2 Differences from the research model
 
-Bands and Regions do not carry a Transform; move/rotate/mirror bake into `points`. `MotifDefinition.origin` does not exist; children are re-based on creation (§7.3). Rationale in the reconciliation document.
+Bands and Regions carry no Transform (move/rotate/mirror bake into points). `MotifDefinition.origin` does not exist: Create Motif re-bases children so the pivot is at definition `(0, 0)` (§7.4). `Band.closed` is added for borders and outlines.
 
 ## 3. Materials
 
-- Starter palette (created with a new project, all editable): Maple `#E8D4A8`, Walnut `#5C3A21`, Cherry `#A8543A`, Purpleheart `#6B2E6B`, Padauk `#C8402A`, Ash `#DED2B4`, Oak `#C19A6B`, Wenge `#3B2A20`.
-- Add, rename, recolour, and delete (only when unused; the UI shows the usage count). "Replace everywhere" swaps every reference from one material to another in one history step.
-- Clicking a swatch with a non-empty selection assigns that material to every selected Band and Region. Selected instances/repeats are unaffected (their materials live in the definition).
+- Starter palette on a new project (all editable): Maple `#E8D4A8`, Walnut `#5C3A21`, Cherry `#A8543A`, Purpleheart `#6B2E6B`, Padauk `#C8402A`, Ash `#DED2B4`, Oak `#C19A6B`, Wenge `#3B2A20`.
+- Add, rename, recolour; delete only when unused (usage count shown). **Replace everywhere** swaps every reference in one history step.
+- One material is **current** (highlighted swatch). With an empty selection, clicking a swatch sets the current material; new Bands/Regions use it. With Bands/Regions selected, clicking assigns to them. With only instances/repeats selected, the palette shows "Edit the motif to recolour".
 
 ## 4. Geometry semantics
 
-### 4.1 Transform matrix
+### 4.1 Transforms
 
-For a Transform `t`, the matrix applied to local points is `M = T(x, y) · R(rotationDeg) · S(scale) · Mirror(mirrorX, mirrorY)`, i.e. mirror first, then uniform scale, then rotate about the local origin, then translate. Occurrence matrices compose outward: `world = M_parentOccurrence · M_local`. World stroke width of a Band occurrence = `widthMm × product of scales along the path`. Mirror never changes width. `vector-effect: non-scaling-stroke` is never used.
+For `t: Transform`, `M(t) = T(x, y) · R(rotationDeg) · S(scale) · Mirror(mirrorX, mirrorY)` applied to column vectors, where `Mirror` negates x when `mirrorX` and y when `mirrorY`, `S` is uniform, and `R(θ)` in y-down space is `[[cos θ, −sin θ], [sin θ, cos θ]]` (positive θ clockwise on screen). Occurrence matrices compose outward: `world = M_parent · M(t)`. World width of a Band occurrence = `widthMm × ∏ scale` along its path; mirror never changes width. `vector-effect: non-scaling-stroke` is never used.
+
+Mirroring an instance about a world axis: toggle `mirrorX` (or `mirrorY`), negate `rotationDeg`, and reflect `x` (or `y`) about the axis — because `Mx · R(θ) = R(−θ) · Mx`.
+
+`geometry/affine.ts` owns matrix composition and inversion (Flatten's `Matrix` has no inverse; inversion is needed for edit-context input mapping). No second matrix type.
 
 ### 4.2 Bands
 
-A Band renders as an SVG path along its points with `stroke = material colour`, `stroke-width = world width`, `stroke-linejoin = miter`, `stroke-miterlimit = 10`, `stroke-linecap = butt`, `fill = none`. Segment `i` runs from `points[i]` to `points[i+1]` and is identified by `points[i].id` (its start point).
+Rendered as an SVG path along its points (`Z` when closed) with `fill="none"`, `stroke` = material colour, `stroke-width` = world width, `stroke-linejoin="miter"`, `stroke-miterlimit="10"`, `stroke-linecap="butt"`. Segment `i` runs from `points[i]` to `points[i+1]` and is identified by `points[i].id`; a closed Band's closing segment is identified by the last point's id.
 
 ### 4.3 Regions
 
-A Region renders as a closed SVG path (`Z`) with `fill = material colour`, no stroke, `fill-rule = nonzero`. Self-intersecting polygons are allowed and render per `nonzero`; the editor does not prevent them.
+Rendered as a closed path with `fill` = material colour, `fill-rule="nonzero"`, plus a same-colour stroke of `REGION_SEAM_MM` (0.1 mm) so abutting Regions show no anti-aliased background seam. This is a rendering choice, not geometry; the inspector and export dimensions are the polygon's. Self-intersecting polygons are allowed.
 
 ### 4.4 Expansion
 
-`expand(project)` produces the flat world-space occurrence list in paint order:
+`expand(project)` yields the flat world occurrence list in paint order:
 
-- Root children in order. A Band/Region yields one occurrence with `path = []` and identity matrix.
-- A MotifInstance yields the definition's children (recursively) with `path = [...parentPath, { instanceId }]` and matrix `parent · M(transform)`.
-- A RepeatField yields, for `row in 0..rows-1`, `column in 0..columns-1` (row-major), the definition's children with `path = [...parentPath, { repeatId, row, column }]` and matrix `parent · M(transform) · Cell(row, column)` where
+- Root children in order. A Band/Region yields one occurrence, `path = []`, identity matrix.
+- A MotifInstance yields the definition's children recursively with `path = [...parent, { instanceId }]`, matrix `parent · M(t)`.
+- A RepeatField yields, row-major over `rows × columns`, the definition's children with `path = [...parent, { repeatId, row, column }]` and matrix `parent · M(t) · Cell(row, column)`:
 
 ```
 Cell(r, c) = T(c·stepX + (r odd ? rowOffset : 0),  r·stepY + (c odd ? columnOffset : 0))
-           · R(alternateRotationDeg if (r + c) odd else 0)
+           · R((r + c) odd ? alternateRotationDeg : 0)
            · Mirror(alternateMirrorX && c odd, alternateMirrorY && r odd)
 ```
 
-Each occurrence carries: `key` (§5.1), `kind`, `sourceId`, `path`, `matrix`, `materialId`, `worldPoints`, and for Bands `worldWidth`. The cap of 5000 occurrences is enforced by commands (a change that would exceed it is rejected with a visible message) and by import validation.
+Each occurrence carries `key` (§5.1), `kind`, `sourceId`, `path`, `matrix`, `materialId`, `worldPoints`, and for Bands `worldWidth`, `closed`. Commands that would exceed `MAX_OCCURRENCES` are rejected with a visible message.
 
 ### 4.5 Bounds
 
-Band occurrence bounds are the bounds of its stroke: polyline bounds expanded by `worldWidth / 2` (an approximation at miter tips; sufficient for selection, fit, and prefiltering). Region bounds are polygon bounds. Instance/repeat bounds are the union of their occurrences' bounds.
+- **Painted bounds** of a Band occurrence: union of its segments' stroke rectangles (each segment's endpoints offset ±`w/2` along the segment normal). Exact at butt ends; miter tips may exceed it slightly. Used for selection proxies, marquee, fit, and the default repeat step.
+- **Conservative bounds**: polyline bounds expanded by `2.5 × w` (the miter-limit-10 tip extent). Used only to prefilter pair tests.
+- Region bounds are polygon bounds. Instance/repeat bounds are the union of their occurrences' painted bounds.
 
-### 4.6 Tolerances (single module `geometry/tolerance.ts`)
+### 4.6 Tolerances and constants (`geometry/tolerance.ts`)
 
 | Name | Value | Use |
 | --- | --- | --- |
-| `EPS_GEOMETRY` | 1e-6 mm | point equality, degenerate segments, parameter interior test |
-| `MIN_CROSSING_ANGLE_DEG` | 10° | below this a centreline intersection is unsupported (near-parallel) |
-| `CLIP_EXTEND_MM` | 0.05 mm | extension of the crossing clip across the under Band's edges (§6.2) |
-| `REMATCH_TOLERANCE_MM` | 3 mm | distance from `hint` within which a lost crossing may rebind (§5.5) |
-| `SNAP_TOLERANCE_PX` | 8 screen px | converted to mm through the current zoom |
-| `ANGLE_SNAP_DEG` | 15° step, ±4° capture | while drawing Band segments |
+| `EPS_GEOMETRY` | 1e-6 mm | point equality, parameter interior test |
+| `MIN_SEGMENT_MM` | 0.01 mm | shortest legal segment; closer points are merged by commands |
+| `MIN_CROSSING_ANGLE_DEG` | 10° | below this an intersection is `near-parallel` |
+| `EPS_OVERLAP_MM` | 0.01 mm | minimum footprint penetration to count as overlap |
+| `REMATCH_TOLERANCE_MM` | 3 mm | rebind radius around `hint` (§5.5) |
+| `MAX_OCCURRENCES` | 5000 | expansion cap |
+| `REGION_SEAM_MM` | 0.1 mm | §4.3 |
+| `EXPORT_CLIP_EXTEND_MM` | 0.2 mm | §6.2 clip enlargement in export |
+| `EDITOR_CLIP_EXTEND_PX` | 1.5 px | §6.2 clip enlargement in the editor, converted at current zoom |
+| `SNAP_TOLERANCE_PX` | 8 px | converted to mm through zoom (and occurrence scale in edit context) |
+| `ANGLE_SNAP_DEG` | 15° step, ±4° capture | while drawing segments |
+| `TAP_SLOP_PX`, `DOUBLE_TAP_MS` | 6 px, 300 ms | tap vs drag, double-tap detection |
 
 ## 5. Crossings: identity, scope, resolution
 
-### 5.1 Occurrence keys
+### 5.1 Keys
 
-`stepKey({instanceId}) = 'i:' + instanceId`; `stepKey({repeatId,row,column}) = 'r:' + repeatId + ':' + row + ':' + column`. `occurrenceKey = stepKeys.join('/') + '#' + sourceId` (empty path → `'#' + sourceId`). `refKey(ref) = occurrenceKey(ref.path, ref.bandId) + '@' + ref.segmentStart`.
+`stepKey({instanceId}) = 'i:' + id`; `stepKey({repeatId,row,column}) = 'r:' + id + ':' + row + ':' + column`. `occurrenceKey(path, sourceId) = stepKeys.join('/') + '#' + sourceId`. `refKey(ref) = occurrenceKey(ref.path, ref.bandId) + '@' + ref.segmentStart`. Ids cannot contain `:/#@|` by validation, so keys are unambiguous.
 
 ### 5.2 Intersection discovery and classification
 
-Performed on Band occurrences in one common space: world space for the root, or definition space (identity at the definition) when evaluating a definition context. Segment intersections use `@flatten-js/core` `Segment.intersect`. Pairs of occurrences are prefiltered by stroke bounds overlap.
+Runs on Band occurrences in one space: world space for rendering; definition space (identity at the definition) when evaluating a definition context. Pairs are prefiltered by conservative bounds; segment intersections use Flatten `Segment.intersect`. Segments of the same occurrence are never compared.
 
-For every pair of segments from two **distinct** occurrences that intersect, classify:
+Every intersection point between segments `sA` (occurrence A, width `wA`) and `sB` gets exactly one class, decided in this precedence order (first match wins):
 
-| Class | Condition | Behaviour |
-| --- | --- | --- |
-| `eligible` | exactly one intersection point; parameters on both segments in `(EPS, 1−EPS)` scaled by segment length (interior); angle between directions in `[MIN_CROSSING_ANGLE_DEG, 180 − MIN_CROSSING_ANGLE_DEG]`; footprint (§6.1) does not overlap any other intersection footprint on either occurrence | toggleable |
-| `endpoint` | an intersection parameter is within `EPS` of 0 or 1 on either segment (includes a crossing exactly at a polyline joint) | unsupported |
-| `collinear` | segments overlap along a length | unsupported |
-| `near-parallel` | angle outside the eligible range | unsupported |
-| `crowded` | footprint overlaps another intersection's footprint on either occurrence (includes triple points and adjacent crossings) | unsupported |
+| Class | Condition |
+| --- | --- |
+| `ignored` | both parameters are at segment ends (endpoint-to-endpoint contact, e.g. collinear Band ends meeting at a repeat seam). Not listed, not marked. |
+| `collinear` | the segments overlap along a length |
+| `endpoint` | a parameter is within `EPS_GEOMETRY` (scaled by segment length) of 0 or 1 on either segment, including a crossing exactly at a polyline joint |
+| `near-parallel` | angle between directions outside `[MIN_CROSSING_ANGLE_DEG, 180 − MIN_CROSSING_ANGLE_DEG]` |
+| `near-joint` | an interior vertex of either Band lies within `halfDiagonal(footprint) + miterExtent(vertex)` of the point, where `miterExtent = w / (2 sin(φ/2))` capped at `5w` for joint angle φ |
+| `occluded` | some element strictly between A and B in paint order has painted geometry (segment stroke rectangles or Region polygon) penetrating the enlarged footprint (§6.2) by more than `EPS_OVERLAP_MM` |
+| `crowded` | the enlarged footprint penetrates another listed intersection's footprint on either occurrence by more than `EPS_OVERLAP_MM`. Proxy footprints: `collinear` uses the overlap strip; `endpoint` uses a disc of radius `max(w)`. Triple points and adjacent crossings land here. |
+| `eligible` | everything else |
 
-Segments within the same occurrence are never compared (self-intersection is not a crossing; the Band paints over itself in path order). Unsupported intersections are listed with their reason and drawn with a distinct marker when the Crossing tool is active; they receive no toggle and no record can bind to them. If a record's target becomes unsupported, the record is unresolved (§5.5).
+Unsupported classes carry their reason. They are drawn with a distinct marker in the Crossing tool and get no toggle; tapping one shows the reason in the tool options bar. **Render eligibility is always decided per world intersection.** A definition record can be resolved in its own space while a particular world occurrence of it is additionally `unsupported (world)` because of neighbouring cells or root objects; that occurrence renders by paint order and is marked.
 
-### 5.3 Records and scope
+### 5.3 Records, scope, precedence
 
-A Crossing record lives in exactly one context: `project.crossings` (root) or `motifs[m].crossings` (definition). Its two `BandRef`s are relative to that context. Canonical order sorts `a` and `b` by `refKey`, so selection order never changes identity. The record's canonical key is `refKey(a) + '|' + refKey(b)`; unique per context.
+A record lives in exactly one context (`project.crossings` or `motifs[m].crossings`); its refs are relative to that context. `canonicalize(record)` sorts `a`/`b` by `refKey` and swaps `over` accordingly; every write goes through it. Canonical key = `refKey(a) + '|' + refKey(b)`.
 
-- A record in a definition with empty paths applies to **every occurrence** of that definition ("all instances").
-- A record in the root context with non-empty paths applies to **exactly one** occurrence pair ("this occurrence only").
-- Records may also live in an intermediate definition with non-empty paths (a nested instance addressed from an outer definition). V1 UI creates only the two forms above; the resolver handles all three.
+- A record in a definition with empty paths applies to every occurrence of the definition ("all instances").
+- A record in the root context with non-empty paths applies to one occurrence pair ("this occurrence").
+- Records in a definition with non-empty paths (a nested instance addressed from an outer definition) arise from Create Motif (§5.6) and from toggles inside nested contexts. The resolver treats all three forms uniformly.
 
-**Precedence.** For an eligible intersection between world occurrences `A` and `B`, candidate records are found by walking contexts from the root inward along the occurrences' common ancestry: at each context, strip the common path prefix and look up the record by canonical key. **The record found in the outermost context wins** (it names the most specific occurrence). If no record exists, the default is paint order: the occurrence later in the flat expansion is over.
+**Common ancestor** of two occurrences = their longest common path prefix. Their **contexts** are: root, then the definition of each step in the common prefix, innermost last.
+
+**Precedence.** For a world intersection between `A` and `B`, look up the canonical key in each context from outermost (root, full paths) inward (paths with the prefix stripped). **The outermost record found wins.** With no record, paint order decides: the later occurrence is over.
+
+**Limit (V1).** Occurrences with no common motif ancestor (two cells of one repeat, two instances, or a root Band and an instance interior) can only have root records. Their default is paint order, and the scope control is hidden. Fixture F keeps every strand crossing inside its cell.
 
 ### 5.4 Toggle semantics
 
-Toggling an eligible intersection flips the effective over/under. The Crossing tool has a scope control, visible only when both occurrences share at least one motif ancestor: **All instances** (default) or **This occurrence**. 
+Toggling an eligible intersection flips the effective over/under. The Crossing tool shows a scope control only when the pair has a common motif ancestor: **All instances** (default) or **This occurrence**.
 
-- *All instances*: the record is written in the innermost common definition context with paths relative to it. Any more-specific root record for the same pair is removed so the toggle is visible (otherwise the root record would keep winning).
-- *This occurrence*: the record is written in the root context with full paths. Definition records are untouched.
-- If a record already exists in the target context, `over` flips. If flipping makes it equal to the paint-order default and no outer record shadows it, the record is still kept (explicit intent survives reordering).
-- A toggle on an eligible intersection whose pair has an unresolved record in the target context rebinds that record (§5.5) instead of creating a new one.
+- *All instances*: write (or flip) the record in the innermost common definition; remove records for the same pair from every context outside it, so the toggle is visible everywhere.
+- *This occurrence*: write (or flip) the root record. If the result equals the value the outer contexts would give without it, delete the root record instead (an override never shadows silently). Overridden occurrences get a distinct badge; the inspector lists a selected instance's/repeat's overrides with **Remove**.
+- If the pair has an unresolved record in the target context, the toggle rebinds it (§5.5) and sets `over`.
 
-### 5.5 Topology edits and rematching
+### 5.5 Rematching after edits
 
-After any command that changes Band points (move, rotate, mirror, vertex drag, vertex insert/delete, duplicate does not count), `rematchCrossings(project)` runs inside the same history step:
+Every command that changes any occurrence geometry or width (point edits, transforms, repeat parameters, width, definition edits, detach) ends with `rematchCrossings(before, after)` inside the same history step, computed from the pre-command project to the committed one (never per preview frame):
 
-1. For each record, evaluate its context. If an eligible intersection exists between the referenced occurrence pair on the referenced segments, update `hint` to the intersection point. Done.
-2. Otherwise collect eligible intersections between the same occurrence pair (any segments) within `REMATCH_TOLERANCE_MM` of `hint`. If exactly one, rebind `segmentStart` on the changed side(s) and update `hint`. 
-3. Otherwise leave the record untouched. It is **unresolved**: derived at scene build time, never stored.
+1. For every record resolved in `before` (its refs yielded a listed intersection), evaluate in `after`. If its refs still yield an intersection, update `hint`.
+2. Otherwise collect listed intersections of the same occurrence pair within `REMATCH_TOLERANCE_MM` of `hint` that (a) did not exist as an intersection of that pair in `before` and (b) are not bound by another record in that context. Process lost records in canonical-key order. Exactly one candidate → rebind `segmentStart` (on the changed side or sides) and `hint`; otherwise leave the record untouched.
+3. Records already unresolved in `before` are never auto-rebound; only an explicit toggle (§5.4) rebinds them, choosing the nearest hint if several match.
 
-Unresolved records render as a marker at `hint` in the Crossing tool and are listed in the inspector when a referenced Band or motif is selected, with a **Remove** action. Undo restores records exactly; import/export carries records verbatim, so an unresolved record stays unresolved across save/reopen until removed or rebound.
+A record with no matching intersection is **unresolved**, a derived state. Unresolved records show a ring marker at `hint` (per occurrence, mapped to world) and appear in the inspector with **Remove** whenever a referenced Band, instance, or repeat is selected. Undo restores records exactly; import/export carries them verbatim.
 
-A record referencing a deleted Band, instance, or repeat is removed by the delete command. A record inside a definition survives instance deletion.
+Deleting a Band, instance, or repeat removes records that reference it; shrinking a repeat removes root records addressing removed cells. Deleting a vertex rewrites `segmentStart` of records naming it to the previous point (the merged segment) before rematching. Definition records survive instance deletion.
 
 ### 5.6 Motif operations and records
 
-- **Create Motif** from a selection: records between two selected Bands move from the context into the new definition unchanged. Records between a selected Band and an unselected Band stay in the context with the selected side's path prefixed by the new instance step. Records involving the selection through repeats are impossible (repeats cannot be partially selected).
-- **Detach instance**: definition children are copied into the context with baked points and widths; definition records between them are copied into the context with fresh ids and empty paths; context records whose path begins with that instance step have the step removed and `bandId` remapped.
-- **Delete definition**: allowed only when unused.
+- **Create Motif** (§7.4): a ref is *inside* the selection if its `bandId` is a selected object or its path begins with a selected instance/repeat. Records with both refs inside move into the new definition unchanged (nested paths included). Records with one ref inside stay in the context with that ref's path prefixed by the new instance step. All moved records are re-canonicalized.
+- **Detach instance**: definition children are copied into the context with baked points, widths × scale, and fresh ids for objects, points, and nested instances/repeats; definition records are copied with fresh ids, empty paths, and every copied id remapped in `bandId` and path steps. Context records whose path begins with the instance step have the step removed and all ids remapped. Where a copied definition record and an existing context record collide on canonical key, the context record (the override) wins and the copy is dropped.
+- A definition that loses its last instance/repeat is deleted in the same history step (undo restores both). Motif names are edited from the instance/repeat inspector.
 
-## 6. Compositing (the over/under render)
+## 6. Compositing
 
 ### 6.1 Footprint
 
-For an eligible intersection between segments `sA` (world width `wA`) and `sB` (`wB`), the footprint is the parallelogram bounded by the two stroke edges of `sA` and the two stroke edges of `sB`: the four corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`. Computed analytically in `geometry/footprint.ts`. Footprint overlap for the `crowded` class is a polygon-intersection test on these parallelograms.
+For segments `sA` (width `wA`) and `sB` (`wB`) crossing transversely, `footprint(sA, wA, sB, wB)` is the parallelogram bounded by the two stroke edges of each segment: its corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`, computed analytically in `geometry/footprint.ts`. Overlap tests between footprints and other polygons use Flatten polygon intersection with the `EPS_OVERLAP_MM` penetration threshold.
 
 ### 6.2 Patch
 
-Let `O` be the over occurrence and `U` the under occurrence at an eligible intersection. If `O` is already later than `U` in paint order, nothing is drawn. Otherwise the scene inserts a **patch** immediately after `U`:
+`buildScene(project, clipExtendMm)` takes the enlargement as a parameter: the editor passes `EDITOR_CLIP_EXTEND_PX / zoom`, export passes `EXPORT_CLIP_EXTEND_MM`. The **enlarged footprint** uses `wA + 2e` and `wB + 2e`.
+
+Let `O` be the effective over occurrence and `U` the under at an eligible intersection. If `O` is already after `U` in paint order, nothing is drawn. Otherwise the scene inserts a patch immediately after `U`:
 
 ```svg
-<clipPath id="{prefix}-clip-{n}" clipPathUnits="userSpaceOnUse"><polygon points="…"/></clipPath>
-<path d="{O's full world path}" stroke="{O material}" stroke-width="{wO}" … clip-path="url(#{prefix}-clip-{n})"/>
+<clipPath id="{prefix}-c{n}" clipPathUnits="userSpaceOnUse"><polygon points="…enlarged footprint…"/></clipPath>
+<path d="M x1 y1 L x2 y2" fill="none" stroke="{O colour}" stroke-width="{wO}" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt" clip-path="url(#{prefix}-c{n})"/>
 ```
 
-The clip polygon is the footprint computed with `U`'s width enlarged by `2 × CLIP_EXTEND_MM`, so the patch overlaps `O`'s own paint by a hair across `U`'s edges (harmless) while its edges along `O`'s stroke coincide with `O`'s real edges (any anti-aliasing blends against `U`, not background). Because the patch is placed right after `U`, anything painted above `U` still covers both. Patches never modify `U`'s paint, so two crossings on the same Band are independent by construction. Ids use a per-render prefix so editor and export never collide.
+The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach, so O's segment stroke equals O's real paint there). Enlarging across both Bands' edges removes anti-aliasing seams: across O's edges the extra area is limited by O's own stroke; across U's edges it overpaints O's own colour on O's path. The `occluded` class guarantees nothing painted between U and O meets the enlarged footprint, so the overpaint is invisible. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
 
 ### 6.3 Scene
 
-`buildScene(project): Scene` is the single derivation used by both the React renderer and the SVG exporter:
+One derivation feeds the React renderer and the exporter:
 
 ```ts
 type Scene = {
   elements: Array<
     | { kind: 'region'; occurrence: RegionOccurrence }
     | { kind: 'band'; occurrence: BandOccurrence }
-    | { kind: 'patch'; over: BandOccurrence; clip: Point[] }
+    | { kind: 'patch'; over: BandOccurrence; segment: [Point, Point]; clip: Point[] }
   >
-  intersections: Intersection[]        // eligible + unsupported, with world point, class, and effective over key
-  unresolved: Array<{ record: Crossing; contextId: Id | null; worldHint: Point }>
+  intersections: Intersection[]      // every listed world intersection: point, class, reason, effective over key, record source ('default' | 'definition' | 'override'), footprint
+  unresolved: Array<{ record: Crossing; contextId: Id | null; occurrenceKey: string; worldHint: Point }>
 }
 ```
 
 ## 7. Editor
 
-### 7.1 State
+### 7.1 State and history
 
-Three stores of concern in one Zustand store:
+One Zustand store with:
 
-- `project` — the document. Wrapped by zundo `temporal` with `partialize` to `project` only and `limit: 100`.
-- `preview` — `Project | null`. Commands that run per frame (drag, rotate, inspector typing) write here; the renderer uses `preview ?? project`. `commit()` copies the preview into `project` (one history entry) and clears it; `cancel()` clears it. History never sees preview frames.
-- Ephemeral: `tool`, `selection: Id[]`, `editContext: { motifId, path: Step[] } | null`, `camera: { x, y, zoom }`, `snapEnabled`, `crossingScope`, `save status`, drawing-in-progress state.
+- `project` — the document, wrapped by zundo `temporal({ partialize: s => ({ project: s.project }), equality: (a, b) => a.project === b.project, limit: 100 })`. The equality is required: without it camera and selection writes push duplicate entries and clear redo.
+- `preview: { base: Project; next: Project; onInterrupt: 'commit' | 'cancel' } | null`. Pointer gestures and inspector typing write `next`, always recomputed from `base` with the cumulative gesture arguments (never frame-on-frame). The renderer uses `preview?.next ?? project`.
+- `settlePreview()` runs before **any** command, undo, redo, import, or New Project: inspector previews commit, gesture previews cancel. `commit()` asserts `project === preview.base`, replaces `project` with `rematch(base, next)` result, and clears the preview. History therefore sees exactly one entry per gesture or field edit, and never a preview frame.
+- Ephemeral: `tool`, `selection: Id[]`, `editContext: { motifId, path: Step[] }[]`, `camera`, `snapEnabled`, `addToSelection`, `crossingScope`, `currentMaterialId`, drawing state, save status, `lastMoveDelta`.
 
-Commands are pure functions `(project, args) → project` in `domain/commands/`, unit-tested without React. Any command that changes Band points ends with `rematchCrossings`.
+After undo, redo, or import: drop selection ids that no longer exist, pop `editContext` to the deepest level whose motif and path still validate, cancel any drawing. Undo and redo trigger autosave like commits.
 
-### 7.2 Camera and input
+Commands are pure `(project, args) → project` in `domain/commands/`, tested without React. Every command's output must satisfy §2.1.
 
-- One camera transform: `viewBox` of the root `<svg>` derived from `camera`. Screen→world uses `getScreenCTM().inverse()`.
-- `@use-gesture/react` on the canvas handles: wheel zoom about the cursor, pinch zoom about the pinch centre, two-finger drag pan, middle-button drag pan, `Space`+drag pan. Single-pointer gestures go to the active tool.
-- The canvas sets `touch-action: none`. `pointercancel` cancels the current drag/drawing and clears `preview`.
-- Zoom limits: 0.05–50 px/mm. Fit: Board bounds plus 5% margin.
+### 7.2 Camera and input ownership
 
-### 7.3 Tools
+- The root `<svg>`'s `viewBox` is derived from `camera` and kept at the wrapper's client aspect ratio via `ResizeObserver` (no letterboxing, so zoom-about-cursor is exact). Screen→world uses `getScreenCTM().inverse()`.
+- The canvas wrapper `<div>` has `touch-action: none`; `html, body` have `overflow: hidden; overscroll-behavior: none`; the viewport meta disables user zoom. Moveable's `container` is the wrapper, so its handles inherit `touch-action`.
 
-Tool keys: `V` select, `B` band, `R` rectangle region, `P` polygon region, `X` crossing. `Esc` cancels an in-progress drawing or returns to Select. Tablet gets the same tools in a rail with ≥ 44 px targets and visible **Finish** / **Cancel** buttons during Band and polygon drawing.
+Input ownership (the proof in Slice 1 verifies each row):
 
-- **Select**: click selects the topmost object at point within the current context (occurrences inside instances/repeats select their top-level instance/repeat). `Shift`+click toggles. Marquee (drag on empty space) selects objects whose bounds intersect the marquee (react-selecto, with its element-geometry callback configured for rotated targets). Selected objects get react-moveable handles: drag to move (commits baked translation for Bands/Regions, transform `x/y` for instances/repeats), rotate handle around the selection's bounds centre (snaps to 15° with `Shift` or when snap is on and within ±4°). Resize/scale handles are disabled. Double-click a Band vertex region: vertex drag; double-click an instance or repeat: enter its definition (§7.5).
-- **Band**: click/tap to place points with live segment length and angle labels; move shows the pending segment; `Enter`, double-click, or **Finish** ends (≥ 2 points required, else cancelled); `Backspace` removes the last placed point. New Bands take the current material and the last-used width (default 6.35 mm = 1/4").
-- **Rectangle region**: drag from corner to corner; produces a 4-point Region.
-- **Polygon region**: same placement flow as Band; ≥ 3 points; closes on Finish.
-- **Crossing**: all intersections are drawn as markers (filled circle for eligible, hatched for unsupported with a tooltip reason, ring for unresolved records). Click/tap an eligible marker toggles per §5.4 using the scope control in the tool options bar. Marker hit radius is 12 screen px, independent of Band paint.
+| Input | Owner | Notes |
+| --- | --- | --- |
+| Plain wheel | use-gesture | pans |
+| Ctrl/Cmd + wheel, trackpad pinch (`ctrlKey` wheel), Safari `gesture*` | use-gesture | zooms about cursor; `preventDefault` (`eventOptions: { passive: false }`) |
+| Two-finger drag / pinch | use-gesture | pan/zoom; on the second pointer, any Moveable drag is stopped and cancelled and any Selecto marquee aborted |
+| Middle button drag, `Space`+drag, Hand tool (`H`) drag | use-gesture | pan; Moveable `draggable={false}` while Space is held |
+| Single pointer on a selection proxy or handle | react-moveable | drag/rotate; commits only when `isDrag` and the ending event is not `touchcancel`, else cancel |
+| Single pointer on empty space in Select | react-selecto | marquee over proxies, `getElementRect` from domain bounds |
+| Single pointer in drawing tools | tool code (Pointer Events) | Moveable and Selecto are unmounted |
+| `pointercancel` | tool/use-gesture | cancel preview, restore state |
 
-Drawing takes place in the current edit context; screen points are inverse-mapped through the entered occurrence matrix into definition space.
+Never `preventDefault` on canvas `pointerdown`: it suppresses the compatibility mouse events Moveable and Selecto (Gesto) rely on. Zoom limits 0.05–50 px/mm. Fit: Board bounds + 5% margin. Top bar has −, +, Fit.
 
-### 7.4 Selection commands
+### 7.3 Selection proxies
 
-Delete/Backspace, duplicate (`Ctrl/Cmd+D`, offset by one grid step), copy/paste (`Ctrl/Cmd+C/V`, in-app clipboard of DesignObjects and their definition-internal crossings), mirror X / mirror Y (about the selection bounds centre), rotate 90° CW/CCW, arrow nudge by one grid step (`Shift` ×10), bring forward / send backward / to front / to back, Create Motif (`Ctrl/Cmd+G`), Repeat, Detach. All are toolbar/inspector buttons as well as keys.
+The scene is flat occurrences, so Moveable and Selecto need one DOM target per selectable object. The renderer emits, for each top-level object in the current context, an invisible `<rect data-object-id>` at its painted bounds in world space. Proxies are the only Moveable targets and Selecto selectables. During a rotate gesture the proxy rect is frozen at gesture start and the angle is computed from pointer positions about the fixed centre, so the handle does not move under the finger as baked points change. Hit testing for click-select uses domain geometry (topmost occurrence under the point maps to its top-level object).
 
-### 7.5 Edit context
+### 7.4 Tools and commands
 
-Entering a definition (double-click an instance or repeat cell, or **Edit Motif** in the inspector) pushes `{ motifId, path }` where `path` is the clicked occurrence's path. The breadcrumb shows `Board / Motif: Name` with a **Done** button. While entered: only that definition's children are selectable and drawable; everything else is drawn at 40% opacity; edits go to the definition so every occurrence updates live; the inspector shows definition-space values (width is the definition's width; the world width is shown read-only when scale ≠ 1). Nested entry is allowed by double-clicking a nested instance inside the entered definition. `Esc` with nothing in progress pops one level.
+Tool keys: `V` select, `H` hand, `B` band, `R` rectangle region, `P` polygon region, `X` crossing. The rail shows the same tools with ≥ 44 px targets plus toggles **Snap**, **Add to selection** (tap acts as Shift+tap), and **Show grid**.
 
-### 7.6 Inspector (right panel, context sensitive)
+- **Select**: tap selects the topmost object at the point; Shift or Add-to-selection toggles; marquee selects objects whose painted bounds intersect it. Moveable handles: drag (translate), rotate handle about the selection's painted-bounds centre (snaps to 15° with Shift or when snap is on within ±4°). No resize/scale handles. A single selected Band or Region also shows **vertex handles** (drag with snapping) and **midpoint handles** (drag to insert a vertex); dragging a vertex onto its neighbour within snap tolerance deletes it. Double-tap an instance or repeat cell enters its definition (§7.6).
+- **Band / Polygon**: points are placed on `pointerup` when movement is under `TAP_SLOP_PX` and no second pointer arrived. A tool options bar shows the pending segment's **Length** and **Angle** as editable fields (Enter places the point from the typed values), the live snapped values otherwise. Angle snap applies to both tools. A point within snap tolerance of the previous point is merged. Own double-tap detection (`DOUBLE_TAP_MS`, ≤ 10 px) finishes and discards the second tap. **Finish**, **Undo point**, **Cancel** buttons appear in the options bar; keys: Enter finishes, Backspace removes the last point (Ctrl+Z too, while drawing), Esc cancels. Band needs ≥ 2 points; tapping the first point of a polygon closes it (≥ 3 points). A Band drawn back onto its first point becomes `closed`. New objects use the current material and last-used width (default 6.35 mm).
+- **Rectangle**: drag corner to corner; 4-point Region.
+- **Crossing**: draws markers for every listed intersection (filled = eligible, badge = overridden, hatched = unsupported, ring = unresolved). Tap an eligible marker to toggle per §5.4 using the scope control in the options bar; tap an unsupported marker to read its reason. Hit radius 12 px for mouse, 22 px for touch; nearest centre wins.
 
-- Board: width, height, background material, display units, project name.
-- Band: material, width, per-point X/Y list with insert/delete vertex; for 2-point Bands also length and angle (editing angle rotates about the start point; editing length moves the end point).
-- Region: material, per-point X/Y with insert/delete vertex.
-- Motif instance: definition name (link to Edit), X, Y, rotation, mirror X/Y, scale; Detach.
-- Repeat: all fields of §2 plus the same transform fields; live preview while typing.
-- Multi-selection: material assignment and transform commands only.
-- Any selection with unresolved records: list with Remove.
+Selection commands (toolbar buttons and keys; all operate in the current context): Delete/Backspace; **Duplicate** (`Ctrl/Cmd+D`, in place; if the selection was moved since the last duplicate, the copy is offset by `lastMoveDelta`, giving a linear array by repetition); copy/paste (`Ctrl/Cmd+C/V`, in place, in-app clipboard including definition-internal records); **Mirror X / Y** about the painted-bounds centre; **Rotate 90° CW/CCW** and **Rotate by °** about the same centre; arrow nudge one grid step (Shift ×10; screen axes, mapped into the context); Bring forward / Send backward / To front / To back; **Offset copy** (Band only: a parallel copy on the chosen side at perpendicular distance `(w + w')/2` with miter-offset joints; width `w'` defaults to `w`); **Create Motif** (`Ctrl/Cmd+G`); **Repeat**; **Detach**.
 
-All numeric fields are `<input type="text" inputMode="decimal">` using the unit parser (§8). Preview applies on each valid keystroke; commit on `Enter` or blur; `Esc` reverts. Invalid text shows an inline error and does not preview.
+**Create Motif**: pivot = centre of the selection's painted bounds. Children are re-based so the pivot is definition `(0,0)`; the new instance has `x, y` = pivot, replacing the selection at the topmost selected child's position in paint order. A pivot marker is drawn on selected instances. **Repeat**: on one instance, replaces it with a 2×2 RepeatField with the same motif and transform and steps equal to the definition's painted-bounds size × scale (seamless by default); on any other selection, performs Create Motif then Repeat.
+
+Keyboard dispatch is one listener that ignores events whose target is an input, textarea, select, or contenteditable (Esc excepted: it reverts the field and stops). Modifiers are matched exactly. Esc order: cancel gesture → cancel drawing → clear selection → pop edit context → Select tool.
+
+### 7.5 Inspector (right panel)
+
+- Board: name, width, height, background material, display units, grid spacing.
+- Any selection: bounds X/Y (edits translate), Rotate by, Mirror X/Y, material (Bands/Regions), order buttons.
+- Band: material, width, closed, per-point X/Y with per-segment length and angle (editing a segment moves its end point and translates the points after it), insert/delete vertex; **crossings list** (each listed intersection of this Band with an over/under toggle button — the keyboard path for crossings) and unresolved records with Remove.
+- Region: material, width/height of bounds (edits scale the polygon about the bounds origin), per-point X/Y, insert/delete.
+- Instance: motif name (editable), X, Y, rotation, mirror X/Y, scale, world width read-out, Edit Motif, Detach, overrides list.
+- Repeat: all §2 fields with **½ step** buttons beside the offsets, transform fields, Edit Motif, overrides list.
+
+Numeric fields are `<input type="text" inputMode="text" autocapitalize="off" autocorrect="off" spellcheck="false" enterKeyHint="done">`. Preview on each valid keystroke; commit on Enter or blur **only if the text differs from the formatted value at focus** (Tabbing through fields never rounds geometry or creates history); Esc reverts. Invalid text shows an inline error and no preview.
+
+### 7.6 Edit context
+
+Entering a definition (double-tap an instance/cell, or **Edit Motif**) pushes `{ motifId, path }` for the tapped occurrence. Breadcrumb `Board / Motif: Name` with **Done**. While entered:
+
+- Only the definition's children are selectable and drawable. Tapping another occurrence of the same definition re-targets `path` to it.
+- All pointer input (drawing, drag, rotate, vertex drag, nudge) is mapped through `inverse(occurrenceMatrix)`; in a mirrored occurrence a clockwise screen rotation becomes `−θ`; snap tolerance divides by zoom × occurrence scale; length/angle labels are in definition space to match the inspector.
+- Rendering: the full scene draws normally; a 60% scrim in the background colour covers it; the entered occurrence's elements (with their patches) are drawn again above the scrim. Per-element opacity is never used (it would double-paint patches).
+- Nested entry by double-tapping a nested instance. Esc with nothing in progress pops one level.
 
 ### 7.7 Snapping
 
-Enabled by default; `Alt` held disables temporarily; a toolbar toggle persists the setting. Candidates (world mm): grid points; Board edges and centre lines; Band endpoints and vertices; Region vertices; eligible intersection points; bounds edges and centres of other objects in the context. Point snaps win over line snaps, which win over grid. A snap draws a guide line/point overlay. While drawing a Band segment, the angle snaps to 15° multiples when within ±4° unless a point snap is active. Grid spacing defaults to 3.175 mm (1/8") for inch projects and 5 mm for mm projects and is editable.
+Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`ed); the rail toggle persists. Grid spacing is an editor setting (not in the document), defaulting to 3.175 mm for inch projects and 5 mm for mm projects; the grid is drawn when **Show grid** is on.
 
-### 7.8 History
+- **Targets** (computed once at gesture start from `preview.base`, excluding the moving selection; inside an edit context they include the other occurrences of the entered definition and its siblings, mapped into definition space): grid points; Board edges and centre lines; Band endpoints and vertices; Region vertices; listed intersection points; painted-bounds edges and centres of other objects.
+- **Sources** while moving: the selection's vertices, endpoints, and bounds edges/centres. The nearest source–target pair within tolerance wins; point targets beat line targets beat grid. A guide overlay shows the active snap.
+- While drawing: the angle constrains the ray to a 15° multiple when within ±4° (unless a point target is within tolerance); the length then snaps to grid along the ray or to line targets intersecting the ray.
+- Moveable's own `snappable` is disabled.
 
-`Ctrl/Cmd+Z` undo, `Ctrl/Cmd+Shift+Z` and `Ctrl/Cmd+Y` redo. Selection is cleared of ids that no longer exist after undo/redo. Camera, selection, tool, and edit context are not in history. Opening/importing a project clears history.
+### 7.8 Board view
 
-## 8. Units, parsing, formatting (`domain/units.ts`)
+The editor draws the whole scene unclipped, then a mat (a rect with an even-odd hole at the Board) at 70% opacity in the background colour, so outside-Board geometry is visible dimmed and remains hit-testable. Selection overlays draw above the mat. Selection outline is a double stroke (light over dark) so it reads on any material.
 
-`parseLength(text, defaultUnit): { ok: true; mm: number } | { ok: false; error: string }`.
+## 8. Units (`domain/units.ts`)
 
-Accepted, after trimming and collapsing whitespace: decimal (`0.25`, `.5`, `-3`); fraction (`3/16`); mixed (`1 1/8`, `1-1/8`); optional unit suffix `in`, `"`, `mm`, with or without a space; suffix overrides `defaultUnit`. Fractions use `fraction.js` for exact parsing; result converts to mm (`× 25.4` for inches). Rejected: empty, zero denominators, feet, expressions, more than one unit, non-finite.
+`parseLength(text, defaultUnit)`: grammar, case-insensitive, after trimming:
 
-`formatLength(mm, unit)`: inches — if the value is within 0.0005" of `k/64`, render as reduced mixed fraction (`1 1/8`, `3/16`, `2`); otherwise three decimals. mm — up to two decimals, trailing zeros trimmed. Unit label is shown beside the field, not inside the value. Angles format with one decimal, trailing zero trimmed.
+```
+^([+-])?\s*(\d+(?:[.,]\d*)?|[.,]\d+)?(?:(?:\s+|-)?(\d+)\s*/\s*(\d+))?\s*(in|"|”|″|mm)?$
+```
 
-Field policies: widths, board dimensions, steps allow positive only (steps also allow zero and negative); coordinates allow any finite value; scale > 0; rows/columns integers 1–50.
+with at least one of the number or fraction present, `,` accepted as the decimal separator, the sign applying to the whole value, a non-zero denominator, and the unit suffix overriding `defaultUnit`. Integer arithmetic (numerator/denominator) then `× 25.4` for inches. Rejected: empty, `1 - 1/8`, exponents, feet, expressions, two units. No fraction library is used (rationale in the reconciliation document).
+
+`formatLength(mm, unit)`: inches — if within 0.0005" of `k/64`, a reduced mixed fraction (`1 1/8`, `3/16`, `2`); otherwise three decimals. mm — up to two decimals, trailing zeros trimmed. Angles: one decimal, trailing zero trimmed. Units are shown beside the field.
+
+Field policies: widths, board dimensions, grid spacing, scale > 0; steps and offsets any finite; coordinates any finite; rows/columns integers 1–50.
 
 ## 9. Persistence
 
-- Autosave: after every committed change, debounce 500 ms, write `JSON.stringify(project)` to `localStorage` key `cbpd:project:v1`. On failure (quota, disabled storage) show a persistent **Not saved in this browser — download your project** status with a Download button; retry on next change.
-- Startup: if the key exists and validates, open it. If it exists but fails validation or migration, keep it untouched, start a blank project, and show a banner with **Download recovered file** (raw text) and **Discard**.
-- **New Project** confirms when unsaved-to-file changes exist (the status bar tracks "downloaded at" vs last commit).
-- **Download Project**: `Blob` of the JSON, pretty-printed, filename `<name>.cbpd.json`.
-- **Open Project**: `<input type="file" accept=".json">`, `File.text()`, `importProject(text)`: `JSON.parse` → `migrate` → Zod `safeParse` → domain invariants (§2.1). Any failure leaves the current project and history untouched and shows the first error with its path. Success replaces the project and clears history.
-- `migrate(json)`: `schemaVersion === 1` passes through; anything else is an error naming the version. The harness exists from day one so version 2 is a function, not a redesign.
-- One active project only. No IndexedDB in V1.
+- Autosave: 500 ms after a commit, undo, or redo, write the project JSON to `localStorage` key `cbpd:project:v1`; flush on `pagehide` and `visibilitychange: hidden`. On failure show **Not saved in this browser — download your project** with a Download button; retry on the next change; clear the status on success.
+- Startup: if the key validates, open it. If it exists but fails, move its text to `cbpd:recovered` (so autosave cannot destroy it), start blank, and show a banner with **Download recovered file** and **Discard**.
+- Another tab writing the key (`storage` event) shows **Project changed in another tab** and suspends autosave here until reload.
+- **New Project** and **Open Project** confirm when the current project differs from the last downloaded one. The hash of the last downloaded JSON is stored beside the project so the status survives reload and undoing back to it reads as clean.
+- **Download Project**: pretty-printed JSON Blob, `<name>.cbpd.json`. **Open Project**: `<input type="file">`, `File.text()`, then `JSON.parse → migrate → zod safeParse → §2.1 invariants`. Any failure leaves project and history untouched and shows the first error with its path. Success replaces the project and clears history.
+- `migrate(json)`: version 1 passes; any other version is an error naming it.
+- One active project. No IndexedDB.
 
 ## 10. SVG export
 
-`exportSvg(project): string` serialises `buildScene(project)` to a standalone document:
+`exportSvg(project): string` serialises `buildScene(project, EXPORT_CLIP_EXTEND_MM)`:
 
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" width="{W}mm" height="{H}mm" viewBox="0 0 {W} {H}">
-  <title>{name}</title>
-  <defs><clipPath id="board"><rect width="{W}" height="{H}"/></clipPath> …patch clipPaths…</defs>
-  <g clip-path="url(#board)">
-    <rect width="{W}" height="{H}" fill="{background or none}"/>
-    …elements in scene order, colours inline, no classes…
-  </g>
+  <title>{escaped name}</title>
+  <defs><clipPath id="{p}-board"><rect width="{W}" height="{H}"/></clipPath> …patch clipPaths…</defs>
+  <g clip-path="url(#{p}-board)"><rect width="{W}" height="{H}" fill="{background or none}"/>…scene elements…</g>
 </svg>
 ```
 
-No editor overlays, grid, CSS, fonts, or external references. Numbers are written with up to 4 decimals. The same scene drives the editor, so parity is structural; the acceptance test opens the exported file in a fresh page and compares a raster of it with a raster of the editor's Board region at the same pixel size (mean channel difference < 1%, no pixel cluster larger than the anti-aliasing tolerance). PNG export is not in V1 unless it falls out of the parity test harness for free.
+`{p}` is unique per export. All text and attribute values are XML-escaped; colours and ids are already constrained by validation. No classes, CSS, fonts, editor overlays, or external references. Numbers use up to 4 decimals. PNG export is not in V1.
 
 ## 11. Accessibility
 
-Every control is a native `button`, `input`, `select`, or a Radix primitive (Dialog for confirmations, Tooltip for tool labels, Popover for the material editor). Tool buttons have visible labels or `aria-label` plus tooltips. Inspector fields have `<label>`s. Selection is indicated by a dashed outline and by the inspector heading, not colour alone. Materials show name and swatch. Every drag has a numeric equivalent in the inspector. The app respects browser zoom (layout in rem/flex, canvas fills the remainder).
+Native `button`/`input`/`select` or Radix primitives (Dialog, Tooltip, Popover). Every control has a visible label or `aria-label`. Inspector fields have `<label>`s. Tab / `[` / `]` cycle selection through the current context's objects, so the inspector and the crossing list are reachable without a pointer. Selection is indicated by outline and inspector heading, not colour alone. Material names are visible. Every drag has a numeric equivalent (bounds X/Y, Rotate by, per-point fields, crossing list). Layout is rem/flex; the canvas fills the remainder and stays correct at 200% browser zoom.
 
-## 12. Fixtures
+## 12. Fixtures (`src/fixtures/`, original designs; JSON plus UI authoring tests)
 
-Original JSON fixtures in `src/fixtures/`, each also constructible from the UI (Playwright tests prove C, E, F):
+- A `stripes` — 4 materials, 7 flush parallel Bands of different widths.
+- B `checker` — one 2-Region motif, 6×6 with row offset.
+- C `basket-weave` — 2 horizontal + 2 vertical Bands with alternating definition crossings, 3×3 with alternate 90° rotation, seamless by default step.
+- D `chevron-diamond` — ±45° parallel Bands via Offset copy and Mirror, a closed diamond Band outline, nested diamond Regions.
+- E `isometric` — three-rhombus cube (30°/60°) with three materials, built with angle snap and typed lengths, 4×4 with ½-step row offset.
+- F `interlace` — 6 materials; a lattice motif (4 angular polylines) containing an instance of a 2-Band accent motif; 5×5 with alternate mirror X; ≥ 40 eligible crossings per field, alternating definition crossings, two root overrides; all crossings inside the cell. The performance variant repeats it so that ≥ 1000 occurrences exist.
 
-- A `stripes` — Board, 4 materials, 7 parallel Bands of different widths.
-- B `checker` — one 2-Region motif repeated 6×6 with row offset (brick).
-- C `basket-weave` — motif of 2 horizontal + 2 vertical Bands with alternating definition crossings, repeated 3×3 with alternate 90° rotation.
-- D `chevron-diamond` — ±45° parallel Bands mirrored, nested diamond Regions.
-- E `isometric` — three-rhombus cube motif (30°/60°) with three materials, repeated 4×4 with row offset.
-- F `interlace` — synthetic: 6 materials, nested motif (a 4-Band lattice motif containing an instance of a 2-Band accent motif), repeated 5×5 with alternate mirror, at least 40 eligible crossings with alternating definition crossings and two root overrides. ≥ 1000 expanded occurrences when repeated 8×8 in the performance test.
+## 13. Acceptance gates
 
-## 13. Acceptance gates (from packet Part II §5, made concrete)
-
-Each gate is an automated test unless marked manual; all must pass before V1 is reported complete.
+All automated unless marked manual; all must pass before V1 is reported complete.
 
 | # | Gate | Test |
 | --- | --- | --- |
-| G1 | Crossing identity | Vitest: two 3-point polylines crossing twice; set opposite over at each; move an endpoint, change width, insert a vertex on the crossed segment, delete it; after each step the two records resolve to their intended intersections or become unresolved exactly when the intersection no longer exists; undo restores. |
-| G2 | Occurrence scope | Vitest: Fixture C-like 3×3 repeat; definition record + one root override in cell (1,2); scene shows the override only there; JSON round-trip preserves both; a nested instance variant passes the same assertions. |
-| G3 | Transform parity | Vitest: rotate 30°, mirror X, scale 1.5 an instance; painted width, intersection point, bounds, and inspector value agree with hand-computed values. Playwright: after drag/rotate/undo, the DOM has no residual `transform` and the project values match. |
-| G4 | Edge classes | Vitest: acute 15° unequal widths (eligible, footprint corners checked), shared endpoint, collinear, 5° near-parallel, self-crossing polyline, triple point, two crossings 1 mm apart → each classified as specified. |
-| G5 | Export parity | Playwright: export Fixture F, load the SVG standalone, rasterise both at 800 px wide, compare per §10. Also assert no `class`, `style`, or external `url(` outside `#`-refs. |
-| G6 | Authorability | Playwright: build C, E, and F from a blank project using only UI actions (tools, snapping, inspector, Create Motif, Repeat, Crossing tool); then edit the source motif and one dimension; assert the scene matches the fixture within tolerance. The test log records action counts. |
-| G7 | Tablet | Playwright with touch emulation (WebKit or Chromium mobile): tap-create Band with Finish, tap-select, drag, two-finger pan and pinch, `pointercancel` mid-drag leaves the project unchanged; no page scroll. |
-| G8 | Persistence | Vitest: malformed JSON, wrong version, cyclic motifs, 401-cell repeat, duplicate ids, dangling refs each rejected with a path; valid round-trip is deep-equal. Playwright: simulated quota failure shows the unsaved status and Download works. |
-| G9 | Performance | Playwright on Fixture F at 8×8 (≥ 1000 occurrences): measure a 60-frame drag; report median and p95 frame time and inspector edit latency. Target: median ≤ 16 ms, p95 ≤ 50 ms on the dev machine. Report the numbers; a miss is a finding, not a silent pass. |
+| G1 | Crossing identity | Vitest: two polylines crossing twice with opposite records; move an endpoint, change width, insert a vertex on each half of the crossed segment, delete the referenced start point, move an instance transform then make an unrelated edit, undo, redo, save/reopen. Each record resolves to its intended intersection or is unresolved exactly when it no longer exists. Includes the hairpin counterexample: a lost record must not rebind onto an intersection already owned by another record. |
+| G2 | Occurrence scope | Vitest: 3×3 repeat with a definition record and a root override in cell (1,2); only that cell differs; JSON round-trip preserves both; rows shrink removes the override; Detach with an override keeps the override; "All instances" toggled in an overridden cell removes the override; a nested-instance record in an intermediate context resolves. |
+| G3 | Transform parity | Vitest: rotate 30°, mirror X, scale 1.5 → width, intersection point, bounds, inspector values agree with hand-computed; world mirror of a rotated instance; 2×2 with alternate 90° lands on expected cell centres. Playwright: the Slice-1 assertions (§15). |
+| G4 | Edge classes | Vitest: acute 15° unequal widths (eligible; footprint corners checked); shared endpoint; collinear; 5°; self-crossing polyline; triple point; two crossings 1 mm apart; a crossing 1 mm from a joint; a Region between O and U; lattice footprints touching exactly, checked in definition space and in world space after a 30° rotation. Each classified as specified. |
+| G5 | Export correctness and parity | Playwright in Chromium, Firefox, WebKit: export Fixture F; load standalone; for every eligible intersection sample the raster at the intersection point and at footprint-interior offsets (must equal the effective over colour) and along a 1-px band at each footprint edge (no third colour); max per-pixel difference between editor Board region and export, excluding an anti-aliased-edge mask, ≤ 8/255. Assert no `class`, `style`, or external `url(`. |
+| G6 | Authorability | Playwright: build A–F from a blank project using only UI actions; then edit a source motif and one dimension; scene matches the fixture within tolerance. The log records action counts, elapsed time, and any step needing a workaround. |
+| G7 | Tablet | Playwright Chromium with CDP touch: tap-create Band with Finish, tap-select, drag, two-finger pan and pinch (`scrollY === 0`, `visualViewport.scale === 1` afterwards), `touchcancel` mid-drag leaves project and history unchanged. Manual iPad Safari checklist (recorded in the report): wheel/trackpad behaviour, handle touch, drawing double-tap, multi-select toggle, fraction entry keyboard. |
+| G8 | Persistence | Vitest: malformed JSON, version 2, cyclic motifs, nested repeats exceeding 5000 occurrences while each field is within bounds, duplicate ids, dangling refs → each rejected with a path; valid round-trip deep-equal; `validate(command(p))` property test over fixtures and all commands. Playwright: quota failure (`setItem` override) shows the status and Download works, and the status clears after a successful retry; corrupt key → banner and the recovered key byte-identical after an edit; failed Open leaves project and both history stacks unchanged; New/Open confirmations; autosave flushed on `pagehide`. |
+| G9 | Performance | Playwright, Fixture F performance variant (≥ 1000 occurrences): 60-frame drag median and p95 frame time, inspector edit latency, patch count. Target median ≤ 16 ms, p95 ≤ 50 ms. Numbers are reported; a miss is a finding. |
 
-Product success test (packet): performed manually once at the end and reported with timings.
+Product success test (packet): performed manually at the end and reported with timings.
 
 ## 14. Module layout
 
 ```
 src/
   domain/      model.ts  ids.ts  units.ts  validate.ts  migrate.ts  crossings.ts  commands/*.ts
-  geometry/    affine.ts  tolerance.ts  expand.ts  intersections.ts  footprint.ts  scene.ts  bounds.ts  snap.ts
-  editor/      store.ts  camera.ts  keyboard.ts  tools/*.ts
-  render/      Canvas.tsx  SceneSvg.tsx  overlays/*.tsx
+  geometry/    affine.ts  tolerance.ts  expand.ts  intersections.ts  footprint.ts  scene.ts  bounds.ts  offset.ts  snap.ts
+  editor/      store.ts  camera.ts  keyboard.ts  input.ts  tools/*.ts
+  render/      Canvas.tsx  SceneSvg.tsx  Proxies.tsx  overlays/*.tsx
   export/      svg.ts  download.ts
   storage/     local.ts
   ui/          App.tsx  Toolbar.tsx  Inspector/*.tsx  MaterialPalette.tsx  Breadcrumb.tsx  StatusBar.tsx
   fixtures/    *.json  index.ts
 ```
 
-`domain/` and `geometry/` import nothing from React or the DOM. `geometry/` may import `@flatten-js/core`; `domain/` may not. Tests live beside sources as `*.test.ts`; Playwright tests in `e2e/`.
+`domain/` and `geometry/` import nothing from React or the DOM; `geometry/` may import `@flatten-js/core`, `domain/` may not. Tests sit beside sources as `*.test.ts`; Playwright tests in `e2e/`.
 
-## 15. Dependencies by slice
+## 15. Slice-1 interaction proof (assertions, from the editor review)
 
-Installed in the slice that first uses them: scaffold (`react`, `react-dom`, `vite`, `@vitejs/plugin-react`, `typescript`, `vitest`); model (`zod`, `@flatten-js/core`, `fraction.js`); editor (`zustand`, `zundo`, `@use-gesture/react`, `react-moveable`, `react-selecto`); UI (`@radix-ui/react-dialog`, `@radix-ui/react-tooltip`, `@radix-ui/react-popover`); e2e (`@playwright/test`). Nothing else without a recorded reason.
+(a) Drag N screen px at zoom 0.5, 1, and 7.3 px/mm with a panned camera commits Δ = N/zoom mm within 1e-6, computed through `getScreenCTM`. (b) The Moveable box client rect equals the domain bounds projected through the CTM ±1 px after commit, undo, redo, zoom, and resize. (c) No SVG element or proxy carries a `transform` attribute or `style.transform`. (d) 20 drag+undo cycles return a deep-equal project. (e) History +1 per gesture, +0 for click-without-move. (f) `touchcancel` and a second finger mid-drag leave project and history unchanged. (g) Marquee over a rotated instance selects by domain bounds. (h) Drag inside a rotated, mirrored, 1.5× edit context moves the definition child by the inverse-mapped delta. (i) Mouse drag works while use-gesture is bound. (j) Selecto marquee can be aborted programmatically when a second pointer arrives (if not, record it and arbitrate by unmounting Selecto during multi-touch).
+
+## 16. Review resolution log
+
+| Source | Objection | Resolution |
+| --- | --- | --- |
+| Slop | 400-cell repeat limit duplicates the 5000 cap; G8 tested the wrong limit | Removed; G8 tests nested over-budget import |
+| Slop | Intermediate-context records are created by the UI, not merely tolerated | §5.3 says so |
+| Geometry 1 | Rebind could steal another record's intersection | §5.5 step 2 (a)(b), canonical processing order |
+| Geometry 2 | Commands could produce invalid documents (rows shrink, detach collisions, vertex delete) | §5.5 last paragraph, §5.6 Detach rules, G8 property test |
+| Geometry 3 | Crossings near joints mis-render; full-path patch | `near-joint` class; patch is the segment only |
+| Geometry 4 | Elements between O and U are punched through | `occluded` class |
+| Geometry 5 | Anti-aliasing seams; extension in mm is wrong in kind | Enlarge across both edges; device-px in editor, 0.2 mm in export |
+| Geometry 6 | `crowded` ill-defined; classes overlap | Precedence order, proxy footprints, `EPS_OVERLAP_MM` |
+| Geometry 7 | Definition-space verdict ≠ world verdict | Per-world-intersection eligibility; per-occurrence unresolved hints |
+| Geometry 8 | Rematch triggers too narrow; stale hints | Rematch on every geometry-affecting command, from before→after; only previously resolved records auto-rebind |
+| Geometry 9 | Canonical order not recomputed on path rewrites | `canonicalize` on every write |
+| Geometry 10 | "All instances" could be a no-op under an outer record | Removes the pair's records from all outer contexts |
+| Geometry 11, Product 1 | Pivot undefined | Painted-bounds centre at Create Motif |
+| Geometry 12, Product 11 | Cross-cell crossings unscopable | Documented V1 limit; scope control hidden; F stays in-cell |
+| Geometry 13, Product 9 | No closed Bands | `Band.closed` |
+| Geometry 14 | Raster mean test not decisive; not independent | Pixel sampling gate + max-diff with AA mask, three engines |
+| Geometry 15 | Export injection | XML escaping; colour and id regexes |
+| Geometry 16–23 | Matrix conventions, min segment, bounds kinds, patch attributes, seams, invariants, gate coverage, patch count | Adopted as written |
+| Editor 1 | zundo without `equality` pollutes history | §7.1 |
+| Editor 2, 6 | Whole-project preview overwrites commits; frame-on-frame drift | `settlePreview`, base assertion, recompute from base |
+| Editor 3 | Autosave destroys the corrupt key | Moved to `cbpd:recovered` |
+| Editor 4 | No DOM target for instances/repeats | Proxy rects (§7.3) |
+| Editor 5, 8, 9, 10, 11 | Gesto touch semantics, library fights, touch-action, rotate re-fit, weak G3 | Ownership table, container, frozen proxy, §15 assertions |
+| Editor 7 | Wheel = zoom breaks trackpads | Wheel pans; Ctrl+wheel zooms |
+| Editor 12, 13, 14 | Edit context mapping, opacity vs patches, stale context | §7.6 |
+| Editor 15, Product 6 | Snapping sources/frozen candidates/cross-cell targets | §7.7 |
+| Editor 16, Product 3 | Drawing flow on touch; exact lengths/angles | `pointerup` placement, own double-tap, Length/Angle fields, Undo point |
+| Editor 17, Product 18 | No tablet multi-select | Add-to-selection toggle |
+| Editor 18, 19, 20, 27 | inputMode, blur rounding, key scoping, fraction.js grammar gaps | §7.5 fields, §7.4 dispatch, own grammar |
+| Editor 21, 22, 26 | Open confirmation, multi-tab, G8 gaps | §9, G8 |
+| Editor 23, 24, 25 | Touch marker reason/size, keyboard paths, touch emulation limits | §7.4, §11, G7 |
+| Editor 28, 29 | Grid details, hand tool, aspect | §7.7, §7.2 |
+| Product 2 | Repeat command unspecified; default step leaves gaps | §7.4 Repeat; painted bounds |
+| Product 4, 8, 21 | No numeric rotate/position; polyline segment angles | Rotate by, bounds X/Y, Region W/H, per-segment length/angle |
+| Product 5 | Duplicate offset by grid step | In place; repeat last move delta |
+| Product 7 | No flush parallel strips at angles | Offset copy |
+| Product 10 | Override could shadow silently | Delete on return to outer value; badge; list |
+| Product 12 | Vertex editing vague | Vertex and midpoint handles |
+| Product 13 | Orphan definitions, no rename | Auto-delete with last reference; name in inspector |
+| Product 14, 16, 17, 20, 22 | G6 scope, F counts, grid/zoom/outside view, seam markers, ½ step | Adopted |
+| Product 15 | Current material undefined | §3 |
+| Editor 30 | Show `≈` for inexact fractions | Declined: adds a display state for no workflow gain |
+| Product 4 (part) | Draggable pivot point | Declined: vertex-snapped move and typed lengths cover alignment |
+| Product 8 (part) | Separate "Move by" field | Declined: bounds X/Y covers it |

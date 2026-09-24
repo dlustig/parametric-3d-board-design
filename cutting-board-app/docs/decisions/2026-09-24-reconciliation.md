@@ -33,6 +33,9 @@ TypeScript 7.x (native compiler) is now the npm latest. The Vite template pins i
 4. **Gestures and touch are in the first editor slice**, not Phase 5, as Part II §3.1 instructs.
 5. **Compositing algorithm.** Part II suggests masking the under Band. The SPEC instead re-paints the over Band clipped to the crossing footprint (SPEC §6). This is the same primitive class (SVG clip in `userSpaceOnUse`) but avoids anti-aliasing gaps along the over Band's edges and never touches the under Band's paint outside the footprint. The proof gate is unchanged.
 6. **Single active project, no `idb`.** Part II leaves this to the SPEC. V1 stores one project in `localStorage` with explicit Download/Open; a gallery is not in scope.
+7. **`fraction.js` dropped.** Part II §3.4 recommends it behind a thin wrapper. The editor review ran fraction.js 5.3.4 against the packet's own input list: it rejects `1-1/8` and padded whitespace, and accepts `1:2`, `0.(3)`, and `1.'3'`. The wrapper would therefore have to own the grammar anyway, after which the library contributes nothing a 20-line integer parser does not. SPEC §8 defines the grammar. Affected acceptance: unit parser tests only.
+8. **`Band.closed` added.** Borders and nested outlines are named Band uses in Part I §6.3; an open polyline returning to its start renders two butt caps at the corner. One boolean, rendered with `Z`.
+9. **Compositing corrections after review.** The clipped re-paint patch draws only the crossed segment, is enlarged across both Bands' edges by a device-pixel amount in the editor (fixed mm in export), and two further unsupported classes (`near-joint`, `occluded`) guarantee it never paints where it should not. Eligibility is decided per world intersection. See SPEC §5.2, §6.2, §16.
 
 ## Decisions deferred to proofs (not settled by research)
 
