@@ -2,6 +2,7 @@
 // until the fixtures arrive (Task 15 extends this test with them).
 
 import { describe, expect, it } from 'vitest'
+import { fixtures } from '../../fixtures/index.ts'
 import { expand } from '../../geometry/expand.ts'
 import { findIntersections } from '../../geometry/intersections.ts'
 import type { Band, Id, Project, Step } from '../model.ts'
@@ -56,6 +57,13 @@ const corpus: Array<[string, Project]> = [
   ['3×3 repeat with records', field],
   ['nested motif', nested],
   ['at occurrence cap', atCap],
+  // Task 15: the six original acceptance fixtures (SPEC §12).
+  ['fixture: stripes', fixtures.stripes],
+  ['fixture: checker', fixtures.checker],
+  ['fixture: basket weave', fixtures.basketWeave],
+  ['fixture: chevron diamond', fixtures.chevronDiamond],
+  ['fixture: isometric', fixtures.isometric],
+  ['fixture: interlace', fixtures.interlace],
 ]
 
 type Command = [string, (p: Project) => Project | CommandResult]

@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-checker",
+  "name": "Checker",
+  "displayUnits": "mm",
+  "board": {
+    "widthMm": 300,
+    "heightMm": 450,
+    "backgroundMaterialId": null
+  },
+  "materials": [
+    {
+      "id": "maple",
+      "name": "Maple",
+      "color": "#E8D4A8"
+    },
+    {
+      "id": "walnut",
+      "name": "Walnut",
+      "color": "#5C3A21"
+    }
+  ],
+  "objects": {
+    "checker-left": {
+      "type": "region",
+      "id": "checker-left",
+      "materialId": "maple",
+      "points": [
+        {
+          "id": "checker-leftp0",
+          "x": -20,
+          "y": -20
+        },
+        {
+          "id": "checker-leftp1",
+          "x": 0,
+          "y": -20
+        },
+        {
+          "id": "checker-leftp2",
+          "x": 0,
+          "y": 20
+        },
+        {
+          "id": "checker-leftp3",
+          "x": -20,
+          "y": 20
+        }
+      ]
+    },
+    "checker-right": {
+      "type": "region",
+      "id": "checker-right",
+      "materialId": "walnut",
+      "points": [
+        {
+          "id": "checker-rightp0",
+          "x": 0,
+          "y": -20
+        },
+        {
+          "id": "checker-rightp1",
+          "x": 20,
+          "y": -20
+        },
+        {
+          "id": "checker-rightp2",
+          "x": 20,
+          "y": 20
+        },
+        {
+          "id": "checker-rightp3",
+          "x": 0,
+          "y": 20
+        }
+      ]
+    },
+    "checker-field": {
+      "type": "repeat",
+      "id": "checker-field",
+      "motifId": "checker-unit",
+      "transform": {
+        "x": 40,
+        "y": 70,
+        "rotationDeg": 0,
+        "mirrorX": false,
+        "mirrorY": false,
+        "scale": 1
+      },
+      "rows": 6,
+      "columns": 6,
+      "stepXMm": 40,
+      "stepYMm": 40,
+      "rowOffsetMm": 20,
+      "columnOffsetMm": 0,
+      "alternateMirrorX": false,
+      "alternateMirrorY": false,
+      "alternateRotationDeg": 0
+    }
+  },
+  "rootChildren": [
+    "checker-field"
+  ],
+  "motifs": {
+    "checker-unit": {
+      "id": "checker-unit",
+      "name": "Checker unit",
+      "children": [
+        "checker-left",
+        "checker-right"
+      ],
+      "crossings": []
+    }
+  },
+  "crossings": []
+}

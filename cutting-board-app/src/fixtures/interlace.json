@@ -1,0 +1,394 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-interlace",
+  "name": "Interlace",
+  "displayUnits": "mm",
+  "board": {
+    "widthMm": 375,
+    "heightMm": 400,
+    "backgroundMaterialId": null
+  },
+  "materials": [
+    {
+      "id": "maple",
+      "name": "Maple",
+      "color": "#E8D4A8"
+    },
+    {
+      "id": "walnut",
+      "name": "Walnut",
+      "color": "#5C3A21"
+    },
+    {
+      "id": "cherry",
+      "name": "Cherry",
+      "color": "#A8543A"
+    },
+    {
+      "id": "purpleheart",
+      "name": "Purpleheart",
+      "color": "#6B2E6B"
+    },
+    {
+      "id": "padauk",
+      "name": "Padauk",
+      "color": "#C8402A"
+    },
+    {
+      "id": "oak",
+      "name": "Oak",
+      "color": "#C19A6B"
+    }
+  ],
+  "objects": {
+    "accent-a": {
+      "type": "band",
+      "id": "accent-a",
+      "materialId": "padauk",
+      "widthMm": 1.6,
+      "closed": false,
+      "points": [
+        {
+          "id": "accent-ap0",
+          "x": -3,
+          "y": -3
+        },
+        {
+          "id": "accent-ap1",
+          "x": 3,
+          "y": 3
+        }
+      ]
+    },
+    "accent-b": {
+      "type": "band",
+      "id": "accent-b",
+      "materialId": "oak",
+      "widthMm": 1.6,
+      "closed": false,
+      "points": [
+        {
+          "id": "accent-bp0",
+          "x": -3,
+          "y": 3
+        },
+        {
+          "id": "accent-bp1",
+          "x": 3,
+          "y": -3
+        }
+      ]
+    },
+    "lat-0": {
+      "type": "band",
+      "id": "lat-0",
+      "materialId": "maple",
+      "widthMm": 2.8,
+      "closed": false,
+      "points": [
+        {
+          "id": "lat-0p0",
+          "x": 16.689309382202175,
+          "y": 6.742918681486416
+        },
+        {
+          "id": "lat-0p1",
+          "x": 1.102182119232618e-15,
+          "y": 18
+        },
+        {
+          "id": "lat-0p2",
+          "x": -16.689309382202172,
+          "y": 6.742918681486421
+        }
+      ]
+    },
+    "lat-1": {
+      "type": "band",
+      "id": "lat-1",
+      "materialId": "walnut",
+      "widthMm": 2.8,
+      "closed": false,
+      "points": [
+        {
+          "id": "lat-1p0",
+          "x": -6.742918681486415,
+          "y": 16.689309382202175
+        },
+        {
+          "id": "lat-1p1",
+          "x": -18,
+          "y": 2.204364238465236e-15
+        },
+        {
+          "id": "lat-1p2",
+          "x": -6.7429186814864215,
+          "y": -16.689309382202172
+        }
+      ]
+    },
+    "lat-2": {
+      "type": "band",
+      "id": "lat-2",
+      "materialId": "cherry",
+      "widthMm": 2.8,
+      "closed": false,
+      "points": [
+        {
+          "id": "lat-2p0",
+          "x": -16.689309382202175,
+          "y": -6.742918681486414
+        },
+        {
+          "id": "lat-2p1",
+          "x": -3.3065463576978537e-15,
+          "y": -18
+        },
+        {
+          "id": "lat-2p2",
+          "x": 16.689309382202172,
+          "y": -6.742918681486422
+        }
+      ]
+    },
+    "lat-3": {
+      "type": "band",
+      "id": "lat-3",
+      "materialId": "purpleheart",
+      "widthMm": 2.8,
+      "closed": false,
+      "points": [
+        {
+          "id": "lat-3p0",
+          "x": 6.7429186814864135,
+          "y": -16.689309382202175
+        },
+        {
+          "id": "lat-3p1",
+          "x": 18,
+          "y": -4.408728476930472e-15
+        },
+        {
+          "id": "lat-3p2",
+          "x": 6.742918681486423,
+          "y": 16.689309382202172
+        }
+      ]
+    },
+    "accent-inst": {
+      "type": "motif-instance",
+      "id": "accent-inst",
+      "motifId": "accent-unit",
+      "transform": {
+        "x": 27.2,
+        "y": 0,
+        "rotationDeg": 0,
+        "mirrorX": false,
+        "mirrorY": false,
+        "scale": 1
+      }
+    },
+    "interlace-field": {
+      "type": "repeat",
+      "id": "interlace-field",
+      "motifId": "lat-unit",
+      "transform": {
+        "x": 46.49,
+        "y": 58.99,
+        "rotationDeg": 0,
+        "mirrorX": false,
+        "mirrorY": false,
+        "scale": 1
+      },
+      "rows": 5,
+      "columns": 5,
+      "stepXMm": 70.48,
+      "stepYMm": 70.48,
+      "rowOffsetMm": 0,
+      "columnOffsetMm": 0,
+      "alternateMirrorX": true,
+      "alternateMirrorY": false,
+      "alternateRotationDeg": 0
+    }
+  },
+  "rootChildren": [
+    "interlace-field"
+  ],
+  "motifs": {
+    "accent-unit": {
+      "id": "accent-unit",
+      "name": "Accent unit",
+      "children": [
+        "accent-a",
+        "accent-b"
+      ],
+      "crossings": [
+        {
+          "id": "accent-x",
+          "a": {
+            "path": [],
+            "bandId": "accent-a",
+            "segmentStart": "accent-ap0"
+          },
+          "b": {
+            "path": [],
+            "bandId": "accent-b",
+            "segmentStart": "accent-bp0"
+          },
+          "over": "a",
+          "hint": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ]
+    },
+    "lat-unit": {
+      "id": "lat-unit",
+      "name": "Lattice unit",
+      "children": [
+        "lat-0",
+        "lat-1",
+        "lat-2",
+        "lat-3",
+        "accent-inst"
+      ],
+      "crossings": [
+        {
+          "id": "x-01",
+          "a": {
+            "path": [],
+            "bandId": "lat-0",
+            "segmentStart": "lat-0p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "lat-1",
+            "segmentStart": "lat-1p0"
+          },
+          "over": "a",
+          "hint": {
+            "x": -10.749422782239467,
+            "y": 10.749422782239467
+          }
+        },
+        {
+          "id": "x-12",
+          "a": {
+            "path": [],
+            "bandId": "lat-1",
+            "segmentStart": "lat-1p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "lat-2",
+            "segmentStart": "lat-2p0"
+          },
+          "over": "a",
+          "hint": {
+            "x": -10.749422782239465,
+            "y": -10.749422782239465
+          }
+        },
+        {
+          "id": "x-23",
+          "a": {
+            "path": [],
+            "bandId": "lat-2",
+            "segmentStart": "lat-2p1"
+          },
+          "b": {
+            "path": [],
+            "bandId": "lat-3",
+            "segmentStart": "lat-3p0"
+          },
+          "over": "a",
+          "hint": {
+            "x": 10.749422782239465,
+            "y": -10.749422782239465
+          }
+        },
+        {
+          "id": "x-30",
+          "a": {
+            "path": [],
+            "bandId": "lat-0",
+            "segmentStart": "lat-0p0"
+          },
+          "b": {
+            "path": [],
+            "bandId": "lat-3",
+            "segmentStart": "lat-3p1"
+          },
+          "over": "b",
+          "hint": {
+            "x": 10.749422782239467,
+            "y": 10.749422782239467
+          }
+        }
+      ]
+    }
+  },
+  "crossings": [
+    {
+      "id": "override-0",
+      "a": {
+        "path": [
+          {
+            "repeatId": "interlace-field",
+            "row": 1,
+            "column": 2
+          }
+        ],
+        "bandId": "lat-0",
+        "segmentStart": "lat-0p1"
+      },
+      "b": {
+        "path": [
+          {
+            "repeatId": "interlace-field",
+            "row": 1,
+            "column": 2
+          }
+        ],
+        "bandId": "lat-1",
+        "segmentStart": "lat-1p0"
+      },
+      "over": "b",
+      "hint": {
+        "x": 176.70057721776055,
+        "y": 140.21942278223946
+      }
+    },
+    {
+      "id": "override-1",
+      "a": {
+        "path": [
+          {
+            "repeatId": "interlace-field",
+            "row": 3,
+            "column": 3
+          }
+        ],
+        "bandId": "lat-0",
+        "segmentStart": "lat-0p1"
+      },
+      "b": {
+        "path": [
+          {
+            "repeatId": "interlace-field",
+            "row": 3,
+            "column": 3
+          }
+        ],
+        "bandId": "lat-1",
+        "segmentStart": "lat-1p0"
+      },
+      "over": "b",
+      "hint": {
+        "x": 268.6794227822395,
+        "y": 281.17942278223956
+      }
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-isometric",
+  "name": "Isometric",
+  "displayUnits": "mm",
+  "board": {
+    "widthMm": 300,
+    "heightMm": 450,
+    "backgroundMaterialId": null
+  },
+  "materials": [
+    {
+      "id": "ash",
+      "name": "Ash",
+      "color": "#DED2B4"
+    },
+    {
+      "id": "oak",
+      "name": "Oak",
+      "color": "#C19A6B"
+    },
+    {
+      "id": "walnut",
+      "name": "Walnut",
+      "color": "#5C3A21"
+    }
+  ],
+  "objects": {
+    "cube-top": {
+      "type": "region",
+      "id": "cube-top",
+      "materialId": "ash",
+      "points": [
+        {
+          "id": "cube-topp0",
+          "x": 0,
+          "y": -24
+        },
+        {
+          "id": "cube-topp1",
+          "x": 20.784609690826528,
+          "y": -12
+        },
+        {
+          "id": "cube-topp2",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "cube-topp3",
+          "x": -20.784609690826528,
+          "y": -12
+        }
+      ]
+    },
+    "cube-left": {
+      "type": "region",
+      "id": "cube-left",
+      "materialId": "oak",
+      "points": [
+        {
+          "id": "cube-leftp0",
+          "x": -20.784609690826528,
+          "y": -12
+        },
+        {
+          "id": "cube-leftp1",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "cube-leftp2",
+          "x": 0,
+          "y": 24
+        },
+        {
+          "id": "cube-leftp3",
+          "x": -20.784609690826528,
+          "y": 12
+        }
+      ]
+    },
+    "cube-right": {
+      "type": "region",
+      "id": "cube-right",
+      "materialId": "walnut",
+      "points": [
+        {
+          "id": "cube-rightp0",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "cube-rightp1",
+          "x": 20.784609690826528,
+          "y": -12
+        },
+        {
+          "id": "cube-rightp2",
+          "x": 20.784609690826528,
+          "y": 12
+        },
+        {
+          "id": "cube-rightp3",
+          "x": 0,
+          "y": 24
+        }
+      ]
+    },
+    "cube-field": {
+      "type": "repeat",
+      "id": "cube-field",
+      "motifId": "cube-unit",
+      "transform": {
+        "x": 80,
+        "y": 90,
+        "rotationDeg": 0,
+        "mirrorX": false,
+        "mirrorY": false,
+        "scale": 1
+      },
+      "rows": 4,
+      "columns": 4,
+      "stepXMm": 46.569219381653056,
+      "stepYMm": 36,
+      "rowOffsetMm": 23.284609690826528,
+      "columnOffsetMm": 0,
+      "alternateMirrorX": false,
+      "alternateMirrorY": false,
+      "alternateRotationDeg": 0
+    }
+  },
+  "rootChildren": [
+    "cube-field"
+  ],
+  "motifs": {
+    "cube-unit": {
+      "id": "cube-unit",
+      "name": "Cube unit",
+      "children": [
+        "cube-top",
+        "cube-left",
+        "cube-right"
+      ],
+      "crossings": []
+    }
+  },
+  "crossings": []
+}

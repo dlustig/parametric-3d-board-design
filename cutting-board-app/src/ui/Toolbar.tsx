@@ -1,13 +1,51 @@
 // The tool rail (SPEC §7.4): Select, Hand, Band, Rectangle, Polygon; the Snap
 // and Show grid toggles (SPEC §7.7); and −, +, Fit (SPEC §7.2).
 
-import type { JSX } from 'react'
+import type { ChangeEvent, JSX } from 'react'
 import { createMotifFromSelection, pasteClipboard, repeatSelection } from '@/editor/keyboard'
 import { fitView, zoomViewBy } from '@/editor/input'
 import type { Tool } from '@/editor/store'
 import { useEditor } from '@/editor/store'
+import { fixtures } from '@/fixtures'
 
 const ZOOM_STEP = 1.25
+
+type FixtureKey = keyof typeof fixtures
+
+const FIXTURE_OPTIONS: Array<[FixtureKey, string]> = [
+  ['stripes', 'Stripes'],
+  ['checker', 'Checker'],
+  ['basketWeave', 'Basket weave'],
+  ['chevronDiamond', 'Chevron diamond'],
+  ['isometric', 'Isometric'],
+  ['interlace', 'Interlace'],
+]
+
+/** Dev-only manual-inspection aid (SPEC §12 fixtures); never bundled into a production build. */
+function FixtureLoader(): JSX.Element {
+  const replaceProject = useEditor((s) => s.replaceProject)
+  const onChange = (e: ChangeEvent<HTMLSelectElement>): void => {
+    const key = e.target.value
+    if (key === '') return
+    replaceProject(structuredClone(fixtures[key as FixtureKey]))
+    e.target.value = ''
+  }
+  return (
+    <label className="toolbar-fixture-loader">
+      Load fixture
+      <select aria-label="Load fixture" defaultValue="" onChange={onChange}>
+        <option value="" disabled>
+          Load fixture…
+        </option>
+        {FIXTURE_OPTIONS.map(([key, label]) => (
+          <option key={key} value={key}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
 
 export function Toolbar(): JSX.Element {
   const tool = useEditor((s) => s.tool)
@@ -52,6 +90,7 @@ export function Toolbar(): JSX.Element {
       <button type="button" onClick={fitView}>
         Fit
       </button>
+      {import.meta.env.DEV && <FixtureLoader />}
     </header>
   )
 }

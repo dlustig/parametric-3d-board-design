@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-chevron-diamond",
+  "name": "Chevron diamond",
+  "displayUnits": "mm",
+  "board": {
+    "widthMm": 300,
+    "heightMm": 450,
+    "backgroundMaterialId": null
+  },
+  "materials": [
+    {
+      "id": "cherry",
+      "name": "Cherry",
+      "color": "#A8543A"
+    },
+    {
+      "id": "purpleheart",
+      "name": "Purpleheart",
+      "color": "#6B2E6B"
+    },
+    {
+      "id": "wenge",
+      "name": "Wenge",
+      "color": "#3B2A20"
+    },
+    {
+      "id": "ash",
+      "name": "Ash",
+      "color": "#DED2B4"
+    },
+    {
+      "id": "padauk",
+      "name": "Padauk",
+      "color": "#C8402A"
+    }
+  ],
+  "objects": {
+    "chevron-wide": {
+      "type": "band",
+      "id": "chevron-wide",
+      "materialId": "cherry",
+      "widthMm": 20,
+      "closed": false,
+      "points": [
+        {
+          "id": "chevron-widep0",
+          "x": 50,
+          "y": 200
+        },
+        {
+          "id": "chevron-widep1",
+          "x": 110,
+          "y": 140
+        },
+        {
+          "id": "chevron-widep2",
+          "x": 170,
+          "y": 200
+        }
+      ]
+    },
+    "chevron-narrow": {
+      "type": "band",
+      "id": "chevron-narrow",
+      "materialId": "purpleheart",
+      "widthMm": 12,
+      "closed": false,
+      "points": [
+        {
+          "id": "chevron-narrowp0",
+          "x": 170,
+          "y": 290
+        },
+        {
+          "id": "chevron-narrowp1",
+          "x": 230,
+          "y": 230
+        },
+        {
+          "id": "chevron-narrowp2",
+          "x": 290,
+          "y": 290
+        }
+      ]
+    },
+    "diamond-outline": {
+      "type": "band",
+      "id": "diamond-outline",
+      "materialId": "wenge",
+      "widthMm": 4,
+      "closed": true,
+      "points": [
+        {
+          "id": "diamond-outlinep0",
+          "x": 150,
+          "y": 305
+        },
+        {
+          "id": "diamond-outlinep1",
+          "x": 195,
+          "y": 350
+        },
+        {
+          "id": "diamond-outlinep2",
+          "x": 150,
+          "y": 395
+        },
+        {
+          "id": "diamond-outlinep3",
+          "x": 105,
+          "y": 350
+        }
+      ]
+    },
+    "diamond-outer": {
+      "type": "region",
+      "id": "diamond-outer",
+      "materialId": "ash",
+      "points": [
+        {
+          "id": "diamond-outerp0",
+          "x": 150,
+          "y": 290
+        },
+        {
+          "id": "diamond-outerp1",
+          "x": 210,
+          "y": 350
+        },
+        {
+          "id": "diamond-outerp2",
+          "x": 150,
+          "y": 410
+        },
+        {
+          "id": "diamond-outerp3",
+          "x": 90,
+          "y": 350
+        }
+      ]
+    },
+    "diamond-inner": {
+      "type": "region",
+      "id": "diamond-inner",
+      "materialId": "padauk",
+      "points": [
+        {
+          "id": "diamond-innerp0",
+          "x": 150,
+          "y": 320
+        },
+        {
+          "id": "diamond-innerp1",
+          "x": 180,
+          "y": 350
+        },
+        {
+          "id": "diamond-innerp2",
+          "x": 150,
+          "y": 380
+        },
+        {
+          "id": "diamond-innerp3",
+          "x": 120,
+          "y": 350
+        }
+      ]
+    }
+  },
+  "rootChildren": [
+    "diamond-outer",
+    "diamond-outline",
+    "diamond-inner",
+    "chevron-wide",
+    "chevron-narrow"
+  ],
+  "motifs": {},
+  "crossings": []
+}

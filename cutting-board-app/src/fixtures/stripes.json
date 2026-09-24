@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-stripes",
+  "name": "Stripes",
+  "displayUnits": "mm",
+  "board": {
+    "widthMm": 300,
+    "heightMm": 450,
+    "backgroundMaterialId": null
+  },
+  "materials": [
+    {
+      "id": "maple",
+      "name": "Maple",
+      "color": "#E8D4A8"
+    },
+    {
+      "id": "walnut",
+      "name": "Walnut",
+      "color": "#5C3A21"
+    },
+    {
+      "id": "cherry",
+      "name": "Cherry",
+      "color": "#A8543A"
+    },
+    {
+      "id": "purpleheart",
+      "name": "Purpleheart",
+      "color": "#6B2E6B"
+    }
+  ],
+  "objects": {
+    "stripe-0": {
+      "type": "band",
+      "id": "stripe-0",
+      "materialId": "maple",
+      "widthMm": 30,
+      "closed": false,
+      "points": [
+        {
+          "id": "stripe-0p0",
+          "x": 0,
+          "y": 87
+        },
+        {
+          "id": "stripe-0p1",
+          "x": 300,
+          "y": 87
+        }
+      ]
+    },
+    "stripe-1": {
+      "type": "band",
+      "id": "stripe-1",
+      "materialId": "walnut",
+      "widthMm": 42,
+      "closed": false,
+      "points": [
+        {
+          "id": "stripe-1p0",
+          "x": 0,
+          "y": 123
+        },
+        {
+          "id": "stripe-1p1",
+          "x": 300,
+          "y": 123
+        }
+      ]
+    },
+    "stripe-2": {
+      "type": "band",
+      "id": "stripe-2",
+      "materialId": "cherry",
+      "widthMm": 55,
+      "closed": false,
+      "points": [
+        {
+          "id": "stripe-2p0",
+          "x": 0,
+          "y": 171.5
+        },
+        {
+          "id": "stripe-2p1",
+          "x": 300,
+          "y": 171.5
+        }
+      ]
+    },
+    "stripe-3": {
+      "type": "band",
+      "id": "stripe-3",
+      "materialId": "purpleheart",
+      "widthMm": 38,
+      "closed": false,
+      "points": [
+        {
+          "id": "stripe-3p0",
+          "x": 0,
+          "y": 218
+        },
+        {
+          "id": "stripe-3p1",
+          "x": 300,
+          "y": 218
+        }
+      ]
+    },
+    "stripe-4": {
+      "type": "band",
+      "id": "stripe-4",
+      "materialId": "maple",
+      "widthMm": 61,
+      "closed": false,
+      "points": [
+        {
+          "id": "stripe-4p0",
+          "x": 0,
+          "y": 267.5
+        },
+        {
+          "id": "stripe-4p1",
+          "x": 300,
+          "y": 267.5
+        }
+      ]
+    },
+    "stripe-5": {
+      "type": "band",
+      "id": "stripe-5",
+      "materialId": "walnut",
+      "widthMm": 47,
+      "closed": false,
+      "points": [
+        {
+          "id": "stripe-5p0",
+          "x": 0,
+          "y": 321.5
+        },
+        {
+          "id": "stripe-5p1",
+          "x": 300,
+          "y": 321.5
+        }
+      ]
+    },
+    "stripe-6": {
+      "type": "band",
+      "id": "stripe-6",
+      "materialId": "cherry",
+      "widthMm": 33,
+      "closed": false,
+      "points": [
+        {
+          "id": "stripe-6p0",
+          "x": 0,
+          "y": 361.5
+        },
+        {
+          "id": "stripe-6p1",
+          "x": 300,
+          "y": 361.5
+        }
+      ]
+    }
+  },
+  "rootChildren": [
+    "stripe-0",
+    "stripe-1",
+    "stripe-2",
+    "stripe-3",
+    "stripe-4",
+    "stripe-5",
+    "stripe-6"
+  ],
+  "motifs": {},
+  "crossings": []
+}
