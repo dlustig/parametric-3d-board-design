@@ -3,7 +3,8 @@
 // translates the points after it), insert-after and delete.
 
 import type { JSX } from 'react'
-import { setBandClosed, setBandWidth, setMaterial } from '@/domain/commands'
+import { useEffect, useState } from 'react'
+import { offsetCopyBand, setBandClosed, setBandWidth, setMaterial } from '@/domain/commands'
 import type { Band } from '@/domain/model'
 import { useEditor } from '@/editor/store'
 import { NumberField } from './NumberField.tsx'
@@ -60,6 +61,13 @@ export function BandPanel({ band }: Props): JSX.Element {
   const unit = project.displayUnits
   const commit = (): void => useEditor.getState().commit()
 
+  // SPEC §7.4 Offset copy (Band only): a width field defaulting to this
+  // band's own width, reset whenever the selected band changes.
+  const [offsetWidth, setOffsetWidth] = useState(band.widthMm)
+  // Intentionally keyed on band.id only, not band.widthMm: re-defaulting on
+  // every width edit would clobber a width the user already typed here.
+  useEffect(() => setOffsetWidth(band.widthMm), [band.id])
+
   const n = band.points.length
 
   return (
@@ -101,6 +109,24 @@ export function BandPanel({ band }: Props): JSX.Element {
           checked={band.closed}
           onChange={(e) => useEditor.getState().run((p) => setBandClosed(p, band.id, e.target.checked))}
         />
+      </div>
+
+      <h3>Offset copy</h3>
+      <NumberField
+        label="Offset copy width"
+        value={offsetWidth}
+        unit={unit}
+        policy="positive"
+        onPreview={() => undefined}
+        onCommit={setOffsetWidth}
+      />
+      <div className="button-row">
+        <button type="button" onClick={() => useEditor.getState().run((p) => offsetCopyBand(p, band.id, 'left', offsetWidth))}>
+          Offset copy left
+        </button>
+        <button type="button" onClick={() => useEditor.getState().run((p) => offsetCopyBand(p, band.id, 'right', offsetWidth))}>
+          Offset copy right
+        </button>
       </div>
 
       <h3>Points</h3>

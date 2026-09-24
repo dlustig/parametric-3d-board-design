@@ -2,6 +2,7 @@
 // and Show grid toggles (SPEC §7.7); and −, +, Fit (SPEC §7.2).
 
 import type { JSX } from 'react'
+import { pasteClipboard } from '@/editor/keyboard'
 import { fitView, zoomViewBy } from '@/editor/input'
 import type { Tool } from '@/editor/store'
 import { useEditor } from '@/editor/store'
@@ -30,6 +31,9 @@ export function Toolbar(): JSX.Element {
       </button>
       <button type="button" aria-pressed={showGrid} onClick={() => useEditor.setState({ showGrid: !showGrid })}>
         Show grid
+      </button>
+      <button type="button" onClick={pasteClipboard}>
+        Paste
       </button>
       <span className="toolbar-gap" />
       <button type="button" aria-label="Zoom out" onClick={() => zoomViewBy(1 / ZOOM_STEP)}>

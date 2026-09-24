@@ -1,10 +1,11 @@
 // Object-level commands: add, delete, transform, width, instance/repeat params.
 
 import { rematchCrossings } from '@/geometry/resolve'
+import { offsetPolyline } from '@/geometry/offset'
 import { newId } from '@/domain/ids'
 import { MAX_OCCURRENCES } from '@/domain/limits'
 import type { Band, BandRef, ContextId, DesignObject, Id, MotifInstance, Project, Region, RepeatField, Transform } from '@/domain/model'
-import { childrenOf } from '@/domain/project'
+import { childrenOf, contextOf } from '@/domain/project'
 import { countOccurrences } from '@/domain/validate'
 import type { CommandResult } from './index.ts'
 import { fail, filterAllRecords, mapObjects, ok, replaceObject, withChildren } from './shared.ts'
@@ -138,6 +139,33 @@ export function setBandClosed(p: Project, id: Id, closed: boolean): CommandResul
   const band = p.objects[id] as Band
   if (closed && band.points.length < 3) return fail('A closed band needs at least 3 points')
   return ok(rematchCrossings(p, replaceObject(p, { ...band, closed })))
+}
+
+/**
+ * SPEC §7.4 Offset copy (Band only): a parallel copy on the chosen `side`,
+ * at perpendicular distance `(w + w') / 2` from the original (so the two
+ * bands' painted edges touch), with miter-offset joints and width `w'`. The
+ * copy shares the original's material; it is never refused (no occurrence
+ * cap check — one Band added is never enough to matter).
+ *
+ * `offsetPolyline`'s `distance` sign is screen "right" of the point order
+ * (SPEC §4.1's clockwise-positive convention); `side` maps directly to it.
+ */
+export function offsetCopyBand(p: Project, id: Id, side: 'left' | 'right', widthMm: number): Project {
+  const band = p.objects[id] as Band
+  const ctx = contextOf(p, id)
+  const distance = ((band.widthMm + widthMm) / 2) * (side === 'right' ? 1 : -1)
+  const offsetPoints = offsetPolyline(band.points, distance, band.closed)
+  const copy: Band = {
+    type: 'band',
+    id: newId(),
+    materialId: band.materialId,
+    widthMm,
+    closed: band.closed,
+    points: offsetPoints.map((pt) => ({ id: newId(), x: pt.x, y: pt.y })),
+  }
+  const withBand: Project = { ...p, objects: { ...p.objects, [copy.id]: copy } }
+  return withChildren(withBand, ctx, [...childrenOf(withBand, ctx), copy.id])
 }
 
 /** Patches an instance's or repeat's transform. (The occurrence count cannot change, so this cannot be refused.) */

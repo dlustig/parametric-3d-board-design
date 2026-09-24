@@ -1,8 +1,9 @@
 // SPEC §7.4: the drawing tools' options bar — the pending segment's Length and
 // Angle (live snapped values; typed values place the point on Enter), Finish,
-// Undo point, Cancel, and the last command message. Also the drawing keys
-// until keyboard dispatch lands: Enter finishes, Backspace / Ctrl+Z removes
-// the last point, Esc cancels; Alt keyup is preventDefault'ed (SPEC §7.7).
+// Undo point, Cancel, and the last command message. The drawing keys
+// (Enter/Backspace/Ctrl+Z/Esc) are dispatched by `editor/keyboard.ts`, not
+// here. Alt keyup is preventDefault'ed (SPEC §7.7) — unrelated to that
+// dispatch, so it stays a small listener of its own.
 
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
@@ -10,31 +11,13 @@ import { useEditor } from '@/editor/store'
 import { cancelDrawing, finishDrawing, isDrawTool, placeTyped, undoPoint } from '@/editor/tools/draw'
 import { NumberField } from './Inspector/NumberField.tsx'
 
-function isTextTarget(t: EventTarget | null): boolean {
-  return t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
-}
-
-function useDrawingKeys(): void {
+function useAltKeyupGuard(): void {
   useEffect(() => {
-    const down = (e: KeyboardEvent): void => {
-      if (isTextTarget(e.target)) return
-      if (useEditor.getState().drawing === null) return
-      const undoChord = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z'
-      if (e.key === 'Enter') finishDrawing()
-      else if (e.key === 'Backspace' || undoChord) undoPoint()
-      else if (e.key === 'Escape') cancelDrawing()
-      else return
-      e.preventDefault()
-    }
     const up = (e: KeyboardEvent): void => {
       if (e.key === 'Alt') e.preventDefault()
     }
-    window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
-    return () => {
-      window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
-    }
+    return () => window.removeEventListener('keyup', up)
   }, [])
 }
 
@@ -43,7 +26,7 @@ export function ToolOptions(): JSX.Element | null {
   const drawing = useEditor((s) => s.drawing)
   const unit = useEditor((s) => s.project.displayUnits)
   const message = useEditor((s) => s.message)
-  useDrawingKeys()
+  useAltKeyupGuard()
 
   // Typed values: state for display, refs for the synchronous read on Enter
   // (the field's own Enter blurs and commits just before the bar sees the key).

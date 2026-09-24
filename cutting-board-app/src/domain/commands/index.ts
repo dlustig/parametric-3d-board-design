@@ -6,7 +6,9 @@ import type { Project } from '@/domain/model'
 export type CommandResult = { ok: true; project: Project } | { ok: false; message: string }
 
 export * from './board.ts'
+export * from './clipboard.ts'
 export * from './crossings.ts'
+export * from './duplicate.ts'
 export * from './materials.ts'
 export * from './objects.ts'
 export * from './order.ts'

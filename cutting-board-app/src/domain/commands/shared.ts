@@ -1,5 +1,6 @@
 // Immutable-update helpers shared by the command modules.
 
+import { newId } from '@/domain/ids'
 import type { Band, ContextId, Crossing, DesignObject, Id, Project, Region } from '@/domain/model'
 import type { CommandResult } from './index.ts'
 
@@ -46,4 +47,17 @@ export function filterAllRecords(p: Project, keep: (c: Crossing) => boolean): Pr
 /** Whether the shape's last point connects back to its first (closed Band or Region). */
 export function wraps(shape: Band | Region): boolean {
   return shape.type === 'region' || shape.closed
+}
+
+/**
+ * A copy of `obj` with a fresh id — and, for a Band or Region, fresh point
+ * ids too. A motif-instance/repeat keeps its `motifId`: the definition it
+ * points at is never cloned along with it (SPEC §7.4: "arrays are what
+ * Repeat is for"), used by Duplicate and by Paste's top-level objects.
+ */
+export function cloneObjectFreshIds(obj: DesignObject): DesignObject {
+  if (obj.type === 'band' || obj.type === 'region') {
+    return { ...obj, id: newId(), points: obj.points.map((pt) => ({ ...pt, id: newId() })) }
+  }
+  return { ...obj, id: newId() }
 }

@@ -225,3 +225,95 @@ body {
   font-size: 0.8rem;
   color: #c0392b;
 }
+
+/* SPEC §3 materials palette. */
+.materials-panel {
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+}
+
+.materials-hint {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.materials-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.material-swatch-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.material-swatch {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 6px;
+  text-align: left;
+}
+
+.material-swatch[aria-pressed='true'] {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.material-swatch-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  flex: 0 0 auto;
+}
+
+.material-swatch-name {
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-editor-trigger {
+  flex: 0 0 auto;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+.material-editor-popover {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--page-bg);
+  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px color-mix(in srgb, black 25%, transparent);
+  min-width: 14rem;
+}
+
+.material-editor-popover .field select {
+  flex: 1;
+}
+
+.popover-arrow {
+  fill: var(--page-bg);
+}
+
+.tooltip {
+  z-index: 3;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  background: var(--ink);
+  color: var(--page-bg);
+  border-radius: 4px;
+}

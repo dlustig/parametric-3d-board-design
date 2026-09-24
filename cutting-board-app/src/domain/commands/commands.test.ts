@@ -13,6 +13,7 @@ import {
   deletePoint,
   insertPoint,
   mirrorObjects,
+  offsetCopyBand,
   removeRecord,
   reorder,
   replaceMaterial,
@@ -320,6 +321,34 @@ describe('reorder', () => {
   it('reorders within a definition', () => {
     const p = reorder(project([instance('I', 'M')], [plus]), ['H'], 'front')
     expect(p.motifs.M!.children).toEqual(['V', 'H'])
+  })
+})
+
+describe('offsetCopyBand', () => {
+  it('adds a parallel Band at perpendicular distance (w + w\') / 2, same material, on the chosen side', () => {
+    const p = ok(addBand(project([]), { ctx: null, materialId: MAT2, widthMm: 6, points: [{ x: 0, y: 0 }, { x: 10, y: 0 }] }))
+    const original = p.rootChildren[0]!
+
+    const right = offsetCopyBand(p, original, 'right', 4)
+    expect(right.rootChildren).toHaveLength(2)
+    const rightCopy = bandOf(right, right.rootChildren[1]!)
+    expect(coords(right, rightCopy.id)).toEqual([[0, 5], [10, 5]])
+    expect(rightCopy).toMatchObject({ materialId: MAT2, widthMm: 4, closed: false })
+    expect(new Set(rightCopy.points.map((pt) => pt.id)).size).toBe(2)
+
+    const left = offsetCopyBand(p, original, 'left', 4)
+    const leftCopy = bandOf(left, left.rootChildren[1]!)
+    expect(coords(left, leftCopy.id)).toEqual([[0, -5], [10, -5]])
+
+    expect(validateProject(right)).toBeNull()
+    expect(validateProject(left)).toBeNull()
+  })
+
+  it('offsets into a motif definition context', () => {
+    const base = project([instance('I', 'M')], [plus])
+    const p = offsetCopyBand(base, 'H', 'right', 6)
+    expect(p.motifs.M!.children).toHaveLength(3)
+    expect(validateProject(p)).toBeNull()
   })
 })
 

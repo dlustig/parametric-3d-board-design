@@ -18,14 +18,15 @@ export function updateMaterial(p: Project, id: Id, patch: Partial<Omit<Material,
   return { ...p, materials: p.materials.map((m) => (m.id === id ? { ...m, ...patch } : m)) }
 }
 
-function usageCount(p: Project, id: Id): number {
+/** How many Bands/Regions (plus the Board background, if set) use material `id` — shown by the palette next to Delete. */
+export function materialUsageCount(p: Project, id: Id): number {
   const shapes = Object.values(p.objects).filter((o) => (o.type === 'band' || o.type === 'region') && o.materialId === id)
   return shapes.length + (p.board.backgroundMaterialId === id ? 1 : 0)
 }
 
 /** Deletes a material; refused while anything (including the Board background) uses it. */
 export function deleteMaterial(p: Project, id: Id): CommandResult {
-  const used = usageCount(p, id)
+  const used = materialUsageCount(p, id)
   if (used > 0) return fail(`This material is used ${used} time${used === 1 ? '' : 's'}`)
   return ok({ ...p, materials: p.materials.filter((m) => m.id !== id) })
 }

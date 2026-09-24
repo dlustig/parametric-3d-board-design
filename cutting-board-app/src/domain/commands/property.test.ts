@@ -83,6 +83,16 @@ function commandsFor(p: Project): Command[] {
     ...root.map((id): Command => [`delete ${id}`, (q) => commands.deleteObjects(q, [id])]),
     ...Object.keys(p.motifs).map((m): Command => [`addBand in ${m}`, (q) => commands.addBand(q, { ctx: m, materialId: m0, widthMm: 2, points: [{ x: -9, y: -9 }, { x: 9, y: 9 }] })]),
     ...p.crossings.map((c): Command => [`removeRecord ${c.id}`, (q) => commands.removeRecord(q, null, c.id)]),
+    ['duplicate root', (q) => commands.duplicateObjects(q, null, root).project],
+    ['copy/paste root', (q) => commands.pasteObjects(q, null, commands.copyObjects(q, root))],
+    ...Object.keys(p.motifs).map((m): Command => [
+      `duplicate in ${m}`,
+      (q) => commands.duplicateObjects(q, m, q.motifs[m]!.children).project,
+    ]),
+    ...Object.keys(p.motifs).map((m): Command => [
+      `copy/paste in ${m}`,
+      (q) => commands.pasteObjects(q, m, commands.copyObjects(q, q.motifs[m]!.children)),
+    ]),
   ]
 
   for (const b of Object.values(p.objects).filter((o): o is Band => o.type === 'band')) {
@@ -99,6 +109,8 @@ function commandsFor(p: Project): Command[] {
       [`setPoints ${b.id}`, (q) => commands.setPoints(q, b.id, b.points.map((pt) => ({ x: pt.x + 1, y: pt.y - 1 })))],
       // Adversarial: every point collapses onto the first — well under MIN_SEGMENT_MM, so this is expected to refuse.
       [`setPoints adversarial ${b.id}`, (q) => commands.setPoints(q, b.id, b.points.map(() => ({ x: b.points[0]!.x, y: b.points[0]!.y })))],
+      [`offsetCopyBand right ${b.id}`, (q) => commands.offsetCopyBand(q, b.id, 'right', b.widthMm)],
+      [`offsetCopyBand left ${b.id}`, (q) => commands.offsetCopyBand(q, b.id, 'left', b.widthMm)],
     )
   }
 

@@ -6,6 +6,7 @@
 
 import type { JSX } from 'react'
 import { useEditor } from '@/editor/store'
+import { MaterialPalette } from '../MaterialPalette.tsx'
 import { BandPanel } from './BandPanel.tsx'
 import { BoardPanel } from './BoardPanel.tsx'
 import { RegionPanel } from './RegionPanel.tsx'
@@ -18,6 +19,7 @@ export function Inspector(): JSX.Element {
   if (selection.length === 0) {
     return (
       <aside className="inspector">
+        <MaterialPalette />
         <BoardPanel />
       </aside>
     )
@@ -27,6 +29,7 @@ export function Inspector(): JSX.Element {
 
   return (
     <aside className="inspector">
+      <MaterialPalette />
       <SelectionPanel />
       {single?.type === 'band' && <BandPanel band={single} />}
       {single?.type === 'region' && <RegionPanel region={single} />}

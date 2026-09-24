@@ -6,6 +6,7 @@
 import type { JSX } from 'react'
 import { mirrorObjects, reorder, rotateObjects, translateObjects } from '@/domain/commands'
 import { unionBoxes } from '@/geometry/bounds'
+import { copySelection, deleteSelection, duplicateSelection } from '@/editor/keyboard'
 import { useEditor } from '@/editor/store'
 import { selectableBounds } from '@/editor/tools/select'
 import type { PreviewOutcome } from './NumberField.tsx'
@@ -47,6 +48,14 @@ export function SelectionPanel(): JSX.Element | null {
         onCommit={commit}
       />
       <div className="button-row">
+        <button type="button" onClick={() => useEditor.getState().run((p) => rotateObjects(p, selection, -90, centre))}>
+          Rotate 90° CCW
+        </button>
+        <button type="button" onClick={() => useEditor.getState().run((p) => rotateObjects(p, selection, 90, centre))}>
+          Rotate 90° CW
+        </button>
+      </div>
+      <div className="button-row">
         <button type="button" onClick={() => useEditor.getState().run((p) => mirrorObjects(p, selection, 'x', centre))}>
           Mirror X
         </button>
@@ -66,6 +75,17 @@ export function SelectionPanel(): JSX.Element | null {
         </button>
         <button type="button" onClick={() => useEditor.getState().run((p) => reorder(p, selection, 'back'))}>
           To back
+        </button>
+      </div>
+      <div className="button-row">
+        <button type="button" onClick={duplicateSelection}>
+          Duplicate
+        </button>
+        <button type="button" onClick={copySelection}>
+          Copy
+        </button>
+        <button type="button" onClick={deleteSelection}>
+          Delete
         </button>
       </div>
     </section>
