@@ -5,11 +5,10 @@
 // `eventOptions: { passive: false }` so ctrl-wheel and gesture* can be
 // preventDefault'ed (use-gesture does that itself for pinch). No handler here
 // preventDefaults pointerdown: Moveable and Selecto rely on the compatibility
-// mouse events.
+// mouse events. Also the toolbar's view commands (zoom about centre, Fit).
 
-import type { RefObject } from 'react'
 import { useGesture } from '@use-gesture/react'
-import { placeAt, screenToWorld } from './camera.ts'
+import { fitBoard, placeAt, screenToWorld, zoomAbout } from './camera.ts'
 import type { Camera } from './store.ts'
 import { useEditor } from './store.ts'
 
@@ -22,7 +21,19 @@ function localOf(svg: SVGSVGElement, client: XY): XY {
   return { x: client.x - r.left, y: client.y - r.top }
 }
 
-export function useCanvasGestures(ref: RefObject<HTMLDivElement | null>, svgRef: RefObject<SVGSVGElement | null>, spaceHeld: RefObject<boolean>): void {
+/** SPEC §7.2 Fit: Board bounds + 5% margin in the current viewport. */
+export function fitView(): void {
+  const { project, viewportPx, setCamera } = useEditor.getState()
+  setCamera(fitBoard(project.board, viewportPx))
+}
+
+/** Zoom about the viewport centre (toolbar − / +). */
+export function zoomViewBy(factor: number): void {
+  const { camera, viewportPx, setCamera } = useEditor.getState()
+  setCamera(zoomAbout(camera, factor, { x: camera.x + viewportPx.w / 2 / camera.zoom, y: camera.y + viewportPx.h / 2 / camera.zoom }))
+}
+
+export function useCanvasGestures(wrapper: HTMLDivElement | null, svg: SVGSVGElement | null, spaceDown: boolean): void {
   useGesture(
     {
       onWheel: ({ event }) => {
@@ -32,7 +43,6 @@ export function useCanvasGestures(ref: RefObject<HTMLDivElement | null>, svgRef:
         setCamera({ ...camera, x: camera.x + event.deltaX / camera.zoom, y: camera.y + event.deltaY / camera.zoom })
       },
       onPinch: ({ first, origin, movement, memo }) => {
-        const svg = svgRef.current
         if (svg === null) return memo
         const start = (first ? undefined : (memo as { camera: Camera; anchor: XY } | undefined)) ?? {
           camera: useEditor.getState().camera,
@@ -45,7 +55,7 @@ export function useCanvasGestures(ref: RefObject<HTMLDivElement | null>, svgRef:
       onDrag: ({ first, buttons, touches, movement, memo, cancel }) => {
         if (first) {
           const { tool, camera } = useEditor.getState()
-          const pan = tool === 'hand' || spaceHeld.current || (buttons & MIDDLE_BUTTON) !== 0
+          const pan = tool === 'hand' || spaceDown || (buttons & MIDDLE_BUTTON) !== 0
           if (!pan) {
             cancel()
             return undefined
@@ -59,7 +69,7 @@ export function useCanvasGestures(ref: RefObject<HTMLDivElement | null>, svgRef:
       },
     },
     {
-      target: ref,
+      target: { current: wrapper }, // a null element binds nothing until the wrapper mounts
       eventOptions: { passive: false },
       drag: { pointer: { buttons: -1, capture: false } },
       pinch: { modifierKey: ['ctrlKey', 'metaKey'] },

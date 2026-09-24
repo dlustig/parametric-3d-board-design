@@ -49,6 +49,7 @@ export interface EditorState {
   selection: Id[]
   editContext: EditContextLevel[]
   camera: Camera
+  viewportPx: { w: number; h: number } // canvas client size, kept by the canvas ResizeObserver
   snapEnabled: boolean
   showGrid: boolean
   gridMm: number
@@ -72,6 +73,7 @@ export interface EditorState {
   enterContext(c: EditContextLevel): void
   popContext(): void
   setCamera(c: Camera): void
+  setViewport(v: { w: number; h: number }): void
 }
 
 type Temporal = StoreApi<TemporalState<{ project: Project }>>
@@ -96,6 +98,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       selection: [],
       editContext: [],
       camera: { x: 0, y: 0, zoom: 2 },
+      viewportPx: { w: 1, h: 1 },
       snapEnabled: true,
       showGrid: true,
       gridMm: gridMmFor(INITIAL_PROJECT),
@@ -174,6 +177,10 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       setCamera(c) {
         set({ camera: c })
+      },
+
+      setViewport(v) {
+        set({ viewportPx: v })
       },
     }),
     {

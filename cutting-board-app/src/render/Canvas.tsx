@@ -2,6 +2,13 @@
 // <svg viewBox> at the wrapper's client aspect → scene → board mat → proxies →
 // selection overlay; Moveable drives drag/rotate on the selected proxies and
 // Selecto the marquee. Input ownership follows the SPEC §7.2 table.
+//
+// Every single-pointer press in Select goes through Selecto's dragStart and
+// is decided by domain hit-testing (SPEC §7.3), not by which proxy the DOM
+// hit: proxies have `pointer-events: none`. A press on an object stops
+// Selecto, selects the object if needed, and hands the same press to
+// Moveable (`waitToChangeTarget` → `dragStart`, the Selecto+Moveable recipe);
+// a press on nothing starts a marquee, even inside a selected object's bounds.
 
 import type { JSX } from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -10,14 +17,13 @@ import Moveable from 'react-moveable'
 import type { OnDragEnd, OnRotateEnd } from 'react-moveable'
 import Selecto from 'react-selecto'
 import type { OnDragStart as OnSelectoDragStart, OnSelectEnd } from 'react-selecto'
-import type { Box } from '@/geometry/bounds'
 import { unionBoxes } from '@/geometry/bounds'
 import { EDITOR_CLIP_EXTEND_PX, MAX_CLIP_EXTEND_MM } from '@/geometry/tolerance'
-import { fitBoard, viewBoxFor, worldToScreen } from '@/editor/camera'
-import { useCanvasGestures } from '@/editor/input'
+import { screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
+import { fitView, useCanvasGestures } from '@/editor/input'
 import { useEditor } from '@/editor/store'
 import type { Gesture } from '@/editor/tools/select'
-import { clickSelect, endGesture, selectableBounds, startRotate, startTranslate } from '@/editor/tools/select'
+import { clickSelect, endGesture, objectAt, selectableBounds, startRotate, startTranslate, toggleSelection } from '@/editor/tools/select'
 import { Proxies } from './Proxies.tsx'
 import { SceneSvg } from './SceneSvg.tsx'
 import { SelectionOverlay } from './overlays/Selection.tsx'
@@ -26,8 +32,9 @@ type XY = { x: number; y: number }
 
 const proxySelector = (id: string): string => `[data-object-id="${id}"]`
 
-function isTextInput(t: EventTarget | null): boolean {
-  return t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
+/** Space on these must keep its own meaning (typing, activating a button). */
+function ownsSpace(t: EventTarget | null): boolean {
+  return t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(t.tagName))
 }
 
 function clientOf(e: { clientX: number; clientY: number }): XY {
@@ -38,22 +45,22 @@ export function Canvas(): JSX.Element {
   const project = useEditor((s) => s.project)
   const preview = useEditor((s) => s.preview)
   const camera = useEditor((s) => s.camera)
+  const view = useEditor((s) => s.viewportPx)
   const selection = useEditor((s) => s.selection)
   const tool = useEditor((s) => s.tool)
   const editContext = useEditor((s) => s.editContext)
 
-  const wrapperRef = useRef<HTMLDivElement>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
+  const [wrapper, setWrapper] = useState<HTMLDivElement | null>(null)
+  const [svgEl, setSvgEl] = useState<SVGSVGElement | null>(null)
   const moveableRef = useRef<Moveable>(null)
   const gestureRef = useRef<Gesture | null>(null)
-  const spaceHeld = useRef(false)
-  const [wrapper, setWrapper] = useState<HTMLDivElement | null>(null)
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null)
+  /** The current press selected its object itself, so its tap must not toggle it again. */
+  const pressSelectedRef = useRef(false)
   const [spaceDown, setSpaceDown] = useState(false)
   const [multiTouch, setMultiTouch] = useState(false)
   const [rotating, setRotating] = useState(false)
 
-  useCanvasGestures(wrapperRef, svgRef, spaceHeld)
+  useCanvasGestures(wrapper, svgEl, spaceDown)
 
   /** Second pointer, Space, or pointercancel: stop Moveable, drop the gesture preview. */
   const abortGesture = (): void => {
@@ -67,33 +74,29 @@ export function Canvas(): JSX.Element {
   const abortRef = useRef(abortGesture)
   abortRef.current = abortGesture
 
-  // Viewport size → viewBox (ResizeObserver); fit the Board on mount.
+  // Viewport size → store (viewBox, toolbar zoom/Fit); fit the Board on mount.
   useLayoutEffect(() => {
-    const el = wrapperRef.current!
-    const measure = (): void => setSize({ w: el.clientWidth, h: el.clientHeight })
+    if (wrapper === null) return
+    const { setViewport } = useEditor.getState()
+    const measure = (): void => setViewport({ w: wrapper.clientWidth, h: wrapper.clientHeight })
     const ro = new ResizeObserver(measure)
-    ro.observe(el)
+    ro.observe(wrapper)
     measure()
-    setWrapper(el)
-    const { project: p, setCamera } = useEditor.getState()
-    setCamera(fitBoard(p.board, { w: el.clientWidth, h: el.clientHeight }))
+    fitView()
     return () => ro.disconnect()
-  }, [])
+  }, [wrapper])
 
   // Space held: pan instead of drag (SPEC §7.2).
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
-      if (e.code !== 'Space' || isTextInput(e.target)) return
+      if (e.code !== 'Space' || ownsSpace(e.target)) return
       e.preventDefault()
-      if (spaceHeld.current) return
-      spaceHeld.current = true
+      if (e.repeat) return
       setSpaceDown(true)
       abortRef.current()
     }
     const up = (e: KeyboardEvent): void => {
-      if (e.code !== 'Space') return
-      spaceHeld.current = false
-      setSpaceDown(false)
+      if (e.code === 'Space') setSpaceDown(false)
     }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -105,7 +108,7 @@ export function Canvas(): JSX.Element {
 
   // Second finger: abort Moveable and unmount Selecto (it has no mid-drag abort) until all fingers lift.
   useEffect(() => {
-    const el = wrapperRef.current!
+    if (wrapper === null) return
     const start = (e: TouchEvent): void => {
       if (e.touches.length < 2) return
       abortRef.current()
@@ -115,17 +118,17 @@ export function Canvas(): JSX.Element {
       if (e.touches.length === 0) setMultiTouch(false)
     }
     const cancel = (): void => abortRef.current()
-    el.addEventListener('touchstart', start, { passive: true })
-    el.addEventListener('pointercancel', cancel)
+    wrapper.addEventListener('touchstart', start, { passive: true })
+    wrapper.addEventListener('pointercancel', cancel)
     window.addEventListener('touchend', end)
     window.addEventListener('touchcancel', end)
     return () => {
-      el.removeEventListener('touchstart', start)
-      el.removeEventListener('pointercancel', cancel)
+      wrapper.removeEventListener('touchstart', start)
+      wrapper.removeEventListener('pointercancel', cancel)
       window.removeEventListener('touchend', end)
       window.removeEventListener('touchcancel', end)
     }
-  }, [])
+  }, [wrapper])
 
   const shown = preview?.next ?? project
   // During a rotate the proxies stay at the gesture-start rect (SPEC §7.3).
@@ -141,7 +144,7 @@ export function Canvas(): JSX.Element {
     moveableRef.current?.updateRect()
   })
 
-  const svg = (): SVGSVGElement => svgRef.current!
+  const svg = (): SVGSVGElement => svgEl!
 
   const onDragStart = (e: { clientX: number; clientY: number }): void => {
     gestureRef.current = startTranslate(svg(), clientOf(e))
@@ -149,11 +152,18 @@ export function Canvas(): JSX.Element {
   const onMove = (e: { clientX: number; clientY: number }): void => {
     gestureRef.current?.move(clientOf(e))
   }
-  const onEnd = (e: OnDragEnd | OnRotateEnd): void => {
+  const finish = (e: OnDragEnd | OnRotateEnd): void => {
     setRotating(false)
     if (gestureRef.current === null) return
     gestureRef.current = null
     endGesture(e.isDrag, e.inputEvent as Event | undefined)
+  }
+  /** A drag that never moved is a tap on the selection: re-select from domain geometry (SPEC §7.4). */
+  const onDragEnd = (e: OnDragEnd): void => {
+    finish(e)
+    if (e.isDrag || pressSelectedRef.current) return
+    const input = e.inputEvent as MouseEvent | TouchEvent | undefined
+    clickSelect(svg(), clientOf(e), input?.shiftKey === true || useEditor.getState().addToSelection)
   }
   const onRotateStart = (e: { clientX: number; clientY: number }): void => {
     const box = unionBoxes(selectableBounds(project, editContext).filter((b) => selection.includes(b.id)).map((b) => b.box))
@@ -163,35 +173,45 @@ export function Canvas(): JSX.Element {
   }
 
   const getElementRect = (el: HTMLElement | SVGElement): { pos1: number[]; pos2: number[]; pos3: number[]; pos4: number[] } => {
-    const box: Box | undefined = boundsRef.current.get(el.getAttribute('data-object-id') ?? '')
-    if (box === undefined) {
-      const r = el.getBoundingClientRect()
-      return { pos1: [r.left, r.top], pos2: [r.right, r.top], pos3: [r.left, r.bottom], pos4: [r.right, r.bottom] }
-    }
+    const box = boundsRef.current.get(el.getAttribute('data-object-id')!)!
     const tl = worldToScreen(svg(), { x: box.minX, y: box.minY })
     const br = worldToScreen(svg(), { x: box.maxX, y: box.maxY })
     return { pos1: [tl.x, tl.y], pos2: [br.x, tl.y], pos3: [tl.x, br.y], pos4: [br.x, br.y] }
   }
 
   const onSelectoDragStart = (e: OnSelectoDragStart): void => {
-    const target = e.inputEvent.target as Element
-    const id = target.getAttribute('data-object-id')
-    const onSelected = id !== null && useEditor.getState().selection.includes(id)
-    if (moveableRef.current?.isMoveableElement(target) || (onSelected && !e.inputEvent.shiftKey)) e.stop()
+    const moveable = moveableRef.current!
+    const input = e.inputEvent as MouseEvent | TouchEvent
+    if (moveable.isMoveableElement(input.target as Element)) {
+      e.stop() // a Moveable handle owns this press
+      return
+    }
+    const s = useEditor.getState()
+    const id = objectAt(s.project, s.editContext, screenToWorld(svg(), clientOf(e)))
+    if (id === null) return // empty space: marquee
+    e.stop()
+    const proxy = svg().querySelector(proxySelector(id))
+    pressSelectedRef.current = !s.selection.includes(id)
+    if (!pressSelectedRef.current) {
+      moveable.dragStart(input, proxy)
+      return
+    }
+    s.select(toggleSelection(s.selection, id, input.shiftKey || s.addToSelection))
+    void moveable.waitToChangeTarget().then(() => moveable.dragStart(input, proxy))
   }
   const onSelectEnd = (e: OnSelectEnd): void => {
     const s = useEditor.getState()
-    const toggle = e.inputEvent.shiftKey === true || s.addToSelection
+    const input = e.inputEvent as MouseEvent | TouchEvent
+    const toggle = input.shiftKey || s.addToSelection
     if (e.isClick) {
-      clickSelect(svg(), { x: e.rect.left, y: e.rect.top }, toggle)
+      clickSelect(svg(), clientOf(e.inputEvent as { clientX: number; clientY: number }), toggle)
       return
     }
-    const ids = e.selected.map((el) => el.getAttribute('data-object-id')!).filter((id) => id !== null)
+    const ids = e.selected.map((el) => el.getAttribute('data-object-id')!)
     s.select(toggle ? [...s.selection.filter((id) => !ids.includes(id)), ...ids.filter((id) => !s.selection.includes(id))] : ids)
   }
 
   const clipExtendMm = Math.min(EDITOR_CLIP_EXTEND_PX / camera.zoom, MAX_CLIP_EXTEND_MM)
-  const view = size ?? { w: 1, h: 1 }
   const { widthMm: bw, heightMm: bh, backgroundMaterialId } = project.board
   const boardFill = project.materials.find((m) => m.id === backgroundMaterialId)?.color ?? '#ffffff'
   const vx = camera.x
@@ -199,45 +219,43 @@ export function Canvas(): JSX.Element {
   const vw = view.w / camera.zoom
   const vh = view.h / camera.zoom
   const matD = `M ${vx - vw} ${vy - vh} H ${vx + 2 * vw} V ${vy + 2 * vh} H ${vx - vw} Z M 0 0 H ${bw} V ${bh} H 0 Z`
-  const targets = selection.map(proxySelector)
-  const selecting = tool === 'select'
+  const selecting = tool === 'select' && wrapper !== null && svgEl !== null
 
   return (
-    <div className="canvas" ref={wrapperRef}>
-      <svg ref={svgRef} className="canvas-svg" viewBox={viewBoxFor(camera, view)} width={view.w} height={view.h}>
+    <div className="canvas" ref={setWrapper}>
+      <svg ref={setSvgEl} className="canvas-svg" viewBox={viewBoxFor(camera, view)} width={view.w} height={view.h}>
         <rect className="board" width={bw} height={bh} fill={boardFill} />
         <SceneSvg project={shown} clipExtendMm={clipExtendMm} />
         <path className="board-mat" d={matD} fillRule="evenodd" pointerEvents="none" />
-        <Proxies bounds={bounds} selection={selection} />
+        <Proxies bounds={bounds} />
         <SelectionOverlay boxes={selectedBoxes} zoom={camera.zoom} />
       </svg>
-      {selecting && wrapper !== null && selection.length > 0 && (
+      {selecting && (
         <Moveable
           ref={moveableRef}
-          target={targets.length === 1 ? targets[0]! : targets}
+          target={selection.map(proxySelector)}
           container={wrapper}
           flushSync={flushSync}
           draggable={!spaceDown}
           rotatable
           resizable={false}
-          scalable={false}
           snappable={false}
           origin={false}
           onDragStart={onDragStart}
           onDrag={onMove}
-          onDragEnd={onEnd}
+          onDragEnd={onDragEnd}
           onDragGroupStart={onDragStart}
           onDragGroup={onMove}
-          onDragGroupEnd={onEnd}
+          onDragGroupEnd={onDragEnd}
           onRotateStart={onRotateStart}
           onRotate={onMove}
-          onRotateEnd={onEnd}
+          onRotateEnd={finish}
           onRotateGroupStart={onRotateStart}
           onRotateGroup={onMove}
-          onRotateGroupEnd={onEnd}
+          onRotateGroupEnd={finish}
         />
       )}
-      {selecting && wrapper !== null && !multiTouch && (
+      {selecting && !multiTouch && (
         <Selecto
           container={wrapper}
           dragContainer={wrapper}
@@ -245,9 +263,8 @@ export function Canvas(): JSX.Element {
           selectByClick
           selectFromInside
           hitRate={0}
-          toggleContinueSelect="shift"
           getElementRect={getElementRect}
-          dragCondition={() => !spaceHeld.current}
+          dragCondition={() => !spaceDown}
           onDragStart={onSelectoDragStart}
           onSelectEnd={onSelectEnd}
         />

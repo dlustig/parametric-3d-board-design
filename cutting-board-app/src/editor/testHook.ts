@@ -1,6 +1,10 @@
-// Test-only hook for the Playwright proof (SPEC §15): read the project and
-// history depth, run commands, seed projects, and reach the store. Never
-// installed in production builds.
+// Test-only hook for the Playwright proof (SPEC §15), installed as
+// `window.__cbpd` outside production builds:
+//   getProject()         the committed project (not the preview)
+//   getHistoryLengths()  zundo past/future depths
+//   run(cmd)             run a command through the store, as the UI does
+//   replaceProject(p)    seed a project (clears history, selection, context)
+//   getState()           the whole store, for camera/selection/context setup
 
 import type { Project } from '@/domain/model'
 import type { EditorState } from './store.ts'

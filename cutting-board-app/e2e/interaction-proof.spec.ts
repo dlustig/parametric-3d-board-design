@@ -79,8 +79,7 @@ test.describe('mouse', () => {
     await select(page, ['i1'])
     await expectBoxMatchesDomain(page, 'i1')
 
-    const b = objectBounds(await getProject(page), 'i1')!
-    const start = round(await toClient(page, { x: b.maxX - 3, y: b.minY + 3 })) // inside the rect, off the strokes
+    const start = round(await toClient(page, { x: 209.96, y: 95.75 })) // on the instance's first band: definition (11.5, 0) rotated 30° about (200, 90)
     await mouseDrag(page, start, { x: start.x + 40, y: start.y + 30 })
     expect(await history(page)).toEqual({ past: 1, future: 0 })
     await expectBoxMatchesDomain(page, 'i1')
