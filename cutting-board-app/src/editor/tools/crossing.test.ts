@@ -18,6 +18,10 @@ describe('pickNearest', () => {
     expect(pickNearest(centres, { x: 0, y: 20 }, 22)).toBe(0)
   })
 
+  it('keeps the earlier centre on a tie (listed crossings precede unresolved rings)', () => {
+    expect(pickNearest([{ x: 5, y: 0 }, { x: 5, y: 0 }], { x: 0, y: 0 }, 12)).toBe(0)
+  })
+
   it('returns null with no centres', () => {
     expect(pickNearest([], { x: 0, y: 0 }, 22)).toBeNull()
   })

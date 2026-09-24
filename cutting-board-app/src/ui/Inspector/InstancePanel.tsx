@@ -7,7 +7,7 @@ import type { JSX } from 'react'
 import { useState } from 'react'
 import { detachInstance, removeRecord, renameMotif, setTransform } from '@/domain/commands'
 import { canonicalKey } from '@/domain/crossings'
-import { stepKey } from '@/domain/keys'
+import { hasKeyPrefix, stepKey } from '@/domain/keys'
 import type { BandRef, Id, MotifInstance, Project, RepeatField, Step, Transform } from '@/domain/model'
 import { formatLength } from '@/domain/units'
 import { scaleOf } from '@/geometry/affine'
@@ -98,7 +98,7 @@ export function EditMotifButton({ obj }: { obj: Placed }): JSX.Element {
 /** Whether the world step keys `keys` pass through `obj` placed in the current context (whose world prefix is `prefixKeys`). */
 function throughObject(keys: string[], prefixKeys: string[], obj: Placed): boolean {
   const next = keys[prefixKeys.length]
-  if (next === undefined || !prefixKeys.every((k, i) => keys[i] === k)) return false
+  if (next === undefined || !hasKeyPrefix(keys, prefixKeys)) return false
   return next === `i:${obj.id}` || next.startsWith(`r:${obj.id}:`)
 }
 

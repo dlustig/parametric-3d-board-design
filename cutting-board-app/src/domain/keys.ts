@@ -12,6 +12,11 @@ export function occurrenceKey(path: Step[], sourceId: Id): string {
   return `${path.map(stepKey).join('/')}#${sourceId}`
 }
 
+/** Whether the step keys `keys` begin with the step keys `prefixKeys`. */
+export function hasKeyPrefix(keys: string[], prefixKeys: string[]): boolean {
+  return keys.length >= prefixKeys.length && prefixKeys.every((k, n) => keys[n] === k)
+}
+
 /** A canonical string key for a `BandRef`, used to order and dedupe crossings. */
 export function refKey(ref: BandRef): string {
   return `${occurrenceKey(ref.path, ref.bandId)}@${ref.segmentStart}`

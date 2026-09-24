@@ -6,19 +6,14 @@
 
 import type { JSX } from 'react'
 import { removeRecord } from '@/domain/commands'
-import { stepKey } from '@/domain/keys'
-import type { Id, Step } from '@/domain/model'
+import { hasKeyPrefix, stepKey } from '@/domain/keys'
+import type { Id } from '@/domain/model'
 import { formatLength } from '@/domain/units'
 import type { UnresolvedMarker } from '@/geometry/scene'
 import { useScene } from '@/editor/scene'
 import { useEditor } from '@/editor/store'
 import { toggleAt } from '@/editor/tools/crossing'
 import { contextPrefix } from '@/editor/tools/select'
-
-/** Whether `path` starts with the step keys `prefixKeys`. */
-function startsWith(path: Step[], prefixKeys: string[]): boolean {
-  return path.length >= prefixKeys.length && prefixKeys.every((k, n) => stepKey(path[n]!) === k)
-}
 
 export function CrossingList({ bandId }: { bandId: Id }): JSX.Element {
   const scene = useScene()
@@ -29,7 +24,7 @@ export function CrossingList({ bandId }: { bandId: Id }): JSX.Element {
   const materialName = (id: Id): string => project.materials.find((m) => m.id === id)?.name ?? id
 
   const rows = scene.intersections.flatMap((i) => {
-    const mine = [i.a, i.b].find((side) => side.occ.sourceId === bandId && side.occ.path.length === prefixKeys.length && startsWith(side.occ.path, prefixKeys))
+    const mine = [i.a, i.b].find((side) => side.occ.sourceId === bandId && side.occ.path.length === prefixKeys.length && hasKeyPrefix(side.occ.path.map(stepKey), prefixKeys))
     if (mine === undefined) return []
     const partner = mine === i.a ? i.b : i.a
     return [{ i, over: i.overKey === mine.occ.key, partner }]

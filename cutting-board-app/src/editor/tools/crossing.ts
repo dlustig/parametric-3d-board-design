@@ -8,7 +8,7 @@
 
 import { toggleCrossing } from '@/domain/commands/crossings'
 import { commonPrefix } from '@/domain/crossings'
-import type { SceneIntersection } from '@/geometry/scene'
+import type { Scene, SceneIntersection } from '@/geometry/scene'
 import { TAP_SLOP_PX } from '@/geometry/tolerance'
 import { worldToScreen } from '@/editor/camera'
 import { editorScene } from '@/editor/scene'
@@ -19,13 +19,13 @@ type XY = { x: number; y: number }
 export const HIT_RADIUS_MOUSE_PX = 12
 export const HIT_RADIUS_TOUCH_PX = 22
 
-/** Index of the centre nearest `at` within `radius` (all in screen px), or null. */
+/** Index of the centre nearest `at` within `radius` (all in screen px), or null; on a tie the earlier centre wins. */
 export function pickNearest(centres: XY[], at: XY, radius: number): number | null {
   let best: number | null = null
-  let bestDistance = radius
+  let bestDistance = Infinity
   for (const [k, c] of centres.entries()) {
     const d = Math.hypot(c.x - at.x, c.y - at.y)
-    if (d <= bestDistance) {
+    if (d <= radius && d < bestDistance) {
       best = k
       bestDistance = d
     }
@@ -38,17 +38,24 @@ export function hasCommonAncestor(i: SceneIntersection): boolean {
   return commonPrefix(i.a.occ.path, i.b.occ.path).length > 0
 }
 
-/** SPEC §5.4 toggle with the store's scope; 'all' falls back to 'occurrence' (with a notice) for a pair with no common ancestor. */
+/** Whether the options bar shows the scope control: some eligible pair in `scene` has a common motif ancestor (SPEC §5.4). */
+export function scopeControlShown(scene: Scene): boolean {
+  return scene.intersections.some((i) => i.cls === 'eligible' && hasCommonAncestor(i))
+}
+
+/**
+ * SPEC §5.4 toggle with the store's scope; 'all' falls back to 'occurrence'
+ * for a pair with no common ancestor, with a notice only where the visible
+ * scope control said "All instances" about a pair inside some motif.
+ */
 export function toggleAt(i: SceneIntersection): void {
   const s = useEditor.getState()
   const all = s.crossingScope === 'all' && hasCommonAncestor(i)
-  const notice = s.crossingScope === 'all' && !all ? 'No common motif: toggled this occurrence only' : null
+  const inMotif = i.a.occ.path.length > 0 || i.b.occ.path.length > 0
+  const fellBack = s.crossingScope === 'all' && !all && inMotif && scopeControlShown(editorScene(s))
+  const notice = fellBack ? 'No common motif: toggled this occurrence only' : null
   s.run((p) => toggleCrossing(p, i, all ? 'all' : 'occurrence'))
   useEditor.setState({ crossingNotice: notice })
-}
-
-export function describeUnsupported(i: SceneIntersection): string {
-  return `${i.cls}: ${i.reason}`
 }
 
 function tap(svg: SVGSVGElement, client: XY, pointerType: string): void {
@@ -66,7 +73,7 @@ function tap(svg: SVGSVGElement, client: XY, pointerType: string): void {
     return
   }
   if (i.cls === 'eligible') toggleAt(i)
-  else useEditor.setState({ crossingNotice: describeUnsupported(i) })
+  else useEditor.setState({ crossingNotice: `${i.cls}: ${i.reason}` })
 }
 
 // Pointer bookkeeping, valid while the Canvas has the crossing listeners bound.

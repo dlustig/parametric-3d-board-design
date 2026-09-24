@@ -10,7 +10,7 @@ import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useScene } from '@/editor/scene'
 import { useEditor } from '@/editor/store'
-import { hasCommonAncestor } from '@/editor/tools/crossing'
+import { scopeControlShown } from '@/editor/tools/crossing'
 import { cancelDrawing, finishDrawing, isDrawTool, placeTyped, undoPoint } from '@/editor/tools/draw'
 import { NumberField } from './Inspector/NumberField.tsx'
 
@@ -107,7 +107,7 @@ function CrossingOptions(): JSX.Element {
   const scope = useEditor((s) => s.crossingScope)
   const notice = useEditor((s) => s.crossingNotice)
   const message = useEditor((s) => s.message)
-  const scoped = useScene().intersections.some((i) => i.cls === 'eligible' && hasCommonAncestor(i))
+  const scoped = scopeControlShown(useScene())
   const scopeButton = (value: 'all' | 'occurrence', label: string): JSX.Element => (
     <button type="button" aria-pressed={scope === value} onClick={() => useEditor.setState({ crossingScope: value })}>
       {label}
