@@ -1,6 +1,6 @@
 // Paint-order commands, applied within each context that owns a listed id.
 
-import type { ContextId, Id, Project } from '../model.ts'
+import type { ContextId, Id, Project } from '@/domain/model'
 import { withChildren } from './shared.ts'
 
 function reordered(children: Id[], selected: Set<Id>, how: 'forward' | 'backward' | 'front' | 'back'): Id[] {

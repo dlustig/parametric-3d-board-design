@@ -100,7 +100,11 @@ export function expandContext(p: Project, ctx: ContextId): Occurrence[] {
   return expandChildren(p, ctx, [], IDENTITY)
 }
 
-/** Maps the last step's definition space into the space of the context `path` starts in. */
+/**
+ * Maps the last step's definition space into the space of the context `path`
+ * starts in. Same per-step composition as `expandChildren`, which builds it
+ * incrementally while walking.
+ */
 export function pathMatrix(p: Project, path: Step[]): Mat {
   let matrix = IDENTITY
   for (const step of path) {

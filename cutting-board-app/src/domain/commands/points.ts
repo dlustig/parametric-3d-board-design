@@ -1,11 +1,11 @@
 // Point-level commands on Bands and Regions (SPEC §2.1 invariant 3, §5.5).
 
-import { rematchCrossings } from '../../geometry/resolve.ts'
-import { canonicalize, canonicalKey } from '../crossings.ts'
-import { newId } from '../ids.ts'
-import { refKey } from '../keys.ts'
-import { MIN_SEGMENT_MM } from '../limits.ts'
-import type { Band, BandRef, Crossing, Id, Point, Project, Region } from '../model.ts'
+import { rematchCrossings } from '@/geometry/resolve'
+import { canonicalize, canonicalKey } from '@/domain/crossings'
+import { newId } from '@/domain/ids'
+import { refKey } from '@/domain/keys'
+import { MIN_SEGMENT_MM } from '@/domain/limits'
+import type { Band, BandRef, Crossing, Id, Point, Project, Region } from '@/domain/model'
 import type { CommandResult } from './index.ts'
 import { fail, mapAllRecords, ok, replaceObject, wraps } from './shared.ts'
 

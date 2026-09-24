@@ -1,30 +1,37 @@
 // Object-level commands: add, delete, transform, width, instance/repeat params.
 
-import { rematchCrossings } from '../../geometry/resolve.ts'
-import { newId } from '../ids.ts'
-import { MAX_OCCURRENCES } from '../limits.ts'
-import type { Band, BandRef, ContextId, DesignObject, Id, MotifInstance, Project, Region, RepeatField, Transform } from '../model.ts'
-import { childrenOf } from '../project.ts'
-import { countOccurrences } from '../validate.ts'
+import { rematchCrossings } from '@/geometry/resolve'
+import { newId } from '@/domain/ids'
+import { MAX_OCCURRENCES } from '@/domain/limits'
+import type { Band, BandRef, ContextId, DesignObject, Id, MotifInstance, Project, Region, RepeatField, Transform } from '@/domain/model'
+import { childrenOf } from '@/domain/project'
+import { countOccurrences } from '@/domain/validate'
 import type { CommandResult } from './index.ts'
 import { fail, filterAllRecords, mapObjects, ok, replaceObject, withChildren } from './shared.ts'
 
 type XY = { x: number; y: number }
 
-function addToContext(p: Project, ctx: ContextId, obj: DesignObject): Project {
-  return withChildren(replaceObject(p, obj), ctx, [...childrenOf(p, ctx), obj.id])
+/** `after`, or a refusal when it expands to more than MAX_OCCURRENCES. */
+function withinCap(after: Project): CommandResult {
+  const count = countOccurrences(after)
+  return count > MAX_OCCURRENCES ? fail(`This would make ${count} occurrences; the limit is ${MAX_OCCURRENCES}.`) : ok(after)
+}
+
+/** Appends `obj` to the context; refused over the occurrence cap. Adding an occurrence cannot unbind a record: no rematch. */
+function addToContext(p: Project, ctx: ContextId, obj: DesignObject): CommandResult {
+  return withinCap(withChildren(replaceObject(p, obj), ctx, [...childrenOf(p, ctx), obj.id]))
 }
 
 function newPoints(points: XY[]): Band['points'] {
   return points.map(({ x, y }) => ({ id: newId(), x, y }))
 }
 
-export function addBand(p: Project, args: { ctx: ContextId; materialId: Id; widthMm: number; points: XY[]; closed?: boolean }): Project {
+export function addBand(p: Project, args: { ctx: ContextId; materialId: Id; widthMm: number; points: XY[]; closed?: boolean }): CommandResult {
   const band: Band = { type: 'band', id: newId(), materialId: args.materialId, widthMm: args.widthMm, closed: args.closed ?? false, points: newPoints(args.points) }
-  return addToContext(p, args.ctx, band) // adding an occurrence cannot unbind a record: no rematch
+  return addToContext(p, args.ctx, band)
 }
 
-export function addRegion(p: Project, args: { ctx: ContextId; materialId: Id; points: XY[] }): Project {
+export function addRegion(p: Project, args: { ctx: ContextId; materialId: Id; points: XY[] }): CommandResult {
   const region: Region = { type: 'region', id: newId(), materialId: args.materialId, points: newPoints(args.points) }
   return addToContext(p, args.ctx, region)
 }
@@ -141,11 +148,10 @@ export type RepeatParams = Omit<RepeatField, 'type' | 'id' | 'motifId' | 'transf
  */
 export function setRepeatParams(p: Project, id: Id, patch: Partial<RepeatParams>): CommandResult {
   const field: RepeatField = { ...(p.objects[id] as RepeatField), ...patch }
-  const after = replaceObject(p, field)
-  const count = countOccurrences(after)
-  if (count > MAX_OCCURRENCES) return fail(`This would make ${count} occurrences; the limit is ${MAX_OCCURRENCES}.`)
+  const checked = withinCap(replaceObject(p, field))
+  if (!checked.ok) return checked
 
   const inGrid = (r: BandRef): boolean =>
     r.path.every((step) => !('repeatId' in step) || step.repeatId !== id || (step.row < field.rows && step.column < field.columns))
-  return ok(rematchCrossings(p, filterAllRecords(after, (c) => inGrid(c.a) && inGrid(c.b))))
+  return ok(rematchCrossings(p, filterAllRecords(checked.project, (c) => inGrid(c.a) && inGrid(c.b))))
 }

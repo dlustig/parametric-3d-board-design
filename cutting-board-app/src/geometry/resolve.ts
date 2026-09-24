@@ -1,9 +1,9 @@
 // SPEC §5.3 precedence and §5.5 rematching: binding crossing records to the
 // listed intersections of their context.
 
-import { canonicalize, canonicalKey, commonPrefix, contextsAlong, pairKey, recordsOf, withRecords } from '../domain/crossings.ts'
-import { occurrenceKey, refKey } from '../domain/keys.ts'
-import type { BandRef, ContextId, Crossing, Project } from '../domain/model.ts'
+import { canonicalize, canonicalKey, commonPrefix, contextsAlong, pairKey, recordsOf, withRecords } from '@/domain/crossings'
+import { occurrenceKey, refKey } from '@/domain/keys'
+import type { BandRef, ContextId, Crossing, Project } from '@/domain/model'
 import { expand, expandContext } from './expand.ts'
 import type { Intersection, IntersectionSide } from './intersections.ts'
 import { findIntersections } from './intersections.ts'
@@ -71,21 +71,19 @@ export function isRecordResolved(p: Project, ctx: ContextId, c: Crossing): boole
 /**
  * SPEC §5.5, from the pre-command project to the post-command one, per
  * context (definition records in definition space, root records in world
- * space). Only records resolved in `before` are touched: still resolved →
- * fresh `hint`; lost → rebound to the single unbound, new intersection of the
- * same occurrence pair within REMATCH_TOLERANCE_MM of `hint`, if there is one.
+ * space). Any record resolved in `after` gets a fresh `hint`. A record
+ * resolved in `before` but lost is rebound to the single unbound, new
+ * intersection of the same occurrence pair within REMATCH_TOLERANCE_MM of
+ * `hint`, if there is one; records unresolved in `before` are never rebound.
  */
 export function rematchCrossings(before: Project, after: Project): Project {
   let result = after
   for (const ctx of [null, ...Object.keys(after.motifs)]) {
     const records = recordsOf(after, ctx)
-    const existedBefore = ctx === null || Object.hasOwn(before.motifs, ctx)
-    if (records.length === 0 || !existedBefore) continue
+    if (records.length === 0) continue
 
     const beforeKeys = new Set(contextIntersections(before, ctx).map((i) => intersectionKey(i)))
     const wasResolved = new Set(recordsOf(before, ctx).filter((c) => beforeKeys.has(canonicalKey(c))).map((c) => c.id))
-    if (wasResolved.size === 0) continue
-
     const next = rematchContext(records, wasResolved, beforeKeys, contextIntersections(after, ctx))
     if (next !== records) result = withRecords(result, ctx, next)
   }
@@ -101,12 +99,11 @@ function rematchContext(records: Crossing[], wasResolved: Set<string>, beforeKey
 
   const lost: number[] = []
   for (const [index, c] of records.entries()) {
-    if (!wasResolved.has(c.id)) continue // step 3: never auto-rebound
     const hit = afterByKey.get(canonicalKey(c))
     if (hit === undefined) {
-      lost.push(index)
+      if (wasResolved.has(c.id)) lost.push(index) // step 3: records unresolved before are never auto-rebound
     } else if (hit.point.x !== c.hint.x || hit.point.y !== c.hint.y) {
-      next[index] = { ...c, hint: { x: hit.point.x, y: hit.point.y } } // step 1
+      next[index] = { ...c, hint: { x: hit.point.x, y: hit.point.y } } // step 1, for any record resolved in `after`
       changed = true
     }
   }

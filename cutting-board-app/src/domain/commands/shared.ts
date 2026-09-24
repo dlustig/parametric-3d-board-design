@@ -1,6 +1,6 @@
 // Immutable-update helpers shared by the command modules.
 
-import type { Band, ContextId, Crossing, DesignObject, Id, Project, Region } from '../model.ts'
+import type { Band, ContextId, Crossing, DesignObject, Id, Project, Region } from '@/domain/model'
 import type { CommandResult } from './index.ts'
 
 export function ok(project: Project): CommandResult {

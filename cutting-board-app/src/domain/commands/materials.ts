@@ -1,7 +1,7 @@
 // Material palette commands (SPEC §3).
 
-import { newId } from '../ids.ts'
-import type { Id, Material, Project } from '../model.ts'
+import { newId } from '@/domain/ids'
+import type { Id, Material, Project } from '@/domain/model'
 import type { CommandResult } from './index.ts'
 import { fail, mapObjects, ok } from './shared.ts'
 

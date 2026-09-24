@@ -1,16 +1,28 @@
 // Crossing commands: the §5.4 toggle and record removal.
 
-import { apply, invert } from '../../geometry/affine.ts'
-import { pathMatrix } from '../../geometry/expand.ts'
-import type { Intersection } from '../../geometry/intersections.ts'
-import { contextIntersections, intersectionKey, paintIndexOf, resolveIntersection, sideRef } from '../../geometry/resolve.ts'
-import { canonicalize, canonicalKey, commonPrefix, contextsAlong, pairKey, recordsOf, withRecords } from '../crossings.ts'
-import { newId } from '../ids.ts'
-import type { ContextId, Crossing, Id, Project } from '../model.ts'
+import { apply, invert } from '@/geometry/affine'
+import { pathMatrix } from '@/geometry/expand'
+import type { Intersection } from '@/geometry/intersections'
+import { contextIntersections, intersectionKey, paintIndexOf, resolveIntersection, sideRef } from '@/geometry/resolve'
+import { canonicalize, canonicalKey, commonPrefix, contextsAlong, pairKey, recordsOf, withRecords } from '@/domain/crossings'
+import { newId } from '@/domain/ids'
+import type { ContextId, Crossing, Id, Project } from '@/domain/model'
 
-function withoutKey(p: Project, ctx: ContextId, key: string): Project {
+/** Drops the records of `ctx` that `matches`, keeping the project identical when there are none. */
+function withoutRecords(p: Project, ctx: ContextId, matches: (c: Crossing) => boolean): Project {
   const records = recordsOf(p, ctx)
-  return records.some((c) => canonicalKey(c) === key) ? withRecords(p, ctx, records.filter((c) => canonicalKey(c) !== key)) : p
+  return records.some(matches) ? withRecords(p, ctx, records.filter((c) => !matches(c))) : p
+}
+
+/**
+ * Whether `c` addresses, through one occurrence of a definition `strip` steps
+ * in, the pair whose key in that definition is `definitionKey` — i.e. both refs
+ * share their first `strip` steps and the stripped refs give that key.
+ */
+function isPairThroughDefinition(c: Crossing, strip: number, definitionKey: string): boolean {
+  if (commonPrefix(c.a.path, c.b.path).length < strip) return false
+  const stripped = { a: { ...c.a, path: c.a.path.slice(strip) }, b: { ...c.b, path: c.b.path.slice(strip) } }
+  return canonicalKey(stripped) === definitionKey
 }
 
 /**
@@ -50,13 +62,18 @@ export function toggleCrossing(p: Project, i: Intersection, scope: 'all' | 'occu
   const over = resolveIntersection(p, i, paintIndex).over === 'a' ? 'b' : 'a'
 
   if (scope === 'all' && prefix.length > 0) {
+    // Every occurrence of the pair, not only the clicked one, loses its outer records.
     const contexts = contextsAlong(p, prefix)
+    const definitionKey = intersectionKey(i, prefix.length)
     let next = p
-    for (let depth = 0; depth < prefix.length; depth++) next = withoutKey(next, contexts[depth]!, intersectionKey(i, depth))
+    for (let depth = 0; depth < prefix.length; depth++) {
+      next = withoutRecords(next, contexts[depth]!, (c) => isPairThroughDefinition(c, prefix.length - depth, definitionKey))
+    }
     return writeRecord(next, i, prefix.length, contexts[prefix.length]!, over)
   }
 
-  const withoutRoot = withoutKey(p, null, intersectionKey(i))
+  const rootKey = intersectionKey(i)
+  const withoutRoot = withoutRecords(p, null, (c) => canonicalKey(c) === rootKey)
   if (resolveIntersection(withoutRoot, i, paintIndex).over === over) return withoutRoot
   return writeRecord(p, i, 0, null, over)
 }

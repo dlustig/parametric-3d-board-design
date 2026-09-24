@@ -1,7 +1,7 @@
 // SPEC §7.1: commands are pure `(project, args) → project`. Commands that can
 // be refused return a CommandResult; the store shows the message.
 
-import type { Project } from '../model.ts'
+import type { Project } from '@/domain/model'
 
 export type CommandResult = { ok: true; project: Project } | { ok: false; message: string }
 

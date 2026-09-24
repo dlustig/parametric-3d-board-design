@@ -48,7 +48,7 @@ const plus = { id: 'M', children: [band('H', [[-20, 0], [20, 0]]), band('V', [[0
 
 describe('add', () => {
   it('addBand appends a band with fresh point ids to the context', () => {
-    const p = addBand(project([band('A', [[0, 0], [10, 0]])]), { ctx: null, materialId: MAT2, widthMm: 4, points: [{ x: 0, y: 5 }, { x: 10, y: 5 }] })
+    const p = ok(addBand(project([band('A', [[0, 0], [10, 0]])]), { ctx: null, materialId: MAT2, widthMm: 4, points: [{ x: 0, y: 5 }, { x: 10, y: 5 }] }))
     expect(p.rootChildren).toHaveLength(2)
     const added = bandOf(p, p.rootChildren[1]!)
     expect(added).toMatchObject({ materialId: MAT2, widthMm: 4, closed: false })
@@ -59,12 +59,22 @@ describe('add', () => {
 
   it('addBand and addRegion add into a definition context', () => {
     const base = project([instance('I', 'M')], [plus])
-    const withBand = addBand(base, { ctx: 'M', materialId: MAT, widthMm: 3, points: [{ x: 0, y: 0 }, { x: 5, y: 5 }, { x: 0, y: 5 }], closed: true })
+    const withBand = ok(addBand(base, { ctx: 'M', materialId: MAT, widthMm: 3, points: [{ x: 0, y: 0 }, { x: 5, y: 5 }, { x: 0, y: 5 }], closed: true }))
     expect(withBand.motifs.M!.children).toHaveLength(3)
     expect(bandOf(withBand, withBand.motifs.M!.children[2]!).closed).toBe(true)
-    const withRegion = addRegion(withBand, { ctx: 'M', materialId: MAT, points: [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 5 }] })
+    const withRegion = ok(addRegion(withBand, { ctx: 'M', materialId: MAT, points: [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 5 }] }))
     expect(withRegion.objects[withRegion.motifs.M!.children[3]!]!.type).toBe('region')
-    expect(validateProject(withRegion)).toBeNull()
+  })
+
+  it('adding into a definition placed by a repeat at the occurrence cap is refused', () => {
+    // 50 × 50 cells × 2 bands = exactly 5000 occurrences.
+    const atCap = project([repeat('F', 'M', { rows: 50, columns: 50 })], [plus])
+    expect(validateProject(atCap)).toBeNull()
+    const points = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 5 }]
+    const refused = (count: number): CommandResult => ({ ok: false, message: `This would make ${count} occurrences; the limit is 5000.` })
+    expect(addBand(atCap, { ctx: 'M', materialId: MAT, widthMm: 3, points })).toEqual(refused(7500))
+    expect(addRegion(atCap, { ctx: 'M', materialId: MAT, points })).toEqual(refused(7500))
+    expect(addBand(atCap, { ctx: null, materialId: MAT, widthMm: 3, points })).toEqual(refused(5001))
   })
 })
 
@@ -163,11 +173,8 @@ describe('transforms', () => {
 
   it('setRepeatParams exceeding the occurrence cap returns not-ok and leaves the project unchanged', () => {
     // 50 × 50 cells × 2 bands + 1 root band = 5001 occurrences.
-    const before = project([repeat('F', 'M'), band('A', [[0, 0], [1, 0]])], [plus])
-    const r = setRepeatParams(before, 'F', { rows: 50, columns: 50 })
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.message).toMatch(/5000/)
-    expect(before.objects.F).toMatchObject({ rows: 3, columns: 3 })
+    const r = setRepeatParams(project([repeat('F', 'M'), band('A', [[0, 0], [1, 0]])], [plus]), 'F', { rows: 50, columns: 50 })
+    expect(r).toEqual({ ok: false, message: 'This would make 5001 occurrences; the limit is 5000.' })
   })
 })
 
@@ -210,7 +217,7 @@ describe('points', () => {
   it('deletePoint drops a record that would collide with an existing one on the merged segment', () => {
     const onA0 = record('q', ref('A', 'A0'), ref('B', 'B0'), 'b', { x: 5, y: 0 })
     const p = ok(deletePoint(project(base().rootChildren.map((id) => base().objects[id]!), [], [onA0, r]), 'A', 'A1'))
-    expect(p.crossings).toEqual([onA0])
+    expect(p.crossings).toEqual([{ ...onA0, hint: { x: 15, y: 0 } }]) // now resolved on the merged segment: hint refreshed
   })
 
   it('deletePoint on the first point of an open band drops records naming it', () => {

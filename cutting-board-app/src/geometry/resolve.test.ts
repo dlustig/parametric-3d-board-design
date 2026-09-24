@@ -18,7 +18,6 @@ function ok(r: CommandResult): Project {
   return r.project
 }
 
-const paintIndex = paintIndexOf
 
 /** The listed world intersection at (x, y). */
 function at(p: Project, x: number, y: number): Intersection {
@@ -30,7 +29,7 @@ function at(p: Project, x: number, y: number): Intersection {
 /** The band id of the effective over side at (x, y). */
 function overBandAt(p: Project, x: number, y: number): string {
   const i = at(p, x, y)
-  return i[resolveIntersection(p, i, paintIndex(p)).over].occ.sourceId
+  return i[resolveIntersection(p, i, paintIndexOf(p)).over].occ.sourceId
 }
 
 function rootRecord(p: Project, id: string): Crossing {
@@ -63,8 +62,9 @@ describe('G1 crossing identity', () => {
     expect(validateProject(p)).toBeNull()
     expect(overBandAt(p, 35, 0)).toBe('A')
     expect(overBandAt(p, 65, 0)).toBe('B')
-    expect(resolveIntersection(p, at(p, 35, 0), paintIndex(p))).toEqual({ over: 'a', source: 'definition', record: R1, contextId: null })
-    expect(resolveIntersection(twoCrossings([]), at(p, 35, 0), paintIndex(p)).source).toBe('default')
+    expect(resolveIntersection(p, at(p, 35, 0), paintIndexOf(p))).toEqual({ over: 'a', source: 'definition', record: R1, contextId: null })
+    expect(resolveIntersection(p, at(p, 65, 0), paintIndexOf(p)).record).toEqual(R2)
+    expect(resolveIntersection(twoCrossings([]), at(p, 35, 0), paintIndexOf(p)).source).toBe('default')
   })
 
   it('moving an endpoint slides a crossing along its segment: still resolved, hint updated', () => {
@@ -141,6 +141,7 @@ describe('G1 crossing identity', () => {
     expect(isRecordResolved(p, null, r1)).toBe(false)
     expect(isRecordResolved(p, null, rootRecord(p, 'r2'))).toBe(true)
     expect(overBandAt(p, 50, 1.75)).toBe('B')
+    expect(resolveIntersection(p, at(p, 50, 1.75), paintIndexOf(p)).record?.id).toBe('r2')
     expect(validateProject(p)).toBeNull()
   })
 
@@ -181,6 +182,7 @@ describe('G1 crossing identity', () => {
     expect(isRecordResolved(edited, null, rootRecord(edited, 'r'))).toBe(true)
     expectHint(rootRecord(edited, 'r'), 110, 105)
     expect(overBandAt(edited, 110, 105)).toBe('R')
+    expect(resolveIntersection(edited, at(edited, 110, 105), paintIndexOf(edited)).record?.id).toBe('r')
   })
 })
 
@@ -215,7 +217,7 @@ describe('G2 occurrence scope', () => {
     expect(list).toHaveLength(9)
     for (const i of list) {
       const [row, column] = cellOf(i)
-      const resolved = resolveIntersection(p, i, paintIndex(p))
+      const resolved = resolveIntersection(p, i, paintIndexOf(p))
       const overridden = row === 1 && column === 2
       expect(resolved.source).toBe(overridden ? 'override' : 'definition')
       expect(resolved.contextId).toBe(overridden ? null : 'M')
@@ -248,8 +250,8 @@ describe('G2 occurrence scope', () => {
     const list = findIntersections(expand(p))
     expect(list).toHaveLength(2)
     for (const i of list) {
-      expect(resolveIntersection(p, i, paintIndex(p))).toMatchObject({ source: 'definition', contextId: 'O', record: nested })
-      expect(i[resolveIntersection(p, i, paintIndex(p)).over].occ.sourceId).toBe('H')
+      expect(resolveIntersection(p, i, paintIndexOf(p))).toMatchObject({ source: 'definition', contextId: 'O', record: nested })
+      expect(i[resolveIntersection(p, i, paintIndexOf(p)).over].occ.sourceId).toBe('H')
     }
   })
 
@@ -258,8 +260,8 @@ describe('G2 occurrence scope', () => {
     expect(p.crossings).toEqual([])
     expect(p.motifs.M!.crossings).toEqual([D])
     for (const i of findIntersections(expand(p))) {
-      expect(resolveIntersection(p, i, paintIndex(p)).source).toBe('definition')
-      expect(i[resolveIntersection(p, i, paintIndex(p)).over].occ.sourceId).toBe('H')
+      expect(resolveIntersection(p, i, paintIndexOf(p)).source).toBe('definition')
+      expect(i[resolveIntersection(p, i, paintIndexOf(p)).over].occ.sourceId).toBe('H')
     }
     expect(validateProject(p)).toBeNull()
   })
@@ -267,8 +269,34 @@ describe('G2 occurrence scope', () => {
   it('"All instances" flips the definition record in a cell without an override', () => {
     const p = toggleCrossing(field(), at(field(), 100, 100), 'all')
     expect(p.motifs.M!.crossings).toEqual([{ ...D, over: 'b' }])
-    expect(p.crossings).toEqual([O]) // the override is for another cell's key
+    expect(p.crossings).toEqual([]) // the pair's override in cell (1, 2) is removed too
     expect(overBandAt(p, 150, 150)).toBe('V')
+  })
+
+  it('"All instances" toggled twice in a plain cell leaves every cell uniform and no root record for the pair', () => {
+    let p = field()
+    for (const expected of ['V', 'H']) {
+      p = toggleCrossing(p, at(p, 100, 100), 'all')
+      expect(p.crossings).toEqual([])
+      for (const i of findIntersections(expand(p))) {
+        expect(i[resolveIntersection(p, i, paintIndexOf(p)).over].occ.sourceId).toBe(expected)
+      }
+    }
+  })
+
+  it('"All instances" in a nested definition removes the pair\'s records from every outer context', () => {
+    const inner = { id: 'N', children: [band('H', [[-20, 0], [20, 0]]), band('V', [[0, -20], [0, 20]])] }
+    const viaI = (id: string, over: 'a' | 'b', steps: Step[]): Crossing => record(id, ref('H', 'H0', steps), ref('V', 'V0', steps), over, { x: 0, y: 0 })
+    const outer = { id: 'O', children: [instance('I', 'N')], crossings: [viaI('mid', 'b', [{ instanceId: 'I' }])] }
+    const p0 = project([instance('J1', 'O', { x: 100, y: 100 }), instance('J2', 'O', { x: 200, y: 100 })], [outer, inner], [viaI('root', 'a', [{ instanceId: 'J2' }, { instanceId: 'I' }])])
+    expect(validateProject(p0)).toBeNull()
+
+    const p = toggleCrossing(p0, at(p0, 100, 100), 'all') // effective V (from O) → H
+    expect(p.crossings).toEqual([])
+    expect(p.motifs.O!.crossings).toEqual([])
+    expect(p.motifs.N!.crossings).toMatchObject([{ a: ref('H', 'H0'), b: ref('V', 'V0'), over: 'a' }])
+    expect(overBandAt(p, 100, 100)).toBe('H')
+    expect(overBandAt(p, 200, 100)).toBe('H')
   })
 
   it('"This occurrence" toggled back to the outer value deletes the root record', () => {
