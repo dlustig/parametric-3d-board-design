@@ -137,9 +137,9 @@ Each occurrence carries `key` (§5.1), `kind`, `sourceId`, `path`, `matrix`, `ma
 | `REMATCH_TOLERANCE_MM` | 3 mm | rebind radius around `hint` (§5.5) |
 | `MAX_OCCURRENCES` | 5000 | expansion cap |
 | `REGION_SEAM_MM` | 0.1 mm | §4.3 |
-| `CLASSIFY_EXTEND_MM` | 0.5 mm | footprint enlargement used by the `occluded` and `crowded` classes; upper bound of any renderer's clip enlargement |
+| `MAX_CLIP_EXTEND_MM` | 0.5 mm | upper bound of any renderer's patch clip enlargement; also used by `near-joint` |
 | `EXPORT_CLIP_EXTEND_MM` | 0.2 mm | §6.2 patch clip enlargement in export |
-| `EDITOR_CLIP_EXTEND_PX` | 1.5 px | §6.2 patch clip enlargement in the editor: `min(1.5 / zoom, CLASSIFY_EXTEND_MM)` mm |
+| `EDITOR_CLIP_EXTEND_PX` | 1.5 px | §6.2 patch clip enlargement in the editor: `min(1.5 / zoom, MAX_CLIP_EXTEND_MM)` mm |
 | `SNAP_TOLERANCE_PX` | 8 px | converted to mm through zoom (and occurrence scale in edit context) |
 | `ANGLE_SNAP_DEG` | 15° step, ±4° capture | while drawing segments |
 | `TAP_SLOP_PX`, `DOUBLE_TAP_MS` | 6 px, 300 ms | tap vs drag, double-tap detection |
@@ -162,8 +162,8 @@ Every intersection point between segments `sA` (occurrence A, width `wA`) and `s
 | `collinear` | the segments overlap along a length |
 | `endpoint` | a parameter is within `EPS_GEOMETRY` (scaled by segment length) of 0 or 1 on either segment, including a crossing exactly at a polyline joint |
 | `near-parallel` | angle between directions outside `[MIN_CROSSING_ANGLE_DEG, 180 − MIN_CROSSING_ANGLE_DEG]` |
-| `near-joint` | an interior vertex of either Band lies within `halfDiagonal(footprint) + miterExtent(vertex)` of the point, where `miterExtent = w / (2 sin(φ/2))` capped at `5w` for joint angle φ |
-| `occluded` | some element strictly between A and B in paint order has painted geometry (segment stroke rectangles or Region polygon) penetrating the classification footprint (§6.1) by more than `EPS_OVERLAP_MM` |
+| `near-joint` | an interior vertex of either Band lies within `halfDiagonal(footprint) + MAX_CLIP_EXTEND_MM + miterExtent(vertex)` of the point, where `miterExtent = w / (2 sin(φ/2))` capped at `5w` for joint angle φ |
+| `occluded` | some element strictly between A and B in paint order has painted geometry (segment stroke rectangles or Region polygon) penetrating the footprint (§6.1) by more than `EPS_OVERLAP_MM` |
 | `crowded` | the plain (unenlarged) footprint penetrates another listed intersection's plain footprint on either occurrence by more than `EPS_OVERLAP_MM`. Proxy footprints: `collinear` uses the overlap strip; `endpoint` uses a disc of radius `max(w)`. Triple points land here; flush-packed neighbours whose footprints only touch do not. |
 | `eligible` | everything else |
 
@@ -213,11 +213,11 @@ Deleting a Band, instance, or repeat removes records that reference it; shrinkin
 
 ### 6.1 Footprint
 
-For segments `sA` (width `wA`) and `sB` (`wB`) crossing transversely, `footprint(sA, wA, sB, wB)` is the parallelogram bounded by the two stroke edges of each segment: its corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`, computed analytically in `geometry/footprint.ts`. The **classification footprint** is the footprint with both widths enlarged by `2 × CLASSIFY_EXTEND_MM`; it depends only on the document, so classification is independent of the camera and identical in editor and export. Overlap tests use Flatten polygon intersection with the `EPS_OVERLAP_MM` penetration threshold.
+For segments `sA` (width `wA`) and `sB` (`wB`) crossing transversely, `footprint(sA, wA, sB, wB)` is the parallelogram bounded by the two stroke edges of each segment: its corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`, computed analytically in `geometry/footprint.ts`. Classification uses only this plain footprint, so it depends only on the document and is identical in editor and export. Overlap tests use Flatten polygon intersection with the `EPS_OVERLAP_MM` penetration threshold.
 
 ### 6.2 Patch
 
-`buildScene(project, clipExtendMm)` takes only the patch clip enlargement `e` as a parameter (editor: `min(EDITOR_CLIP_EXTEND_PX / zoom, CLASSIFY_EXTEND_MM)`; export: `EXPORT_CLIP_EXTEND_MM`; both ≤ `CLASSIFY_EXTEND_MM`). The **clip polygon** is the footprint with `wA + 2e` and `wB + 2e`. Classification never uses `e`, so a camera change regenerates only clip polygons.
+`buildScene(project, clipExtendMm)` takes only the patch clip enlargement `e` as a parameter (editor: `min(EDITOR_CLIP_EXTEND_PX / zoom, MAX_CLIP_EXTEND_MM)`; export: `EXPORT_CLIP_EXTEND_MM`; both ≤ `MAX_CLIP_EXTEND_MM`). Classification never uses `e`, so a camera change regenerates only clip polygons.
 
 Let `O` be the effective over occurrence and `U` the under at an eligible intersection. If `O` is already after `U` in paint order, nothing is drawn. Otherwise the scene inserts a patch immediately after `U`:
 
@@ -226,7 +226,9 @@ Let `O` be the effective over occurrence and `U` the under at an eligible inters
 <path d="M x1 y1 L x2 y2" fill="none" stroke="{O colour}" stroke-width="{wO}" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt" clip-path="url(#{prefix}-c{n})"/>
 ```
 
-The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach, so O's segment stroke equals O's real paint there). Enlarging across both Bands' edges removes anti-aliasing seams: across O's edges the extra area is limited by O's own stroke; across U's edges it overpaints O's own colour on O's path. The `occluded` class guarantees no occurrence painted between U and O meets the classification footprint, which contains every clip polygon. A *patch* already placed between O and U whose clip polygon penetrates this crossing's classification footprint is the one remaining way the overpaint could show (two flush-packed unders with opposite decisions); the scene builder checks patches placed so far, in paint order, and demotes such a crossing to `occluded` (no patch, marked) instead. Because patches are emitted in paint order, this is one deterministic pass. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
+The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach of the clip, so O's segment stroke equals O's real paint there).
+
+**Clip polygon.** Start from the footprint. Always enlarge across O's edges (`wO + 2e`): the extra area is limited by O's own stroke, so nothing new is painted anywhere; this removes the anti-aliasing seam along O's edges. Across each of U's two edges, enlarge by `e` **only if no element painted between O and U in paint order — an occurrence, or a patch already emitted — penetrates that side's extension strip** (the part of O's stroke between U's edge and U's edge offset by `e`, by more than `EPS_OVERLAP_MM`). Where the extension is allowed, the sliver beyond U's edge overpaints only O's own colour on O's path and is invisible. Where it is withheld (a flush-packed neighbour with the opposite decision lies in the strip), the clip stays exactly on U's edge and a one-pixel anti-aliased blend of O and U remains on that edge; that is the accepted residual. The `occluded` class guarantees no occurrence between O and U meets the plain footprint, so the patch never punches through anything. Because patches are emitted in paint order, the between-set is known when each patch is built: one deterministic pass. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
 
 ### 6.3 Scene
 
@@ -458,7 +460,7 @@ src/
 | Slop rev 2 F2 | Duplicate-with-last-offset duplicates Repeat | Removed |
 | Slop rev 2 F3 | Download hash for dirty tracking exceeds the objection | Confirm unless blank |
 | Slop rev 2 F4 | `preview.base` duplicated `project` | Removed |
-| Task 4 implementation | Enlarged-footprint `crowded` made flush-packed weaves unsupported | `crowded` compares plain footprints; the scene builder treats a patch between O and U as an occluder (§5.2, §6.2) |
+| Task 4 implementation | Enlarged-footprint `crowded`/`occluded` made flush-packed weaves unsupported in some paint orders | Classification uses plain footprints only; the clip enlargement across U's edges is decided per side in the scene builder (§5.2, §6.1, §6.2); `CLASSIFY_EXTEND_MM` renamed `MAX_CLIP_EXTEND_MM` |
 | Editor 23, 24, 25 | Touch marker reason/size, keyboard paths, touch emulation limits | §7.4, §11, G7 |
 | Editor 28, 29 | Grid details, hand tool, aspect | §7.7, §7.2 |
 | Product 2 | Repeat command unspecified; default step leaves gaps | §7.4 Repeat; painted bounds |
