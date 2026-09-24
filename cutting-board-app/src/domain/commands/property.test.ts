@@ -73,6 +73,11 @@ function commandsFor(p: Project): Command[] {
     ['addMaterial', (q) => commands.addMaterial(q, { name: 'Oak', color: '#C19A6B' })],
     ['updateMaterial', (q) => commands.updateMaterial(q, m0, { name: 'Renamed', color: '#000000' })],
     ['replaceMaterial', (q) => commands.replaceMaterial(q, m0, m1)],
+    ['setProjectName', (q) => commands.setProjectName(q, 'Renamed')],
+    ['setBoardSize', (q) => commands.setBoardSize(q, 500, 700)],
+    ['setBoardBackground', (q) => commands.setBoardBackground(q, m1)],
+    ['setBoardBackground none', (q) => commands.setBoardBackground(q, null)],
+    ['setDisplayUnits', (q) => commands.setDisplayUnits(q, q.displayUnits === 'in' ? 'mm' : 'in')],
     ...p.materials.map((m): Command => [`deleteMaterial ${m.name}`, (q) => commands.deleteMaterial(q, m.id)]),
     ...(['forward', 'backward', 'front', 'back'] as const).map((how): Command => [`reorder ${how}`, (q) => commands.reorder(q, root.slice(0, 1), how)]),
     ...root.map((id): Command => [`delete ${id}`, (q) => commands.deleteObjects(q, [id])]),
@@ -89,6 +94,11 @@ function commandsFor(p: Project): Command[] {
       [`setPoint merge ${b.id}`, (q) => commands.setPoint(q, b.id, p1.id, { x: p0.x + 0.001, y: p0.y })],
       [`insertPoint ${b.id}`, (q) => commands.insertPoint(q, b.id, p0.id, { x: (p0.x + p1.x) / 2 + 1, y: (p0.y + p1.y) / 2 + 1 })],
       ...b.points.map((pt): Command => [`deletePoint ${b.id}/${pt.id}`, (q) => commands.deletePoint(q, b.id, pt.id)]),
+      [`setBandClosed close ${b.id}`, (q) => commands.setBandClosed(q, b.id, true)],
+      [`setBandClosed open ${b.id}`, (q) => commands.setBandClosed(q, b.id, false)],
+      [`setPoints ${b.id}`, (q) => commands.setPoints(q, b.id, b.points.map((pt) => ({ x: pt.x + 1, y: pt.y - 1 })))],
+      // Adversarial: every point collapses onto the first — well under MIN_SEGMENT_MM, so this is expected to refuse.
+      [`setPoints adversarial ${b.id}`, (q) => commands.setPoints(q, b.id, b.points.map(() => ({ x: b.points[0]!.x, y: b.points[0]!.y })))],
     )
   }
 

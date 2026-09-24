@@ -20,6 +20,7 @@ import {
   setBandWidth,
   setMaterial,
   setPoint,
+  setPoints,
   setRepeatParams,
   setTransform,
   translateObjects,
@@ -235,6 +236,38 @@ describe('points', () => {
 
   it('deletePoint below the minimum point count is refused', () => {
     expect(deletePoint(project([region('G', [[0, 0], [4, 0], [4, 4]])]), 'G', 'G0').ok).toBe(false)
+  })
+
+  it('setPoints replaces every point at once, ids kept', () => {
+    const before = base()
+    const beforeIds = bandOf(before, 'A').points.map((q) => q.id)
+    const p = ok(setPoints(before, 'A', [{ x: 1, y: 1 }, { x: 11, y: 1 }, { x: 21, y: 1 }, { x: 31, y: 1 }]))
+    expect(coords(p, 'A')).toEqual([[1, 1], [11, 1], [21, 1], [31, 1]])
+    expect(bandOf(p, 'A').points.map((q) => q.id)).toEqual(beforeIds)
+  })
+
+  it('setPoints refuses a resulting segment shorter than MIN_SEGMENT_MM and leaves the project unchanged', () => {
+    const before = base()
+    const originalA = coords(before, 'A')
+    // 0.001mm apart — below MIN_SEGMENT_MM (0.01mm).
+    const points = [{ x: 0, y: 0 }, { x: 0.001, y: 0 }, { x: 20, y: 0 }, { x: 30, y: 0 }]
+    const r = setPoints(before, 'A', points)
+    expect(r).toEqual({ ok: false, message: 'Two points would be too close together' })
+    expect(coords(before, 'A')).toEqual(originalA) // the input project itself is untouched (commands are pure)
+  })
+
+  it('setPoints refuses a too-short wraparound segment on a closed band', () => {
+    const closed = project([band('C', [[0, 0], [10, 0], [10, 10], [0, 10]], { closed: true })])
+    // The last point lands on top of the first: the wrap segment (last → first) collapses.
+    const points = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0.001, y: 0 }]
+    expect(setPoints(closed, 'C', points).ok).toBe(false)
+  })
+
+  it('setPoints on an open band does not check a wraparound segment (no segment from the last point back to the first)', () => {
+    const open = base()
+    // The first and last points end up close together, which is fine for an open band.
+    const p = ok(setPoints(open, 'A', [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 20, y: 0 }, { x: 0.001, y: 0 }]))
+    expect(coords(p, 'A')[3]).toEqual([0.001, 0])
   })
 })
 
