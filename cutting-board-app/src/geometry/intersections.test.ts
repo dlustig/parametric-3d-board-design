@@ -152,6 +152,10 @@ describe('findIntersections — basic classes', () => {
     expect(classes(classify([bandAt(50, 50, 0), bandAt(50, 50, 5)]))).toEqual(['near-parallel'])
   })
 
+  it('0° vs 175° → near-parallel (the 180 − θ side)', () => {
+    expect(classes(classify([bandAt(50, 50, 0), bandAt(50, 50, 175)]))).toEqual(['near-parallel'])
+  })
+
   it('10° exactly is not near-parallel', () => {
     expect(classes(classify([bandAt(50, 50, 0), bandAt(50, 50, 10)]))).toEqual(['eligible'])
   })
@@ -190,7 +194,7 @@ describe('findIntersections — near-joint', () => {
     expect(classes(list)).toEqual(['near-joint'])
   })
 
-  // Perpendicular 6.35 mm crossing: halfDiagonal(classification footprint) = 7.35·√2/2 ≈ 5.20.
+  // Perpendicular 6.35 mm crossing: halfDiagonal(both-enlarged footprint) = 7.35·√2/2 ≈ 5.20.
   it('90° joint 8 mm away → near-joint through its miter extent (6.35 / (2 sin 45°) ≈ 4.49)', () => {
     const list = classify([
       horizontal(),
@@ -276,11 +280,11 @@ describe('findIntersections — near-joint', () => {
 })
 
 describe('findIntersections — occluded', () => {
-  // Crossing at (50,50), perpendicular 6.35 mm bands: the classification footprint spans 50 ± 3.675.
+  // Crossing at (50,50), perpendicular 6.35 mm bands: the plain footprint spans 50 ± 3.175.
   const a = (): Band => bandAt(50, 50, 0)
   const b = (): Band => bandAt(50, 50, 90)
 
-  it('region painted between A and B entering the classification footprint → occluded', () => {
+  it('region painted between A and B entering the footprint → occluded', () => {
     const r = region([
       [52, 52],
       [60, 52],
@@ -291,12 +295,12 @@ describe('findIntersections — occluded', () => {
     expect(classes(classify([a(), r, b()]))).toEqual(['occluded'])
   })
 
-  it('region 1 mm outside the classification footprint → eligible', () => {
+  it('region painted between A and B, 0.5 mm outside the footprint → eligible', () => {
     const r = region([
-      [54.675, 54.675],
-      [60, 54.675],
+      [53.675, 53.675],
+      [60, 53.675],
       [60, 60],
-      [54.675, 60],
+      [53.675, 60],
     ])
 
     expect(classes(classify([a(), r, b()]))).toEqual(['eligible'])
@@ -320,6 +324,17 @@ describe('findIntersections — occluded', () => {
     const arm60 = band([[v, v], arm(60)])
 
     expect(classes(classify([a(), arm30, arm60, b()]))).toEqual(['eligible'])
+  })
+
+  it('the same region painted below both bands → eligible', () => {
+    const r = region([
+      [52, 52],
+      [60, 52],
+      [60, 60],
+      [52, 60],
+    ])
+
+    expect(classes(classify([r, a(), b()]))).toEqual(['eligible'])
   })
 
   it('the same region painted above both bands → eligible', () => {
@@ -349,6 +364,28 @@ describe('findIntersections — crowded', () => {
     expect(clsOf(b0, b2)).toBe('occluded')
   })
 
+  it('a 1° near-parallel pair does not crowd an eligible crossing 100 mm along the band (disc proxy)', () => {
+    // The 1° plain footprint would reach ≈ 3.175 / sin 1° ≈ 182 mm along A; B itself is only 40 mm long.
+    const c = Math.cos(Math.PI / 180)
+    const s = Math.sin(Math.PI / 180)
+    const list = classify([
+      band([
+        [-300, 0],
+        [300, 0],
+      ]),
+      band([
+        [-20 * c, -20 * s],
+        [20 * c, 20 * s],
+      ]),
+      band([
+        [100, -50],
+        [100, 50],
+      ]),
+    ])
+
+    expect(classes(list)).toEqual(['near-parallel', 'eligible'])
+  })
+
   it('two crossings 1 mm apart on 6.35 mm bands → both crowded', () => {
     // B1, A, B2 in paint order so nothing lies between either crossing pair.
     const list = classify([bandAt(50, 50, 90), bandAt(50, 50, 0), bandAt(51, 50, 90)])
@@ -375,7 +412,7 @@ describe('findIntersections — crowded', () => {
 describe('findIntersections — lattice with touching footprints (G4)', () => {
   // Spec §5.2 (rev 4): `crowded` compares plain footprints; they touch exactly when the
   // centreline step equals the width. Paint order B1, A, B2 so nothing lies between either
-  // crossing pair (`occluded` still uses the enlarged classification footprint).
+  // crossing pair.
   const w = 6.35
   const lattice = (step: number): Band[] => [
     band([

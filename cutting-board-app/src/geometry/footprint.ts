@@ -21,8 +21,9 @@ function meet(n1: XY, c1: number, n2: XY, c2: number): XY {
 
 /**
  * SPEC §6.1: the parallelogram bounded by `offset(sA, ±wA/2)` and
- * `offset(sB, ±wB/2)`, corners in cyclic order. Callers pass enlarged widths
- * for the clip and classification variants. Undefined for parallel segments.
+ * `offset(sB, ±wB/2)`, corners in cyclic order. Classification uses the plain
+ * widths; only the patch clip and the `near-joint` radius pass enlarged ones.
+ * Undefined for parallel segments.
  */
 export function footprint(sA: Seg, wA: number, sB: Seg, wB: number): XY[] {
   const nA = unitNormal(sA)

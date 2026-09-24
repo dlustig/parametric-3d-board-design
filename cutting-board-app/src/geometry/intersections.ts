@@ -25,7 +25,7 @@ export type Intersection = {
   footprint: XY[] | null // plain footprint (SPEC §6.1); null for collinear/endpoint
 }
 
-/** An intersection plus the footprint the `crowded` pass compares: the plain footprint, or a collinear/endpoint proxy (SPEC §5.2). */
+/** An intersection plus the footprint the `crowded` pass compares: the plain footprint, or a collinear/endpoint/near-parallel proxy (SPEC §5.2). */
 type Found = { intersection: Intersection; crowdingFootprint: XY[] }
 
 type BandSegment = { startId: Id; a: XY; b: XY }
@@ -203,7 +203,8 @@ function classifyContact(occA: BandOccurrence, sA: BandSegment, occB: BandOccurr
 
   // Built from the canonical a/b sides, so `footprint(x.a.seg, …, x.b.seg, …)` reproduces it exactly.
   const plain = footprint(a.seg, a.occ.worldWidth, b.seg, b.occ.worldWidth)
-  if (crossingAngleDeg(sA, sB) < MIN_CROSSING_ANGLE_DEG) return found(point, 'near-parallel', plain, plain)
+  // A near-parallel footprint is arbitrarily long, so crowding uses the endpoint disc proxy (SPEC §5.2).
+  if (crossingAngleDeg(sA, sB) < MIN_CROSSING_ANGLE_DEG) return found(point, 'near-parallel', plain, octagon(point, maxWidth))
 
   // Both widths enlarged: the long corner moves by e / sin(θ/2), so this bounds any renderer's clip.
   const extend = 2 * MAX_CLIP_EXTEND_MM
