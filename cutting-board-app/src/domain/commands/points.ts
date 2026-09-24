@@ -71,6 +71,20 @@ export function deletePoint(p: Project, objectId: Id, pointId: Id): CommandResul
   return ok(rematchCrossings(p, rewriteSegmentStart(after, objectId, pointId, previous)))
 }
 
+/**
+ * Replaces every point's coordinates at once, ids kept, no MIN_SEGMENT_MM
+ * merge check. For rigid multi-point edits driven from the inspector — a
+ * Region's bounds W/H scale, a Band segment's typed length/angle moving its
+ * end point and translating the points after it — where `setPoint`'s
+ * per-point neighbour check does not apply.
+ */
+export function setPoints(p: Project, objectId: Id, points: XY[]): Project {
+  const shape = p.objects[objectId] as Band | Region
+  const next = shape.points.map((q, k) => ({ id: q.id, x: points[k]!.x, y: points[k]!.y }))
+  const after = replaceObject(p, { ...shape, points: next })
+  return shape.type === 'band' ? rematchCrossings(p, after) : after
+}
+
 function rewriteSegmentStart(p: Project, bandId: Id, fromId: Id, toId: Id | null): Project {
   const names = (r: BandRef): boolean => r.bandId === bandId && r.segmentStart === fromId
   const move = (r: BandRef): BandRef => (names(r) && toId !== null ? { ...r, segmentStart: toId } : r)

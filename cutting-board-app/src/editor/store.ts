@@ -74,6 +74,7 @@ export interface EditorState {
   popContext(): void
   setCamera(c: Camera): void
   setViewport(v: { w: number; h: number }): void
+  setGridMm(mm: number): void
 }
 
 type Temporal = StoreApi<TemporalState<{ project: Project }>>
@@ -181,6 +182,10 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       setViewport(v) {
         set({ viewportPx: v })
+      },
+
+      setGridMm(mm) {
+        set({ gridMm: mm })
       },
     }),
     {

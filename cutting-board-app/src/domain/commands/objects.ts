@@ -133,6 +133,13 @@ export function setBandWidth(p: Project, id: Id, widthMm: number): Project {
   return rematchCrossings(p, replaceObject(p, { ...(p.objects[id] as Band), widthMm }))
 }
 
+/** Toggles `closed`; refused going closed below the 3-point minimum (SPEC §2 `Band.points`). */
+export function setBandClosed(p: Project, id: Id, closed: boolean): CommandResult {
+  const band = p.objects[id] as Band
+  if (closed && band.points.length < 3) return fail('A closed band needs at least 3 points')
+  return ok(rematchCrossings(p, replaceObject(p, { ...band, closed })))
+}
+
 /** Patches an instance's or repeat's transform. (The occurrence count cannot change, so this cannot be refused.) */
 export function setTransform(p: Project, id: Id, patch: Partial<Transform>): Project {
   const obj = p.objects[id] as MotifInstance | RepeatField
