@@ -1,6 +1,6 @@
 # Cutting Board Pattern Designer — V1 SPEC
 
-Status: revision 2 after four independent reviews (slop audit; geometry/crossing/export; editor/tablet/persistence; product/authorability). Resolutions are logged in §16. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
+Status: revision 3 after four independent reviews and two slop audits (slop audit; geometry/crossing/export; editor/tablet/persistence; product/authorability). Resolutions are logged in §16. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
 
 This document is the contract for V1: document model, geometry semantics, crossing identity and compositing, editor behaviour, persistence, export, and acceptance gates. Product intent, scope, and non-goals come from the research packet and are not restated except where a rule depends on them.
 
@@ -137,8 +137,9 @@ Each occurrence carries `key` (§5.1), `kind`, `sourceId`, `path`, `matrix`, `ma
 | `REMATCH_TOLERANCE_MM` | 3 mm | rebind radius around `hint` (§5.5) |
 | `MAX_OCCURRENCES` | 5000 | expansion cap |
 | `REGION_SEAM_MM` | 0.1 mm | §4.3 |
-| `EXPORT_CLIP_EXTEND_MM` | 0.2 mm | §6.2 clip enlargement in export |
-| `EDITOR_CLIP_EXTEND_PX` | 1.5 px | §6.2 clip enlargement in the editor, converted at current zoom |
+| `CLASSIFY_EXTEND_MM` | 0.5 mm | footprint enlargement used by the `occluded` and `crowded` classes; upper bound of any renderer's clip enlargement |
+| `EXPORT_CLIP_EXTEND_MM` | 0.2 mm | §6.2 patch clip enlargement in export |
+| `EDITOR_CLIP_EXTEND_PX` | 1.5 px | §6.2 patch clip enlargement in the editor: `min(1.5 / zoom, CLASSIFY_EXTEND_MM)` mm |
 | `SNAP_TOLERANCE_PX` | 8 px | converted to mm through zoom (and occurrence scale in edit context) |
 | `ANGLE_SNAP_DEG` | 15° step, ±4° capture | while drawing segments |
 | `TAP_SLOP_PX`, `DOUBLE_TAP_MS` | 6 px, 300 ms | tap vs drag, double-tap detection |
@@ -162,8 +163,8 @@ Every intersection point between segments `sA` (occurrence A, width `wA`) and `s
 | `endpoint` | a parameter is within `EPS_GEOMETRY` (scaled by segment length) of 0 or 1 on either segment, including a crossing exactly at a polyline joint |
 | `near-parallel` | angle between directions outside `[MIN_CROSSING_ANGLE_DEG, 180 − MIN_CROSSING_ANGLE_DEG]` |
 | `near-joint` | an interior vertex of either Band lies within `halfDiagonal(footprint) + miterExtent(vertex)` of the point, where `miterExtent = w / (2 sin(φ/2))` capped at `5w` for joint angle φ |
-| `occluded` | some element strictly between A and B in paint order has painted geometry (segment stroke rectangles or Region polygon) penetrating the enlarged footprint (§6.2) by more than `EPS_OVERLAP_MM` |
-| `crowded` | the enlarged footprint penetrates another listed intersection's footprint on either occurrence by more than `EPS_OVERLAP_MM`. Proxy footprints: `collinear` uses the overlap strip; `endpoint` uses a disc of radius `max(w)`. Triple points and adjacent crossings land here. |
+| `occluded` | some element strictly between A and B in paint order has painted geometry (segment stroke rectangles or Region polygon) penetrating the classification footprint (§6.1) by more than `EPS_OVERLAP_MM` |
+| `crowded` | the classification footprint penetrates another listed intersection's footprint on either occurrence by more than `EPS_OVERLAP_MM`. Proxy footprints: `collinear` uses the overlap strip; `endpoint` uses a disc of radius `max(w)`. Triple points and adjacent crossings land here. |
 | `eligible` | everything else |
 
 Unsupported classes carry their reason. They are drawn with a distinct marker in the Crossing tool and get no toggle; tapping one shows the reason in the tool options bar. **Render eligibility is always decided per world intersection.** A definition record can be resolved in its own space while a particular world occurrence of it is additionally `unsupported (world)` because of neighbouring cells or root objects; that occurrence renders by paint order and is marked.
@@ -212,11 +213,11 @@ Deleting a Band, instance, or repeat removes records that reference it; shrinkin
 
 ### 6.1 Footprint
 
-For segments `sA` (width `wA`) and `sB` (`wB`) crossing transversely, `footprint(sA, wA, sB, wB)` is the parallelogram bounded by the two stroke edges of each segment: its corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`, computed analytically in `geometry/footprint.ts`. Overlap tests between footprints and other polygons use Flatten polygon intersection with the `EPS_OVERLAP_MM` penetration threshold.
+For segments `sA` (width `wA`) and `sB` (`wB`) crossing transversely, `footprint(sA, wA, sB, wB)` is the parallelogram bounded by the two stroke edges of each segment: its corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`, computed analytically in `geometry/footprint.ts`. The **classification footprint** is the footprint with both widths enlarged by `2 × CLASSIFY_EXTEND_MM`; it depends only on the document, so classification is independent of the camera and identical in editor and export. Overlap tests use Flatten polygon intersection with the `EPS_OVERLAP_MM` penetration threshold.
 
 ### 6.2 Patch
 
-`buildScene(project, clipExtendMm)` takes the enlargement as a parameter: the editor passes `EDITOR_CLIP_EXTEND_PX / zoom`, export passes `EXPORT_CLIP_EXTEND_MM`. The **enlarged footprint** uses `wA + 2e` and `wB + 2e`.
+`buildScene(project, clipExtendMm)` takes only the patch clip enlargement `e` as a parameter (editor: `min(EDITOR_CLIP_EXTEND_PX / zoom, CLASSIFY_EXTEND_MM)`; export: `EXPORT_CLIP_EXTEND_MM`; both ≤ `CLASSIFY_EXTEND_MM`). The **clip polygon** is the footprint with `wA + 2e` and `wB + 2e`. Classification never uses `e`, so a camera change regenerates only clip polygons.
 
 Let `O` be the effective over occurrence and `U` the under at an eligible intersection. If `O` is already after `U` in paint order, nothing is drawn. Otherwise the scene inserts a patch immediately after `U`:
 
@@ -225,7 +226,7 @@ Let `O` be the effective over occurrence and `U` the under at an eligible inters
 <path d="M x1 y1 L x2 y2" fill="none" stroke="{O colour}" stroke-width="{wO}" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt" clip-path="url(#{prefix}-c{n})"/>
 ```
 
-The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach, so O's segment stroke equals O's real paint there). Enlarging across both Bands' edges removes anti-aliasing seams: across O's edges the extra area is limited by O's own stroke; across U's edges it overpaints O's own colour on O's path. The `occluded` class guarantees nothing painted between U and O meets the enlarged footprint, so the overpaint is invisible. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
+The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach, so O's segment stroke equals O's real paint there). Enlarging across both Bands' edges removes anti-aliasing seams: across O's edges the extra area is limited by O's own stroke; across U's edges it overpaints O's own colour on O's path. The `occluded` class guarantees nothing painted between U and O meets the classification footprint, which contains every clip polygon, so the overpaint is invisible. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
 
 ### 6.3 Scene
 
@@ -250,9 +251,9 @@ type Scene = {
 One Zustand store with:
 
 - `project` — the document, wrapped by zundo `temporal({ partialize: s => ({ project: s.project }), equality: (a, b) => a.project === b.project, limit: 100 })`. The equality is required: without it camera and selection writes push duplicate entries and clear redo.
-- `preview: { base: Project; next: Project; onInterrupt: 'commit' | 'cancel' } | null`. Pointer gestures and inspector typing write `next`, always recomputed from `base` with the cumulative gesture arguments (never frame-on-frame). The renderer uses `preview?.next ?? project`.
-- `settlePreview()` runs before **any** command, undo, redo, import, or New Project: inspector previews commit, gesture previews cancel. `commit()` asserts `project === preview.base`, replaces `project` with `rematch(base, next)` result, and clears the preview. History therefore sees exactly one entry per gesture or field edit, and never a preview frame.
-- Ephemeral: `tool`, `selection: Id[]`, `editContext: { motifId, path: Step[] }[]`, `camera`, `snapEnabled`, `addToSelection`, `crossingScope`, `currentMaterialId`, drawing state, save status, `lastMoveDelta`.
+- `preview: { next: Project; onInterrupt: 'commit' | 'cancel' } | null`. Pointer gestures and inspector typing write `next`, always recomputed from `project` with the cumulative gesture arguments (never frame-on-frame). The renderer uses `preview?.next ?? project`.
+- `settlePreview()` runs before **any** command, undo, redo, import, or New Project, so `project` cannot change while a preview exists: inspector previews commit, gesture previews cancel. `commit()` replaces `project` with `rematch(project, next)` and clears the preview. History therefore sees exactly one entry per gesture or field edit, and never a preview frame.
+- Ephemeral: `tool`, `selection: Id[]`, `editContext: { motifId, path: Step[] }[]`, `camera`, `snapEnabled`, `addToSelection`, `crossingScope`, `currentMaterialId`, drawing state, save status.
 
 After undo, redo, or import: drop selection ids that no longer exist, pop `editContext` to the deepest level whose motif and path still validate, cancel any drawing. Undo and redo trigger autosave like commits.
 
@@ -291,7 +292,7 @@ Tool keys: `V` select, `H` hand, `B` band, `R` rectangle region, `P` polygon reg
 - **Rectangle**: drag corner to corner; 4-point Region.
 - **Crossing**: draws markers for every listed intersection (filled = eligible, badge = overridden, hatched = unsupported, ring = unresolved). Tap an eligible marker to toggle per §5.4 using the scope control in the options bar; tap an unsupported marker to read its reason. Hit radius 12 px for mouse, 22 px for touch; nearest centre wins.
 
-Selection commands (toolbar buttons and keys; all operate in the current context): Delete/Backspace; **Duplicate** (`Ctrl/Cmd+D`, in place; if the selection was moved since the last duplicate, the copy is offset by `lastMoveDelta`, giving a linear array by repetition); copy/paste (`Ctrl/Cmd+C/V`, in place, in-app clipboard including definition-internal records); **Mirror X / Y** about the painted-bounds centre; **Rotate 90° CW/CCW** and **Rotate by °** about the same centre; arrow nudge one grid step (Shift ×10; screen axes, mapped into the context); Bring forward / Send backward / To front / To back; **Offset copy** (Band only: a parallel copy on the chosen side at perpendicular distance `(w + w')/2` with miter-offset joints; width `w'` defaults to `w`); **Create Motif** (`Ctrl/Cmd+G`); **Repeat**; **Detach**.
+Selection commands (toolbar buttons and keys; all operate in the current context): Delete/Backspace; **Duplicate** (`Ctrl/Cmd+D`, in place; arrays are what Repeat is for); copy/paste (`Ctrl/Cmd+C/V`, in place, in-app clipboard including definition-internal records); **Mirror X / Y** about the painted-bounds centre; **Rotate 90° CW/CCW** and **Rotate by °** about the same centre; arrow nudge one grid step (Shift ×10; screen axes, mapped into the context); Bring forward / Send backward / To front / To back; **Offset copy** (Band only: a parallel copy on the chosen side at perpendicular distance `(w + w')/2` with miter-offset joints; width `w'` defaults to `w`); **Create Motif** (`Ctrl/Cmd+G`); **Repeat**; **Detach**.
 
 **Create Motif**: pivot = centre of the selection's painted bounds. Children are re-based so the pivot is definition `(0,0)`; the new instance has `x, y` = pivot, replacing the selection at the topmost selected child's position in paint order. A pivot marker is drawn on selected instances. **Repeat**: on one instance, replaces it with a 2×2 RepeatField with the same motif and transform and steps equal to the definition's painted-bounds size × scale (seamless by default); on any other selection, performs Create Motif then Repeat.
 
@@ -321,7 +322,7 @@ Entering a definition (double-tap an instance/cell, or **Edit Motif**) pushes `{
 
 Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`ed); the rail toggle persists. Grid spacing is an editor setting (not in the document), defaulting to 3.175 mm for inch projects and 5 mm for mm projects; the grid is drawn when **Show grid** is on.
 
-- **Targets** (computed once at gesture start from `preview.base`, excluding the moving selection; inside an edit context they include the other occurrences of the entered definition and its siblings, mapped into definition space): grid points; Board edges and centre lines; Band endpoints and vertices; Region vertices; listed intersection points; painted-bounds edges and centres of other objects.
+- **Targets** (computed once at gesture start from `project`, excluding the moving selection; inside an edit context they include the other occurrences of the entered definition and its siblings, mapped into definition space): grid points; Board edges and centre lines; Band endpoints and vertices; Region vertices; listed intersection points; painted-bounds edges and centres of other objects.
 - **Sources** while moving: the selection's vertices, endpoints, and bounds edges/centres. The nearest source–target pair within tolerance wins; point targets beat line targets beat grid. A guide overlay shows the active snap.
 - While drawing: the angle constrains the ray to a 15° multiple when within ±4° (unless a point target is within tolerance); the length then snaps to grid along the ray or to line targets intersecting the ray.
 - Moveable's own `snappable` is disabled.
@@ -349,7 +350,7 @@ Field policies: widths, board dimensions, grid spacing, scale > 0; steps and off
 - Autosave: 500 ms after a commit, undo, or redo, write the project JSON to `localStorage` key `cbpd:project:v1`; flush on `pagehide` and `visibilitychange: hidden`. On failure show **Not saved in this browser — download your project** with a Download button; retry on the next change; clear the status on success.
 - Startup: if the key validates, open it. If it exists but fails, move its text to `cbpd:recovered` (so autosave cannot destroy it), start blank, and show a banner with **Download recovered file** and **Discard**.
 - Another tab writing the key (`storage` event) shows **Project changed in another tab** and suspends autosave here until reload.
-- **New Project** and **Open Project** confirm when the current project differs from the last downloaded one. The hash of the last downloaded JSON is stored beside the project so the status survives reload and undoing back to it reads as clean.
+- **New Project** and **Open Project** confirm unless the current project is the blank starter (no objects). Autosaved work is never replaced silently.
 - **Download Project**: pretty-printed JSON Blob, `<name>.cbpd.json`. **Open Project**: `<input type="file">`, `File.text()`, then `JSON.parse → migrate → zod safeParse → §2.1 invariants`. Any failure leaves project and history untouched and shows the first error with its path. Success replaces the project and clears history.
 - `migrate(json)`: version 1 passes; any other version is an error naming it.
 - One active project. No IndexedDB.
@@ -453,6 +454,10 @@ src/
 | Editor 17, Product 18 | No tablet multi-select | Add-to-selection toggle |
 | Editor 18, 19, 20, 27 | inputMode, blur rounding, key scoping, fraction.js grammar gaps | §7.5 fields, §7.4 dispatch, own grammar |
 | Editor 21, 22, 26 | Open confirmation, multi-tab, G8 gaps | §9, G8 |
+| Slop rev 2 F1 | Classification depended on zoom via the clip enlargement | `CLASSIFY_EXTEND_MM` fixed margin; clip enlargement clamped to it |
+| Slop rev 2 F2 | Duplicate-with-last-offset duplicates Repeat | Removed |
+| Slop rev 2 F3 | Download hash for dirty tracking exceeds the objection | Confirm unless blank |
+| Slop rev 2 F4 | `preview.base` duplicated `project` | Removed |
 | Editor 23, 24, 25 | Touch marker reason/size, keyboard paths, touch emulation limits | §7.4, §11, G7 |
 | Editor 28, 29 | Grid details, hand tool, aspect | §7.7, §7.2 |
 | Product 2 | Repeat command unspecified; default step leaves gaps | §7.4 Repeat; painted bounds |
