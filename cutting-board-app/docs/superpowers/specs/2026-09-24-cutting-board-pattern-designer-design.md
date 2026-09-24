@@ -122,7 +122,8 @@ Each occurrence carries `key` (§5.1), `kind`, `sourceId`, `path`, `matrix`, `ma
 
 ### 4.5 Bounds
 
-- **Painted bounds** of a Band occurrence: union of its segments' stroke rectangles (each segment's endpoints offset ±`w/2` along the segment normal). Exact at butt ends; miter tips may exceed it slightly. Used for selection proxies, marquee, fit, and the default repeat step.
+- **Painted geometry** of a Band occurrence: its segments' stroke rectangles (each segment's endpoints offset ±`w/2` along the segment normal) plus, at each interior joint, the miter triangle between the two rectangles' outer corners and the miter tip (`w / (2 sin(φ/2))` from the vertex, bevelled where that exceeds `5w`, matching `stroke-miterlimit` 10). Used by the `occluded` and `crowded` tests.
+- **Painted bounds**: the bounds of the stroke rectangles only (exact at butt ends; miter tips may exceed it). Used for selection proxies, marquee, fit, and the default repeat step.
 - **Conservative bounds**: polyline bounds expanded by `2.5 × w` (the miter-limit-10 tip extent). Used only to prefilter pair tests.
 - Region bounds are polygon bounds. Instance/repeat bounds are the union of their occurrences' painted bounds.
 
@@ -162,8 +163,8 @@ Every intersection point between segments `sA` (occurrence A, width `wA`) and `s
 | `collinear` | the segments overlap along a length |
 | `endpoint` | a parameter is within `EPS_GEOMETRY` (scaled by segment length) of 0 or 1 on either segment, including a crossing exactly at a polyline joint |
 | `near-parallel` | angle between directions outside `[MIN_CROSSING_ANGLE_DEG, 180 − MIN_CROSSING_ANGLE_DEG]` |
-| `near-joint` | an interior vertex of either Band lies within `halfDiagonal(footprint) + MAX_CLIP_EXTEND_MM + miterExtent(vertex)` of the point, where `miterExtent = w / (2 sin(φ/2))` capped at `5w` for joint angle φ |
-| `occluded` | some element strictly between A and B in paint order has painted geometry (segment stroke rectangles or Region polygon) penetrating the footprint (§6.1) by more than `EPS_OVERLAP_MM` |
+| `near-joint` | an interior vertex of either Band lies within `halfDiagonal(footprint with both widths + 2·MAX_CLIP_EXTEND_MM) + miterExtent(vertex)` of the point, where `miterExtent = w / (2 sin(φ/2))` capped at `5w` for joint angle φ |
+| `occluded` | some element strictly between A and B in paint order has painted geometry (§4.5: stroke rectangles and miter triangles, or the Region polygon) penetrating the footprint (§6.1) by more than `EPS_OVERLAP_MM` |
 | `crowded` | the plain (unenlarged) footprint penetrates another listed intersection's plain footprint on either occurrence by more than `EPS_OVERLAP_MM`. Proxy footprints: `collinear` uses the overlap strip; `endpoint` uses a disc of radius `max(w)`. Triple points land here; flush-packed neighbours whose footprints only touch do not. |
 | `eligible` | everything else |
 
@@ -228,7 +229,7 @@ Let `O` be the effective over occurrence and `U` the under at an eligible inters
 
 The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach of the clip, so O's segment stroke equals O's real paint there).
 
-**Clip polygon.** Start from the footprint. Always enlarge across O's edges (`wO + 2e`): the extra area is limited by O's own stroke, so nothing new is painted anywhere; this removes the anti-aliasing seam along O's edges. Across each of U's two edges, enlarge by `e` **only if no element painted between O and U in paint order — an occurrence, or a patch already emitted — penetrates that side's extension strip** (the part of O's stroke between U's edge and U's edge offset by `e`, by more than `EPS_OVERLAP_MM`). Where the extension is allowed, the sliver beyond U's edge overpaints only O's own colour on O's path and is invisible. Where it is withheld (a flush-packed neighbour with the opposite decision lies in the strip), the clip stays exactly on U's edge and a one-pixel anti-aliased blend of O and U remains on that edge; that is the accepted residual. The `occluded` class guarantees no occurrence between O and U meets the plain footprint, so the patch never punches through anything. Because patches are emitted in paint order, the between-set is known when each patch is built: one deterministic pass. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
+**Clip polygon** = `footprint(sO, wO + 2e, sU, wU)`: enlarged across O's edges only. The extra area is limited by O's own stroke, so the patch never paints outside O's real paint and never beyond U's edges; this removes the anti-aliasing seam along O's edges. The clip is **not** enlarged across U's edges: doing so paints O beyond U into whatever neighbour lies there, and making that safe needs a set of paint-order rules that a review showed to be intricate and still incomplete. The accepted residual is a one-pixel anti-aliased blend of O and U along U's edge where O exits U (about 25% U), the same kind of blend U's edge shows against the background elsewhere. The `occluded` class guarantees nothing between O and U meets the footprint, so the patch never punches through anything. Patches that share the same U are emitted in canonical-key order. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
 
 ### 6.3 Scene
 
@@ -460,7 +461,7 @@ src/
 | Slop rev 2 F2 | Duplicate-with-last-offset duplicates Repeat | Removed |
 | Slop rev 2 F3 | Download hash for dirty tracking exceeds the objection | Confirm unless blank |
 | Slop rev 2 F4 | `preview.base` duplicated `project` | Removed |
-| Task 4 implementation | Enlarged-footprint `crowded`/`occluded` made flush-packed weaves unsupported in some paint orders | Classification uses plain footprints only; the clip enlargement across U's edges is decided per side in the scene builder (§5.2, §6.1, §6.2); `CLASSIFY_EXTEND_MM` renamed `MAX_CLIP_EXTEND_MM` |
+| Task 4 implementation | Enlarged-footprint `crowded`/`occluded` made flush-packed weaves unsupported in some paint orders; a per-side enlargement rule was reviewed and found to need four more sub-rules | Classification uses plain footprints only; the clip is enlarged across O's edges only; the U-edge blend is the accepted residual; painted geometry includes miter triangles; `CLASSIFY_EXTEND_MM` renamed `MAX_CLIP_EXTEND_MM` (§4.5, §5.2, §6.1, §6.2) |
 | Editor 23, 24, 25 | Touch marker reason/size, keyboard paths, touch emulation limits | §7.4, §11, G7 |
 | Editor 28, 29 | Grid details, hand tool, aspect | §7.7, §7.2 |
 | Product 2 | Repeat command unspecified; default step leaves gaps | §7.4 Repeat; painted bounds |
