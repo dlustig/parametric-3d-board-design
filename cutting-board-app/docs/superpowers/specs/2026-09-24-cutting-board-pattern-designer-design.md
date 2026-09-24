@@ -188,7 +188,7 @@ A record lives in exactly one context (`project.crossings` or `motifs[m].crossin
 
 Toggling an eligible intersection flips the effective over/under. The Crossing tool shows a scope control only when the pair has a common motif ancestor: **All instances** (default) or **This occurrence**.
 
-- *All instances*: write (or flip) the record in the innermost common definition; remove records for the same pair from every context outside it, so the toggle is visible everywhere.
+- *All instances*: set the record in the innermost common definition to the opposite of the clicked occurrence's current effective value (creating it if absent); remove records for the same pair from every context outside it. Every occurrence, including the clicked one, then shows the flipped value.
 - *This occurrence*: write (or flip) the root record. If the result equals the value the outer contexts would give without it, delete the root record instead (an override never shadows silently). Overridden occurrences get a distinct badge; the inspector lists a selected instance's/repeat's overrides with **Remove**.
 - If the pair has an unresolved record in the target context, the toggle rebinds it (§5.5) and sets `over`.
 
