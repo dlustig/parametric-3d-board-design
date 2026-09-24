@@ -24,7 +24,7 @@ function boundsOf(p: Project, ids: Id[]): Box | null {
 }
 
 /** SPEC §4.5: the union of a definition's children's painted bounds, in definition space. */
-export function definitionBounds(p: Project, motifId: Id): Box | null {
+function definitionBounds(p: Project, motifId: Id): Box | null {
   return boundsOf(p, p.motifs[motifId]!.children)
 }
 
