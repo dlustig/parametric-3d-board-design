@@ -214,7 +214,7 @@ Deleting a Band, instance, or repeat removes records that reference it; shrinkin
 
 ### 6.1 Footprint
 
-For segments `sA` (width `wA`) and `sB` (`wB`) crossing transversely, `footprint(sA, wA, sB, wB)` is the parallelogram bounded by the two stroke edges of each segment: its corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`, computed analytically in `geometry/footprint.ts`. Classification uses only this plain footprint, so it depends only on the document and is identical in editor and export. Overlap tests use Flatten polygon intersection with the `EPS_OVERLAP_MM` penetration threshold.
+For segments `sA` (width `wA`) and `sB` (`wB`) crossing transversely, `footprint(sA, wA, sB, wB)` is the parallelogram bounded by the two stroke edges of each segment: its corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`, computed analytically in `geometry/footprint.ts`. Classification uses only this plain footprint, so it depends only on the document and is identical in editor and export. The footprint is the intersection of two infinite strips: near a butt end it can extend past the painted end of a Band. That is harmless (the patch paints only O's segment, and `occluded` guards elements between), but a pixel test at such a corner sees a legitimate three-way blend with the background, so G5 samples exclude a small clearance around segment ends. Overlap tests use Flatten polygon intersection with the `EPS_OVERLAP_MM` penetration threshold.
 
 ### 6.2 Patch
 
