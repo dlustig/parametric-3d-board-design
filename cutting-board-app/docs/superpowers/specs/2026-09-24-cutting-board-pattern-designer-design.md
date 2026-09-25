@@ -374,7 +374,7 @@ Field policies: widths, board dimensions, grid spacing, scale > 0; steps and off
 
 ## 11. Accessibility
 
-Native `button`/`input`/`select` or Radix primitives (Dialog, Tooltip, Popover). Every control has a visible label or `aria-label`. Inspector fields have `<label>`s. Tab / `[` / `]` cycle selection through the current context's objects, so the inspector and the crossing list are reachable without a pointer. Selection is indicated by outline and inspector heading, not colour alone. Material names are visible. Every drag has a numeric equivalent (bounds X/Y, Rotate by, per-point fields, crossing list). Layout is rem/flex; the canvas fills the remainder and stays correct at 200% browser zoom.
+Native `button`/`input`/`select` or Radix primitives (Dialog, Tooltip, Popover). Every control has a visible label or `aria-label`. Inspector fields have `<label>`s. `[` / `]` cycle selection through the current context's objects (with the canvas focused), so the inspector and the crossing list are reachable without a pointer; Tab keeps its native focus movement so the canvas is never a focus trap. Selection is indicated by outline and inspector heading, not colour alone. Material names are visible. Every drag has a numeric equivalent (bounds X/Y, Rotate by, per-point fields, crossing list). Layout is rem/flex; the canvas fills the remainder and stays correct at 200% browser zoom.
 
 ## 12. Fixtures (`src/fixtures/`, original designs; JSON plus UI authoring tests)
 
