@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { installKeyboardDispatcher } from '@/editor/keyboard'
 import { useEditor } from '@/editor/store'
 import { Canvas } from '@/render/Canvas'
-import { createAutosave, loadAtStartup, PROJECT_KEY } from '@/storage/local'
+import { createAutosave, loadAtStartup, openStorage, PROJECT_KEY } from '@/storage/local'
 import { Breadcrumb } from './Breadcrumb.tsx'
 import { Inspector } from './Inspector/Inspector.tsx'
 import { ProjectMenu } from './ProjectMenu.tsx'
@@ -18,12 +18,20 @@ function usePersistence(): { recoveredText: string | null; dismissRecovery: () =
   const [recoveredText, setRecoveredText] = useState<string | null>(null)
 
   useEffect(() => {
-    const startup = loadAtStartup(window.localStorage)
-    if (startup.kind === 'project') useEditor.getState().replaceProject(startup.project)
-    else if (startup.kind === 'recovered') setRecoveredText(startup.text)
+    const storage = openStorage(() => window.localStorage)
+    const startup = storage === null ? null : loadAtStartup(storage)
+    if (startup?.kind === 'project') useEditor.getState().replaceProject(startup.project)
+    else if (startup?.kind === 'recovered') setRecoveredText(startup.text)
+
+    // No usable storage, or a corrupt document it had no room to move aside:
+    // work continues unsaved (the status bar offers Download), never over it.
+    if (storage === null || (startup?.kind === 'recovered' && !startup.moved)) {
+      useEditor.setState({ saveStatus: 'unsaved' })
+      return
+    }
 
     const autosave = createAutosave(
-      window.localStorage,
+      storage,
       () => useEditor.getState().project,
       (status) => useEditor.setState({ saveStatus: status }),
     )

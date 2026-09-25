@@ -15,13 +15,24 @@ export const RECOVERED_KEY = 'cbpd:recovered'
 
 const AUTOSAVE_DEBOUNCE_MS = 500
 
-export type LoadResult = { kind: 'project'; project: Project } | { kind: 'recovered'; text: string } | { kind: 'none' }
+/** `recovered.moved`: the text now lives under RECOVERED_KEY; when false (no room for the copy) it is still under PROJECT_KEY, and nothing may autosave over it. */
+export type LoadResult = { kind: 'project'; project: Project } | { kind: 'recovered'; text: string; moved: boolean } | { kind: 'none' }
+
+/** The browser's `Storage`, or `null` where merely reading it throws (a `SecurityError` when site data is blocked). */
+export function openStorage(get: () => Storage): Storage | null {
+  try {
+    return get()
+  } catch {
+    return null
+  }
+}
 
 /**
  * Reads `PROJECT_KEY` at startup. A document that fails to parse, migrate,
  * or validate is moved verbatim to `RECOVERED_KEY` — so autosave can never
  * silently overwrite or destroy it — and the main key is removed; the
  * caller starts blank and offers the recovered text for download (SPEC §9).
+ * If the copy cannot be written (quota), the main key is left as it is.
  */
 export function loadAtStartup(storage: Storage): LoadResult {
   const text = storage.getItem(PROJECT_KEY)
@@ -30,9 +41,13 @@ export function loadAtStartup(storage: Storage): LoadResult {
   const result = importProject(text)
   if (result.ok) return { kind: 'project', project: result.project }
 
-  storage.setItem(RECOVERED_KEY, text)
+  try {
+    storage.setItem(RECOVERED_KEY, text)
+  } catch {
+    return { kind: 'recovered', text, moved: false }
+  }
   storage.removeItem(PROJECT_KEY)
-  return { kind: 'recovered', text }
+  return { kind: 'recovered', text, moved: true }
 }
 
 export interface Autosave {

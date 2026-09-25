@@ -51,6 +51,23 @@ test.describe('autosave failure and recovery', () => {
   })
 })
 
+test.describe('storage unavailable', () => {
+  test('a localStorage getter that throws (site data blocked) still starts the app, unsaved with Download', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'localStorage', {
+        get() {
+          throw new DOMException('The operation is insecure.', 'SecurityError')
+        },
+      })
+    })
+    await open(page)
+    await expect(page.getByText('Not saved in this browser')).toBeVisible()
+    await page.evaluate(() => window.__cbpd!.run((p) => ({ ...p, name: 'Renamed' })))
+    expect((await getProject(page)).name).toBe('Renamed')
+    await expect(page.locator('.status-bar').getByRole('button', { name: 'Download' })).toBeVisible()
+  })
+})
+
 test.describe('startup recovery', () => {
   test('a corrupt key shows the recovery banner; the recovered text survives later edits byte-identical', async ({ page }) => {
     const corrupt = '{ this is not valid JSON'

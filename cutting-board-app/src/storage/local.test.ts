@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SaveStatus } from '@/editor/store'
 import { newProject } from '@/domain/project'
-import { createAutosave, loadAtStartup, PROJECT_KEY, RECOVERED_KEY } from './local.ts'
+import { createAutosave, loadAtStartup, openStorage, PROJECT_KEY, RECOVERED_KEY } from './local.ts'
 
 interface FakeStorage extends Storage {
   setThrowing(throwing: boolean): void
@@ -59,7 +59,7 @@ describe('loadAtStartup', () => {
 
     const result = loadAtStartup(storage)
 
-    expect(result).toEqual({ kind: 'recovered', text: '{not json' })
+    expect(result).toEqual({ kind: 'recovered', text: '{not json', moved: true })
     expect(storage.getItem(RECOVERED_KEY)).toBe('{not json')
     expect(storage.getItem(PROJECT_KEY)).toBeNull()
   })
@@ -70,9 +70,30 @@ describe('loadAtStartup', () => {
 
     const result = loadAtStartup(storage)
 
-    expect(result).toEqual({ kind: 'recovered', text })
+    expect(result).toEqual({ kind: 'recovered', text, moved: true })
     expect(storage.getItem(RECOVERED_KEY)).toBe(text)
     expect(storage.getItem(PROJECT_KEY)).toBeNull()
+  })
+})
+
+describe('storage failures at startup', () => {
+  it('openStorage returns null when reading localStorage throws (site data blocked)', () => {
+    const storage = createFakeStorage()
+    expect(openStorage(() => storage)).toBe(storage)
+    expect(
+      openStorage(() => {
+        throw new DOMException('The operation is insecure.', 'SecurityError')
+      }),
+    ).toBeNull()
+  })
+
+  it('leaves the corrupt main key in place when the recovered copy does not fit', () => {
+    const storage = createFakeStorage({ [PROJECT_KEY]: '{not json' })
+    storage.setThrowing(true)
+
+    expect(loadAtStartup(storage)).toEqual({ kind: 'recovered', text: '{not json', moved: false })
+    expect(storage.getItem(PROJECT_KEY)).toBe('{not json')
+    expect(storage.getItem(RECOVERED_KEY)).toBeNull()
   })
 })
 
