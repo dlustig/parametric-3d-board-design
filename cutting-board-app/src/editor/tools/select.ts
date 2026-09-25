@@ -16,7 +16,7 @@ import { objectBounds, paintedBounds, unionBoxes } from '@/geometry/bounds'
 import type { Occurrence } from '@/geometry/expand'
 import { expand, segmentsOf } from '@/geometry/expand'
 import type { SnapResult, SnapSources } from '@/geometry/snap'
-import { boundsTargets, dist, snapDelta, snapPoint } from '@/geometry/snap'
+import { boundsTargets, dist, snapDelta, snapPoint, snapRotation } from '@/geometry/snap'
 import { gestureSnapTargets, toleranceMm } from '@/editor/snap'
 import { MIN_SEGMENT_MM } from '@/geometry/tolerance'
 import { screenToWorld } from '../camera.ts'
@@ -179,9 +179,11 @@ export function clickSelect(svg: SVGSVGElement, client: XY, toggle: boolean): vo
   s.select(toggleSelection(s.selection, objectAt(s.project, s.editContext, screenToWorld(svg, client)), toggle))
 }
 
+/** Modifier keys a gesture reads: Alt disables snapping (SPEC §7.7), Shift forces the rotate handle's 15° steps (SPEC §7.3). */
+export type GestureKeys = { altKey: boolean; shiftKey: boolean }
+
 export interface Gesture {
-  /** `noSnap`: Alt held (SPEC §7.7). */
-  move(client: XY, noSnap: boolean): void
+  move(client: XY, keys: GestureKeys): void
 }
 
 /** SPEC §7.7 sources of the selection, in the context's space: every occurrence vertex/endpoint, and each object's painted-bounds edges and centre. */
@@ -211,10 +213,10 @@ export function startTranslate(svg: SVGSVGElement, startClient: XY): Gesture {
   const start = apply(toContext, screenToWorld(svg, startClient))
   const snap = s.snapEnabled ? { sources: moveSources(project, editContext, selection, toContext), targets: gestureSnapTargets(s, selection), tol: toleranceMm(s) } : null
   return {
-    move(client, noSnap) {
+    move(client, { altKey }) {
       const now = apply(toContext, screenToWorld(svg, client))
       const raw = { x: now.x - start.x, y: now.y - start.y }
-      const snapped = snap === null || noSnap ? null : snapDelta(snap.sources, snap.targets, raw, snap.tol)
+      const snapped = snap === null || altKey ? null : snapDelta(snap.sources, snap.targets, raw, snap.tol)
       const d = snapped?.delta ?? raw
       useEditor.getState().setPreview(translateObjects(project, selection, d.x, d.y), 'cancel')
       showGuide(snapped?.guide == null ? null : snapped)
@@ -280,7 +282,7 @@ export function startHandleDrag(svg: SVGSVGElement, handle: Handle): Gesture {
   const targets = s.snapEnabled ? gestureSnapTargets(s, [id]) : null
   const tol = toleranceMm(s)
   return {
-    move(client, noSnap) {
+    move(client, { altKey }) {
       const raw = apply(toContext, screenToWorld(svg, client))
       const merge = neighbours.find((q) => dist(q, raw) <= tol)
       if (merge !== undefined) {
@@ -292,7 +294,7 @@ export function startHandleDrag(svg: SVGSVGElement, handle: Handle): Gesture {
         }
         useEditor.setState({ message: deleted.message })
       }
-      const snap = targets === null || noSnap ? null : snapPoint(raw, targets, tol)
+      const snap = targets === null || altKey ? null : snapPoint(raw, targets, tol)
       const r = setPoint(base, id, moving, snap?.point ?? raw)
       if (r.ok) useEditor.getState().setPreview(r.project, 'cancel')
       showGuide(snap?.guide == null ? null : snap)
@@ -307,10 +309,10 @@ export function pointsChanged(s: Pick<EditorState, 'project' | 'preview'>, objec
   return after === undefined || after.length !== before.length || after.some((q, i) => q.id !== before[i]!.id || q.x !== before[i]!.x || q.y !== before[i]!.y)
 }
 
-/** SPEC §7.3 rotate: angle from pointer positions about a centre fixed at gesture start. */
+/** SPEC §7.3 rotate: angle from pointer positions about a centre fixed at gesture start, in 15° steps with Shift or near one with snapping on. */
 export function startRotate(svg: SVGSVGElement, startClient: XY, centreWorld: XY): Gesture {
   const s = useEditor.getState()
-  const { project, selection } = s
+  const { project, selection, snapEnabled } = s
   const m = contextMatrix(s)
   const sign = isMirrored(m) ? -1 : 1
   const centre = apply(invert(m), centreWorld)
@@ -320,8 +322,8 @@ export function startRotate(svg: SVGSVGElement, startClient: XY, centreWorld: XY
   }
   const a0 = angleOf(startClient)
   return {
-    move(client) {
-      const deg = ((angleOf(client) - a0) * 180) / Math.PI
+    move(client, { altKey, shiftKey }) {
+      const deg = snapRotation(((angleOf(client) - a0) * 180) / Math.PI, shiftKey, snapEnabled && !altKey)
       useEditor.getState().setPreview(rotateObjects(project, selection, sign * deg, centre), 'cancel')
     },
   }

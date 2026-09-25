@@ -99,6 +99,31 @@ test.describe('mouse', () => {
     expect(await selection(page)).toEqual(['r1'])
   })
 
+  test('the rotate handle turns in 15° steps with Shift held (SPEC §7.3)', async ({ page }) => {
+    await seed(page)
+    await snapOff(page)
+    await select(page, ['b1'])
+    const angle = async (): Promise<number> => {
+      const [a, b] = ((await getProject(page)).objects['b1'] as Band).points
+      return (Math.atan2(b!.y - a!.y, b!.x - a!.x) * 180) / Math.PI
+    }
+    const rot = (await page.locator('.moveable-rotation-control').boundingBox())!
+    const handle = { x: Math.round(rot.x + rot.width / 2), y: Math.round(rot.y + rot.height / 2) }
+    const to = { x: handle.x + 97, y: handle.y + 41 }
+
+    await mouseDrag(page, handle, to)
+    const free = await angle()
+    expect(Math.abs(free - Math.round(free / 15) * 15)).toBeGreaterThan(0.5)
+    await page.evaluate(() => window.__cbpd!.getState().undo())
+
+    await page.keyboard.down('Shift')
+    await mouseDrag(page, handle, to)
+    await page.keyboard.up('Shift')
+    const stepped = await angle()
+    expectClose(stepped, Math.round(free / 15) * 15, 1e-6)
+    expect(await history(page)).toEqual({ past: 1, future: 0 })
+  })
+
   test('Shift-drag on a selected object drags the selection and keeps it', async ({ page }) => {
     await seed(page)
     await select(page, ['b1', 'r1'])

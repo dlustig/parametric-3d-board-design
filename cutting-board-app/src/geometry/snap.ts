@@ -194,6 +194,12 @@ export function segmentMeasure(start: XY, end: XY): { angleDeg: number; lengthMm
   return { angleDeg: normalizeDeg(angleOf(start, end)), lengthMm: dist(start, end) }
 }
 
+/** SPEC §7.3 rotate handle: `deg` snapped to a 15° multiple — always when `force` (Shift), else when `capture` (Snap on, no Alt) and within ±4° of one. */
+export function snapRotation(deg: number, force: boolean, capture: boolean): number {
+  const step = Math.round(deg / ANGLE_SNAP_DEG) * ANGLE_SNAP_DEG
+  return force || (capture && Math.abs(deg - step) <= ANGLE_SNAP_CAPTURE_DEG) ? step : deg
+}
+
 /** Normalises degrees to (−180, 180]. */
 function normalizeDeg(deg: number): number {
   const d = deg % 360

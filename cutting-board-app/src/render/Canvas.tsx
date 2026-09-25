@@ -207,7 +207,8 @@ export function Canvas(): JSX.Element {
     gestureRef.current = startTranslate(svg(), clientOf(e))
   }
   const onMove = (e: { clientX: number; clientY: number; inputEvent?: unknown }): void => {
-    gestureRef.current?.move(clientOf(e), (e.inputEvent as MouseEvent | TouchEvent | undefined)?.altKey === true)
+    const input = e.inputEvent as MouseEvent | TouchEvent | undefined
+    gestureRef.current?.move(clientOf(e), { altKey: input?.altKey === true, shiftKey: input?.shiftKey === true })
   }
   const finish = (e: OnDragEnd | OnRotateEnd): void => {
     setRotating(false)
@@ -355,7 +356,7 @@ export function Canvas(): JSX.Element {
       const press = handlePressRef.current
       if (press === null || press.id !== e.pointerId || gestureRef.current !== press.gesture) return
       press.maxMove = Math.max(press.maxMove, Math.hypot(e.clientX - press.start.x, e.clientY - press.start.y))
-      if (press.maxMove >= TAP_SLOP_PX) press.gesture.move(clientOf(e), e.altKey)
+      if (press.maxMove >= TAP_SLOP_PX) press.gesture.move(clientOf(e), e)
     }
     const onUp = (e: PointerEvent): void => {
       const press = handlePressRef.current

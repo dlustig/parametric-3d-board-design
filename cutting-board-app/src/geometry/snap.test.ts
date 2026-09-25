@@ -4,7 +4,7 @@ import { fromTransform, IDENTITY } from './affine.ts'
 import { expand } from './expand.ts'
 import { findIntersections } from './intersections.ts'
 import type { SnapTargets } from './snap.ts'
-import { collectSnapTargets, snapDelta, snapPoint, snapSegmentEnd } from './snap.ts'
+import { collectSnapTargets, snapDelta, snapPoint, snapRotation, snapSegmentEnd } from './snap.ts'
 
 type XY = { x: number; y: number }
 
@@ -161,6 +161,16 @@ describe('snapSegmentEnd', () => {
     expect(r.guide).toBe('point')
     expectXY(r.point, { x: 10, y: 0.6 })
     expect(r.angleDeg).toBeCloseTo((Math.atan2(0.6, 10) * 180) / Math.PI, 9)
+  })
+})
+
+describe('snapRotation', () => {
+  it('Shift always rounds to a 15° multiple; snapping alone captures only within ±4°; neither leaves the angle', () => {
+    expect(snapRotation(37, true, false)).toBe(30)
+    expect(snapRotation(-50.2, true, true)).toBe(-45)
+    expect(snapRotation(33.9, false, true)).toBe(30)
+    expect(snapRotation(34.1, false, true)).toBe(34.1)
+    expect(snapRotation(33.9, false, false)).toBe(33.9)
   })
 })
 
