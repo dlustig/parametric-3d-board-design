@@ -64,6 +64,25 @@ function maxOf(points: XY[], axis: 'x' | 'y'): number {
   return m
 }
 
+/** The length of the overlap of `p`'s and `q`'s projections onto the unit axis (ux, uy); ≤ 0 when they are disjoint. */
+function slabOverlap(p: XY[], q: XY[], ux: number, uy: number): number {
+  let minP = Infinity
+  let maxP = -Infinity
+  for (const pt of p) {
+    const d = pt.x * ux + pt.y * uy
+    minP = Math.min(minP, d)
+    maxP = Math.max(maxP, d)
+  }
+  let minQ = Infinity
+  let maxQ = -Infinity
+  for (const pt of q) {
+    const d = pt.x * ux + pt.y * uy
+    minQ = Math.min(minQ, d)
+    maxQ = Math.max(maxQ, d)
+  }
+  return Math.min(maxP, maxQ) - Math.max(minP, minQ)
+}
+
 /**
  * Whether `p` and `q` overlap by more than `eps`. "Penetrates by more than
  * eps" is defined as intersection area > eps²: zero for polygons that only
@@ -75,5 +94,20 @@ export function polygonsPenetrate(p: XY[], q: XY[], eps: number): boolean {
   if (overlapW <= 0) return false
   const overlapH = Math.min(maxOf(p, 'y'), maxOf(q, 'y')) - Math.max(minOf(p, 'y'), minOf(q, 'y'))
   if (overlapH <= 0 || overlapW * overlapH <= eps * eps) return false
+  // The same bound in the frame of each edge direction: a polygon edge normal separates two convex polygons that do not overlap.
+  for (const polygon of [p, q]) {
+    for (let k = 0; k < polygon.length; k++) {
+      const a = polygon[k]!
+      const b = polygon[(k + 1) % polygon.length]!
+      const length = Math.hypot(b.x - a.x, b.y - a.y)
+      if (length === 0) continue
+      const ux = (b.x - a.x) / length
+      const uy = (b.y - a.y) / length
+      const along = slabOverlap(p, q, ux, uy)
+      if (along <= 0) return false
+      const across = slabOverlap(p, q, -uy, ux)
+      if (across <= 0 || along * across <= eps * eps) return false
+    }
+  }
   return Flatten.BooleanOperations.intersect(toFlatten(p), toFlatten(q)).area() > eps * eps
 }

@@ -107,4 +107,24 @@ describe('polygonsPenetrate', () => {
     const far = square.map((p) => ({ x: p.x + 50, y: p.y }))
     expect(polygonsPenetrate(square, far, 0.01)).toBe(false)
   })
+
+  // Diamonds (squares at 45°) side by side along a diagonal: their axis-aligned boxes overlap by a 2×2 corner either way.
+  const diamond = (cx: number, cy: number): Array<{ x: number; y: number }> => [
+    { x: cx, y: cy - 5 },
+    { x: cx + 5, y: cy },
+    { x: cx, y: cy + 5 },
+    { x: cx - 5, y: cy },
+  ]
+
+  it('diagonal diamonds whose boxes overlap but whose edges only touch do not penetrate', () => {
+    expect(polygonsPenetrate(diamond(0, 0), diamond(5, 5), 0.01)).toBe(false)
+    expect(polygonsPenetrate(diamond(0, 0), diamond(6, 6), 0.01)).toBe(false)
+  })
+
+  it('diagonal diamonds overlapping by a sliver penetrate by its area', () => {
+    // The overlap is a 0.1√2 × 5√2 rectangle along the shared edge: area 1 mm².
+    expect(polygonsPenetrate(diamond(0, 0), diamond(4.9, 4.9), 0.01)).toBe(true)
+    expect(polygonsPenetrate(diamond(0, 0), diamond(4.9, 4.9), 0.99)).toBe(true)
+    expect(polygonsPenetrate(diamond(0, 0), diamond(4.9, 4.9), 1.01)).toBe(false)
+  })
 })
