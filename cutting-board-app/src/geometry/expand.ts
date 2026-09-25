@@ -35,10 +35,39 @@ function worldPointsOf(points: Point[], matrix: Mat): Point[] {
   return points.map((point) => ({ id: point.id, ...apply(matrix, point) }))
 }
 
+/**
+ * Occurrences already built, by source object and occurrence key. Project
+ * objects are never mutated, so the same object at the same key under an
+ * equal matrix yields an equal occurrence: returning the earlier one keeps
+ * an unchanged occurrence the same object from one project version to the
+ * next (a drag frame re-expands thousands of occurrences to move one), which
+ * lets classification and rendering skip it by identity (packet §22: exploit
+ * motif/repeat reuse).
+ */
+const built = new WeakMap<Band | Region, Map<string, Occurrence>>()
+
+function sameMatrix(m: Mat, n: Mat): boolean {
+  return m === n || m.every((v, k) => v === n[k])
+}
+
+function reuse<O extends Occurrence>(source: Band | Region, path: Step[], matrix: Mat, build: (key: string) => O): O {
+  const key = occurrenceKey(path, source.id)
+  let byKey = built.get(source)
+  if (byKey === undefined) {
+    byKey = new Map()
+    built.set(source, byKey)
+  }
+  const hit = byKey.get(key)
+  if (hit !== undefined && sameMatrix(hit.matrix, matrix)) return hit as O
+  const o = build(key)
+  byKey.set(key, o)
+  return o
+}
+
 function bandOccurrence(band: Band, path: Step[], matrix: Mat): BandOccurrence {
-  return {
+  return reuse(band, path, matrix, (key) => ({
     kind: 'band',
-    key: occurrenceKey(path, band.id),
+    key,
     sourceId: band.id,
     path,
     matrix,
@@ -46,19 +75,19 @@ function bandOccurrence(band: Band, path: Step[], matrix: Mat): BandOccurrence {
     worldPoints: worldPointsOf(band.points, matrix),
     worldWidth: band.widthMm * scaleOf(matrix),
     closed: band.closed,
-  }
+  }))
 }
 
 function regionOccurrence(region: Region, path: Step[], matrix: Mat): RegionOccurrence {
-  return {
+  return reuse(region, path, matrix, (key) => ({
     kind: 'region',
-    key: occurrenceKey(path, region.id),
+    key,
     sourceId: region.id,
     path,
     matrix,
     materialId: region.materialId,
     worldPoints: worldPointsOf(region.points, matrix),
-  }
+  }))
 }
 
 function expandChildren(p: Project, ctx: ContextId, path: Step[], matrix: Mat): Occurrence[] {

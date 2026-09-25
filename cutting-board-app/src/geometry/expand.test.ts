@@ -239,3 +239,25 @@ describe('segmentsOf', () => {
     expect(segmentsOf(occ!)).toHaveLength(2)
   })
 })
+
+describe('expand — reuse across project versions', () => {
+  it('keeps an unchanged occurrence the same object, and rebuilds one whose object or placement changed', () => {
+    const base = newProject('mm')
+    const materialId = base.materials[0]!.id
+    const cellBand = band(materialId, [pt(0, 0), pt(5, 0)])
+    const moved = band(materialId, [pt(0, 20), pt(50, 20)])
+    const field = repeatField('m', { rows: 1, columns: 2 })
+    const p: Project = { ...base, objects: { [cellBand.id]: cellBand, [moved.id]: moved, [field.id]: field }, rootChildren: [field.id, moved.id], motifs: { m: motifDef('m', [cellBand.id]) } }
+
+    const before = expand(p)
+    const movedBand: Band = { ...moved, points: moved.points.map((q) => ({ ...q, x: q.x + 1 })) }
+    const shiftedField: RepeatField = { ...field, stepXMm: 12 }
+    const after = expand({ ...p, objects: { ...p.objects, [moved.id]: movedBand, [field.id]: shiftedField } })
+
+    expect(after[0]).toBe(before[0]) // cell (0,0): same object, same matrix
+    expect(after[1]).not.toBe(before[1]) // cell (0,1): moved by the new step
+    expect(after[1]!.worldPoints[0]!.x).toBe(12)
+    expect(after[2]).not.toBe(before[2]) // the edited root band
+    expect(after[2]!.worldPoints[0]!.x).toBe(1)
+  })
+})

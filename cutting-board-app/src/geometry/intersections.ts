@@ -234,6 +234,21 @@ function boxOf(points: XY[]): Box {
 /** An occurrence's painted polygons and their union box, built on first use. */
 type Painted = { polygons: XY[][]; box: Box }
 
+/** An occurrence's derived shapes: conservative bounds, segments, and painted polygons (built on first use). */
+type Shape = { bounds: Box; segments: BandSegment[]; painted?: Painted }
+
+/** Shapes by occurrence object: `expand` returns the same object for an unchanged occurrence, so they carry across project versions. */
+const shapeCache = new WeakMap<Occurrence, Shape>()
+
+function shapeOf(o: Occurrence): Shape {
+  let shape = shapeCache.get(o)
+  if (shape === undefined) {
+    shape = { bounds: conservativeBounds(o), segments: o.kind === 'band' ? segmentsOf(o) : [] }
+    shapeCache.set(o, shape)
+  }
+  return shape
+}
+
 /** A first-pass contact between occurrences `i` < `j` (paint indices), and whether the `crowded` pass reclassified it. */
 type Entry = { i: number; j: number; found: Found; crowded: boolean }
 
@@ -242,6 +257,7 @@ const firstPasses = new WeakMap<Occurrence[], Entry[]>()
 
 /** Whether two occurrences classify identically: same key and kind, same world points (ids too), width, and closure. Material is not geometry. */
 function sameGeometry(o: Occurrence, q: Occurrence): boolean {
+  if (o === q) return true
   if (o.key !== q.key || o.kind !== q.kind || o.worldPoints.length !== q.worldPoints.length) return false
   if (o.kind === 'band' && q.kind === 'band' && (o.worldWidth !== q.worldWidth || o.closed !== q.closed)) return false
   return o.worldPoints.every((pt, k) => {
@@ -252,6 +268,8 @@ function sameGeometry(o: Occurrence, q: Occurrence): boolean {
 
 /** A reused contact re-pointed at the current list's occurrence objects (equal geometry; the material may differ). */
 function rebound(found: Found, occI: Occurrence, occJ: Occurrence): Found {
+  const { a, b } = found.intersection
+  if ((a.occ === occI || a.occ === occJ) && (b.occ === occI || b.occ === occJ)) return found // the same occurrences: keep the same objects
   const onto = (s: IntersectionSide): IntersectionSide => ({ ...s, occ: (s.occ.key === occI.key ? occI : occJ) as BandOccurrence })
   return { ...found, intersection: { ...found.intersection, a: onto(found.intersection.a), b: onto(found.intersection.b) } }
 }
@@ -271,17 +289,16 @@ function rebound(found: Found, occI: Occurrence, occJ: Occurrence): Found {
  */
 export function findIntersections(occurrences: Occurrence[], previous?: Occurrence[]): Intersection[] {
   const n = occurrences.length
-  const bounds = occurrences.map(conservativeBounds)
-  const segments = occurrences.map((o) => (o.kind === 'band' ? segmentsOf(o) : []))
-  const painted: Array<Painted | undefined> = []
+  const shapes = occurrences.map(shapeOf)
+  const bounds = shapes.map((shape) => shape.bounds)
+  const segments = shapes.map((shape) => shape.segments)
   const paintedAt = (k: number): Painted => {
-    let p = painted[k]
-    if (p === undefined) {
+    const shape = shapes[k]!
+    if (shape.painted === undefined) {
       const polygons = paintedPolygons(occurrences[k]!)
-      p = { polygons, box: boxOf(polygons.flat()) }
-      painted[k] = p
+      shape.painted = { polygons, box: boxOf(polygons.flat()) }
     }
-    return p
+    return shape.painted
   }
   const entries: Entry[] = []
   const classifyPair = (i: number, j: number): void => {
