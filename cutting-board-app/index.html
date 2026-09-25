@@ -7,6 +7,22 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
     />
     <title>Cutting Board Pattern Designer</title>
+    <script>
+      // Shell spec §3: set the resolved theme before first paint. Mirrors
+      // resolveTheme and the prefs validation in src/editor/layout.ts;
+      // anything unreadable (no storage, bad JSON, foreign values) is dark.
+      ;(function () {
+        var theme = 'dark'
+        try {
+          var prefs = JSON.parse(localStorage.getItem('cbpd:prefs'))
+          var pref = prefs && prefs.version === 1 && prefs.state ? prefs.state.theme : undefined
+          if (pref === 'light') theme = 'light'
+          else if (pref === 'system' && !matchMedia('(prefers-color-scheme: dark)').matches) theme = 'light'
+        } catch (e) {}
+        document.documentElement.dataset.theme = theme
+        document.documentElement.style.colorScheme = theme
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

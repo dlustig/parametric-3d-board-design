@@ -11,6 +11,7 @@ import { ProjectMenu } from './ProjectMenu.tsx'
 import { RecoveryBanner } from './RecoveryBanner.tsx'
 import { StatusBar } from './StatusBar.tsx'
 import { Toolbar } from './Toolbar.tsx'
+import { useThemeSync } from './theme.ts'
 import { ToolOptions } from './ToolOptions.tsx'
 
 /** SPEC §9: startup load, debounced autosave on every project change, flush on hide, suspend on another tab's write. */
@@ -66,6 +67,7 @@ function usePersistence(): { recoveredText: string | null; dismissRecovery: () =
 
 function App(): JSX.Element {
   useEffect(() => installKeyboardDispatcher(), [])
+  useThemeSync()
   const { recoveredText, dismissRecovery } = usePersistence()
 
   return (

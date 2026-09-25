@@ -27,7 +27,7 @@ export function DrawPreview({ drawing, matrix, zoom, unit }: Props): JSX.Element
   const cursor = drawing.cursor
   const end = cursor === null ? null : apply(matrix, cursor.point)
   const last = world[world.length - 1]
-  const stroke = { fill: 'none', stroke: '#1a73e8', strokeWidth: 1.5 * px }
+  const stroke = { fill: 'none', style: { stroke: 'var(--acc)' }, strokeWidth: 1.5 * px }
 
   let pending: JSX.Element | null = null
   let label: JSX.Element | null = null
@@ -47,7 +47,7 @@ export function DrawPreview({ drawing, matrix, zoom, unit }: Props): JSX.Element
       )
       const text = `${formatLength(cursor!.lengthMm, unit)} ${unit} · ${formatAngle(cursor!.angleDeg)}°`
       label = (
-        <text x={end.x + 10 * px} y={end.y - 10 * px} fontSize={12 * px} fill="#1a73e8" stroke="#ffffff" strokeWidth={3 * px} paintOrder="stroke">
+        <text x={end.x + 10 * px} y={end.y - 10 * px} fontSize={12 * px} style={{ fill: 'var(--acc)' }} stroke="#ffffff" strokeWidth={3 * px} paintOrder="stroke">
           {text}
         </text>
       )
@@ -59,7 +59,7 @@ export function DrawPreview({ drawing, matrix, zoom, unit }: Props): JSX.Element
       {drawing.tool !== 'rect' && world.length >= 2 && <polyline points={pts(world)} {...stroke} />}
       {pending}
       {world.map((p, k) => (
-        <circle key={k} cx={p.x} cy={p.y} r={3 * px} fill="#ffffff" stroke="#1a73e8" strokeWidth={1.5 * px} />
+        <circle key={k} cx={p.x} cy={p.y} r={3 * px} fill="#ffffff" style={{ stroke: 'var(--acc)' }} strokeWidth={1.5 * px} />
       ))}
       {label}
     </g>

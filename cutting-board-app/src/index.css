@@ -1,15 +1,52 @@
-:root {
-  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
-  color-scheme: light dark;
-  --page-bg: #f4f1ea;
-  --ink: #1f1d1a;
+/* Shell spec §2.1 colour tokens. `data-theme` on <html> always holds the
+   resolved theme (§3). Tooltips are dark in both themes (--tip-bg), so the
+   tooltip surfaces take the dark set too. */
+:root[data-theme='dark'],
+.tooltip,
+.hint {
+  color-scheme: dark;
+  --paste: #1a1c20;
+  --panel: #202328;
+  --raised: #2a2e34;
+  --line: #32363d;
+  --line-strong: #4a5059;
+  --text: #e7e9ec;
+  --muted: #8e96a1;
+  --acc: #3d9bff;
+  --acc-ink: #06121f;
+  --acc-soft: rgb(61 155 255 / 16%);
+  --attn: #f5b042;
+  --ok: #46c07a;
+  --danger: #ff6b5e;
+  --tip-bg: #2e3238;
+  --tip-hint: #a9b0ba;
+  --shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --page-bg: #1e1d1b;
-    --ink: #ece8e0;
-  }
+:root[data-theme='light'] {
+  color-scheme: light;
+  --paste: #e9ebee;
+  --panel: #ffffff;
+  --raised: #f0f2f4;
+  --line: #dfe2e6;
+  --line-strong: #c3c8cf;
+  --text: #1c1f24;
+  --muted: #5f6773;
+  --acc: #1f6fe5;
+  --acc-ink: #ffffff;
+  --acc-soft: rgb(31 111 229 / 11%);
+  --attn: #945800;
+  --ok: #1e8049;
+  --danger: #c0392b;
+  --tip-bg: #2e3238;
+  --tip-hint: #a9b0ba;
+  --shadow: 0 8px 24px rgb(20 30 50 / 12%);
+}
+
+/* §2.2 type: IBM Plex Sans (self-hosted, src/main.tsx), 13 px in the UI. The
+   root stays 16 px so the existing rem-based sizes are unchanged. */
+:root {
+  font: 400 16px/1.5 'IBM Plex Sans', system-ui, sans-serif;
 }
 
 html,
@@ -18,8 +55,38 @@ body {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
-  background: var(--page-bg);
-  color: var(--ink);
+  background: var(--panel);
+  color: var(--text);
+}
+
+body {
+  font-size: 13px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+input[type='number'] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* §2.3 focus and motion. */
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 #root,
@@ -47,7 +114,7 @@ body {
   gap: 4px;
   padding: 8px 6px;
   overflow-y: auto;
-  border-right: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-right: 1px solid var(--line);
 }
 
 .toolbar button {
@@ -69,6 +136,7 @@ body {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  background: var(--paste);
 }
 
 .inspector {
@@ -77,7 +145,7 @@ body {
   box-sizing: border-box;
   padding: 10px 12px;
   overflow-y: auto;
-  border-left: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-left: 1px solid var(--line);
 }
 
 .panel {
@@ -125,7 +193,7 @@ body {
 .field-error {
   flex-basis: 100%;
   font-size: 0.7rem;
-  color: #c0392b;
+  color: var(--danger);
 }
 
 .point-row,
@@ -164,7 +232,7 @@ body {
 }
 
 .board-mat {
-  fill: var(--page-bg);
+  fill: var(--paste);
   opacity: 0.7;
 }
 
@@ -195,8 +263,8 @@ body {
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  background: var(--page-bg);
-  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 6px;
 }
 
@@ -225,7 +293,7 @@ body {
 /* SPEC §3 materials palette. */
 .materials-panel {
   padding-bottom: 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-bottom: 1px solid var(--line);
 }
 
 .materials-hint {
@@ -259,7 +327,7 @@ body {
 }
 
 .material-swatch[aria-pressed='true'] {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--acc);
   outline-offset: -2px;
 }
 
@@ -267,7 +335,7 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 3px;
-  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border: 1px solid var(--line-strong);
   flex: 0 0 auto;
 }
 
@@ -290,10 +358,10 @@ body {
   flex-direction: column;
   gap: 6px;
   padding: 10px;
-  background: var(--page-bg);
-  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  box-shadow: 0 4px 16px color-mix(in srgb, black 25%, transparent);
+  box-shadow: var(--shadow);
   min-width: 14rem;
 }
 
@@ -302,21 +370,21 @@ body {
 }
 
 .popover-arrow {
-  fill: var(--page-bg);
+  fill: var(--panel);
 }
 
 .tooltip {
   z-index: 3;
   padding: 4px 8px;
   font-size: 0.75rem;
-  background: var(--ink);
-  color: var(--page-bg);
+  background: var(--tip-bg);
+  color: var(--text);
   border-radius: 4px;
 }
 
 /* SPEC §7.6 edit context: the scrim over the full scene, and the breadcrumb. */
 .context-scrim-rect {
-  fill: var(--page-bg);
+  fill: var(--paste);
   opacity: 0.6;
 }
 
@@ -329,8 +397,8 @@ body {
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  background: var(--page-bg);
-  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 6px;
 }
 
@@ -388,7 +456,7 @@ body {
   justify-content: space-between;
   gap: 8px;
   padding: 6px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-bottom: 1px solid var(--line);
 }
 
 .project-menu {
@@ -405,7 +473,7 @@ body {
 }
 
 .status-bar-message {
-  color: #c0392b;
+  color: var(--danger);
 }
 
 .recovery-banner {
@@ -413,8 +481,9 @@ body {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  background: color-mix(in srgb, orange 20%, var(--page-bg));
-  border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  background: var(--raised);
+  border-left: 3px solid var(--attn);
+  border-bottom: 1px solid var(--line);
   font-size: 0.85rem;
 }
 
@@ -435,9 +504,10 @@ body {
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  background: var(--page-bg);
-  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  box-shadow: 0 4px 16px color-mix(in srgb, black 25%, transparent);
+  box-shadow: var(--shadow);
   min-width: 20rem;
+  color: var(--text);
 }

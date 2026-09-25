@@ -16,7 +16,7 @@ interface Props {
 
 export function VertexHandles({ handles, matrix, zoom }: Props): JSX.Element {
   const px = 1 / zoom
-  const stroke = { fill: '#ffffff', stroke: '#1a1a1a', strokeWidth: 1.5 * px }
+  const stroke = { fill: '#ffffff', style: { stroke: 'var(--acc)' }, strokeWidth: 1.5 * px }
   return (
     <g className="vertex-handles" pointerEvents="none">
       {handles.map((h) => {

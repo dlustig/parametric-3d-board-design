@@ -22,7 +22,7 @@ export function Grid({ gridMm, matrix, zoom, view }: Props): JSX.Element | null 
     <g className="grid" pointerEvents="none">
       <defs>
         <pattern id="snap-grid" patternUnits="userSpaceOnUse" width={gridMm} height={gridMm} patternTransform={`matrix(${matrix.join(' ')})`}>
-          <path d={`M ${gridMm} 0 H 0 V ${gridMm}`} fill="none" stroke="#808080" strokeOpacity={0.35} strokeWidth={px} />
+          <path d={`M ${gridMm} 0 H 0 V ${gridMm}`} fill="none" style={{ stroke: 'var(--muted)' }} strokeOpacity={0.3} strokeWidth={px} />
         </pattern>
       </defs>
       <rect x={view.x} y={view.y} width={view.w} height={view.h} fill="url(#snap-grid)" />

@@ -169,11 +169,11 @@ test.describe('tablet gate (G7)', () => {
     expect(undersized, `rail buttons under 44×44 px: ${undersized.join(', ')}`).toEqual([])
   })
 
-  test('the selection outline draws both strokes', async ({ page }) => {
+  test('the selection outline draws both strokes: #ffffff over the accent', async ({ page }) => {
     await seed(page)
     await select(page, ['b1'])
     await nextFrame(page)
-    const strokes = await page.locator('.selection-overlay rect').evaluateAll((els) => els.map((el) => el.getAttribute('stroke')))
-    expect(new Set(strokes)).toEqual(new Set(['#1a1a1a', '#ffffff']))
+    const strokes = await page.locator('.selection-overlay rect').evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke))
+    expect(new Set(strokes)).toEqual(new Set(['rgb(255, 255, 255)', 'rgb(61, 155, 255)'])) // --acc, dark theme (shell spec §2.1)
   })
 })
