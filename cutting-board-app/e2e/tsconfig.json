@@ -5,5 +5,5 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node", "vite/client"]
   },
-  "include": [".", "../playwright.config.ts", "../src/editor/testHook.ts"]
+  "include": [".", "../playwright.config.ts", "../playwright.perf.config.ts", "../src/editor/testHook.ts"]
 }

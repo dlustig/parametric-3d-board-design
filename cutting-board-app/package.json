@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p e2e/tsconfig.json",
     "test": "vitest run",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "perf": "vite build --mode perf --outDir dist/perf --emptyOutDir && playwright test -c playwright.perf.config.ts"
   },
   "dependencies": {
     "@flatten-js/core": "^1.6.14",
