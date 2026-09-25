@@ -16,8 +16,8 @@ type Mode = 'empty' | 'assignable' | 'instances-only'
 function selectionMode(project: Project, selection: Id[]): Mode {
   if (selection.length === 0) return 'empty'
   const assignable = selection.some((id) => {
-    const obj = project.objects[id]
-    return obj !== undefined && (obj.type === 'band' || obj.type === 'region')
+    const obj = project.objects[id]!
+    return obj.type === 'band' || obj.type === 'region'
   })
   return assignable ? 'assignable' : 'instances-only'
 }

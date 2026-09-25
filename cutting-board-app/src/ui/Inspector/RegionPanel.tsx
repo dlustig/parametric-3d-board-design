@@ -5,6 +5,7 @@ import type { JSX } from 'react'
 import { setMaterial } from '@/domain/commands'
 import type { Region } from '@/domain/model'
 import { objectBounds } from '@/geometry/bounds'
+import { EPS_GEOMETRY } from '@/geometry/tolerance'
 import { useEditor } from '@/editor/store'
 import type { PreviewOutcome } from './NumberField.tsx'
 import { NumberField } from './NumberField.tsx'
@@ -15,20 +16,17 @@ interface Props {
   region: Region
 }
 
-const MIN_SIZE_MM = 1e-6
-
 export function RegionPanel({ region }: Props): JSX.Element {
   const project = useEditor((s) => s.project)
   const unit = project.displayUnits
 
-  const bounds = objectBounds(project, region.id)
-  const width = bounds === null ? 0 : bounds.maxX - bounds.minX
-  const height = bounds === null ? 0 : bounds.maxY - bounds.minY
+  const bounds = objectBounds(project, region.id)! // a Region has ≥ 3 points
+  const width = bounds.maxX - bounds.minX
+  const height = bounds.maxY - bounds.minY
 
   const previewScale = (axis: 'x' | 'y', newSize: number): PreviewOutcome => {
-    if (bounds === null) return undefined
     const size = axis === 'x' ? width : height
-    if (size < MIN_SIZE_MM) return undefined
+    if (size < EPS_GEOMETRY) return undefined // collinear points: no extent to scale
     const factor = newSize / size
     const points = region.points.map((p) => ({
       x: axis === 'x' ? bounds.minX + (p.x - bounds.minX) * factor : p.x,

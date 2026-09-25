@@ -18,8 +18,8 @@ export function PivotMarkers({ project, selection, matrix, zoom }: Props): JSX.E
   return (
     <g className="pivot-marker" pointerEvents="none" fill="none">
       {selection.map((id) => {
-        const obj = project.objects[id]
-        if (obj === undefined || (obj.type !== 'motif-instance' && obj.type !== 'repeat')) return null
+        const obj = project.objects[id]!
+        if (obj.type !== 'motif-instance' && obj.type !== 'repeat') return null
         const c = apply(matrix, obj.transform)
         const d = `M ${c.x - r} ${c.y} H ${c.x + r} M ${c.x} ${c.y - r} V ${c.y + r}`
         return (

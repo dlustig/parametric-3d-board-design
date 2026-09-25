@@ -74,7 +74,7 @@ function idSafe(s: string): string {
 
 export function SceneSvg({ scene, materials, clipPrefix, include }: Props): JSX.Element {
   const colors = new Map(materials.map((m) => [m.id, m.color]))
-  const colorOf = (materialId: string): string => colors.get(materialId) ?? '#ff00ff'
+  const colorOf = (materialId: string): string => colors.get(materialId)! // SPEC §2.1 invariant 2: every materialId resolves
 
   const clips: JSX.Element[] = []
   const drawn: JSX.Element[] = []

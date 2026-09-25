@@ -33,12 +33,10 @@ export function copyObjects(p: Project, ids: Id[]): Clipboard {
   function captureMotif(motifId: Id): void {
     if (seenMotifs.has(motifId)) return
     seenMotifs.add(motifId)
-    const motif = p.motifs[motifId]
-    if (motif === undefined) return // dangling reference: nothing more to capture
+    const motif = p.motifs[motifId]!
     motifs.push(motif)
     for (const childId of motif.children) {
-      const child = p.objects[childId]
-      if (child === undefined) continue
+      const child = p.objects[childId]!
       if (!seenObjects.has(childId)) {
         seenObjects.add(childId)
         extraObjects.push(child)
@@ -57,9 +55,7 @@ function motifReaches(motifs: Project['motifs'], objects: Project['objects'], fr
   if (from === target) return true
   if (seen.has(from)) return false
   seen.add(from)
-  const def = motifs[from]
-  if (def === undefined) return false
-  for (const childId of def.children) {
+  for (const childId of motifs[from]!.children) {
     const child = objects[childId]
     if (child !== undefined && isPlaced(child) && motifReaches(motifs, objects, child.motifId, target, seen)) return true
   }

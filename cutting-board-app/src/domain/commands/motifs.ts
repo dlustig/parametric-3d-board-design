@@ -217,8 +217,7 @@ export function detachInstance(p: Project, instanceId: Id): IdsResult {
   const objects = { ...next.objects }
   for (const copy of copies) objects[copy.id] = copy
   next = withChildren({ ...next, objects }, ctx, childrenOf(next, ctx).flatMap((id) => (id === instanceId ? [id, ...copies.map((c) => c.id)] : [id])))
-  const capped = withinCap(removeObjects(next, [instanceId]))
-  return capped.ok ? okIds(capped.project, copies.map((c) => c.id)) : capped
+  return okIds(removeObjects(next, [instanceId]), copies.map((c) => c.id))
 }
 
 export function renameMotif(p: Project, motifId: Id, name: string): Project {

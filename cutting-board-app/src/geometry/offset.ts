@@ -28,7 +28,6 @@ function unitNormal(a: XY, b: XY): XY {
  */
 export function offsetPolyline(points: Point[], distance: number, closed: boolean): Point[] {
   const n = points.length
-  if (n < 2) return points.map((p) => ({ ...p }))
 
   const segCount = closed ? n : n - 1
   const normals: XY[] = Array.from({ length: segCount }, (_, i) => unitNormal(points[i]!, points[(i + 1) % n]!))
