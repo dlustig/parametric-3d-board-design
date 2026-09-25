@@ -365,3 +365,27 @@ describe('currentMaterialId repair', () => {
     expect(useEditor.getState().currentMaterialId).toBe(MAT)
   })
 })
+
+describe('immutability outside production (the geometry caches key on identity)', () => {
+  const pointsOf = (p: Project, id: string): Array<{ x: number; y: number }> => (p.objects[id] as { points: Array<{ x: number; y: number }> }).points
+
+  it('every project the store takes in is frozen: an in-place write to a band point throws', () => {
+    useEditor.getState().replaceProject(project([band('b1', [[0, 0], [10, 0]])]))
+    const replaced = useEditor.getState().project
+    expect(() => {
+      pointsOf(replaced, 'b1')[0]!.x = 5
+    }).toThrow(TypeError)
+
+    useEditor.getState().setPreview(project([band('b1', [[0, 0], [20, 0]])]), 'commit')
+    expect(() => pointsOf(useEditor.getState().preview!.next, 'b1').push({ x: 1, y: 1 })).toThrow(TypeError)
+    useEditor.getState().commit()
+    expect(() => {
+      pointsOf(useEditor.getState().project, 'b1')[1]!.y = 3
+    }).toThrow(TypeError)
+
+    useEditor.getState().run((p) => ({ ...p, name: 'renamed' }))
+    expect(() => {
+      useEditor.getState().project.name = 'mutated'
+    }).toThrow(TypeError)
+  })
+})

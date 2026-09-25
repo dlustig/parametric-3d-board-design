@@ -18,6 +18,7 @@ import { temporal } from 'zundo'
 import type { TemporalState } from 'zundo'
 import type { CommandResult } from '@/domain/commands'
 import type { ContextId, Id, Project } from '@/domain/model'
+import { freezeInDev } from '@/domain/freeze'
 import { newProject } from '@/domain/project'
 import type { Mat } from '@/geometry/affine'
 import { IDENTITY, multiply } from '@/geometry/affine'
@@ -109,7 +110,7 @@ const INITIAL_PROJECT = newProject('mm')
 export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Temporal } = create<EditorState>()(
   temporal(
     (set, get) => ({
-      project: INITIAL_PROJECT,
+      project: freezeInDev(INITIAL_PROJECT),
       preview: null,
       tool: 'select',
       selection: [],
@@ -134,21 +135,21 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
         get().settlePreview()
         const result = cmd(get().project)
         if (isCommandResult(result)) {
-          if (result.ok) set({ project: result.project, message: null, currentMaterialId: pruneCurrentMaterial(result.project, get().currentMaterialId) })
+          if (result.ok) set({ project: freezeInDev(result.project), message: null, currentMaterialId: pruneCurrentMaterial(result.project, get().currentMaterialId) })
           else set({ message: result.message })
           return
         }
-        set({ project: result, message: null, currentMaterialId: pruneCurrentMaterial(result, get().currentMaterialId) })
+        set({ project: freezeInDev(result), message: null, currentMaterialId: pruneCurrentMaterial(result, get().currentMaterialId) })
       },
 
       setPreview(next, onInterrupt) {
-        set({ preview: { next, onInterrupt } })
+        set({ preview: { next: freezeInDev(next), onInterrupt } })
       },
 
       commit() {
         const { preview, project } = get()
         if (preview === null) return
-        set({ project: rematchCrossings(project, preview.next), preview: null, snapGuide: null })
+        set({ project: freezeInDev(rematchCrossings(project, preview.next)), preview: null, snapGuide: null })
       },
 
       cancelPreview() {
@@ -176,7 +177,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       replaceProject(p) {
         get().settlePreview()
-        set({ project: p, selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId), message: null })
+        set({ project: freezeInDev(p), selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId), message: null })
         useEditor.temporal.getState().clear()
       },
 
