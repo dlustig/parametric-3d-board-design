@@ -1,4 +1,4 @@
-// The tool rail (SPEC §7.4): Select, Hand, Band, Rectangle, Polygon; the Snap
+// The tool rail (SPEC §7.4): Select, Hand, Band, Rectangle, Polygon, Crossing; the Snap
 // and Show grid toggles (SPEC §7.7); and −, +, Fit (SPEC §7.2).
 
 import type { ChangeEvent, JSX } from 'react'
@@ -53,18 +53,19 @@ export function Toolbar(): JSX.Element {
   const snapEnabled = useEditor((s) => s.snapEnabled)
   const showGrid = useEditor((s) => s.showGrid)
   const hasSelection = useEditor((s) => s.selection.length > 0)
-  const toolButton = (t: Tool, label: string): JSX.Element => (
-    <button type="button" aria-pressed={tool === t} onClick={() => setTool(t)}>
+  const toolButton = (t: Tool, label: string, key: string): JSX.Element => (
+    <button type="button" aria-pressed={tool === t} title={`${label} (${key})`} onClick={() => setTool(t)}>
       {label}
     </button>
   )
   return (
     <header className="toolbar">
-      {toolButton('select', 'Select')}
-      {toolButton('hand', 'Hand')}
-      {toolButton('band', 'Band')}
-      {toolButton('rect', 'Rectangle')}
-      {toolButton('polygon', 'Polygon')}
+      {toolButton('select', 'Select', 'V')}
+      {toolButton('hand', 'Hand', 'H')}
+      {toolButton('band', 'Band', 'B')}
+      {toolButton('rect', 'Rectangle', 'R')}
+      {toolButton('polygon', 'Polygon', 'P')}
+      {toolButton('crossing', 'Crossing', 'X')}
       <button type="button" aria-pressed={snapEnabled} onClick={() => useEditor.setState({ snapEnabled: !snapEnabled })}>
         Snap
       </button>
