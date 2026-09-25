@@ -124,7 +124,7 @@ Each occurrence carries `key` (§5.1), `kind`, `sourceId`, `path`, `matrix`, `ma
 
 - **Painted geometry** of a Band occurrence: its segments' stroke rectangles (each segment's endpoints offset ±`w/2` along the segment normal) plus, at each interior joint, the miter triangle between the two rectangles' outer corners and the miter tip (`w / (2 sin(φ/2))` from the vertex, bevelled where that exceeds `5w`, matching `stroke-miterlimit` 10). Used by the `occluded` and `crowded` tests.
 - **Painted bounds**: the bounds of the stroke rectangles only (exact at butt ends; miter tips may exceed it). Used for selection proxies, marquee, fit, and the default repeat step.
-- **Conservative bounds**: polyline bounds expanded by `2.5 × w` (the miter-limit-10 tip extent). Used only to prefilter pair tests.
+- **Conservative bounds**: polyline bounds expanded by `5 × w` (a miter tip at `stroke-miterlimit` 10 reaches `w / (2 sin(φ/2)) ≤ 5w` from the centreline vertex). Used only to prefilter pair tests and painted-geometry overlap tests.
 - Region bounds are polygon bounds. Instance/repeat bounds are the union of their occurrences' painted bounds.
 
 ### 4.6 Tolerances and constants (`geometry/tolerance.ts`)
@@ -474,6 +474,7 @@ src/
 | Product 14, 16, 17, 20, 22 | G6 scope, F counts, grid/zoom/outside view, seam markers, ½ step | Adopted |
 | Product 15 | Current material undefined | §3 |
 | Editor 30 | Show `≈` for inexact fractions | Declined: adds a display state for no workflow gain |
+| Fix wave | §4.5 padded conservative bounds by 2.5w but a miter tip reaches 5w | Pad is 5w (§4.5); painted-geometry prefilter boxes include joint triangles |
 | Final review C1 | The §8 regex let `13/16` backtrack into `1` + `3/16` | Fraction branch requires a separator between whole and fraction (§8) |
 | Final review I4 | Rematch ran in commands and again in `commit()` | Commands are the only rematch owner (§7.1) |
 | Final review I2, walkthrough | Grid default never followed inch units | Grid spacing set from display units on open and on unit change (§7.7) |
