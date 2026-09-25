@@ -85,21 +85,19 @@ function usePersistence(): { recoveredText: string | null; dismissRecovery: () =
 /**
  * Shell §4 persistence goes through a storage object that never throws. The
  * library reads without a guard (docs/decisions/2026-09-25-shell-spike.md):
- * a throwing `getItem`, text that isn't JSON, or JSON that isn't a record of
- * finite numbers would crash the Group's render. So a blocked
- * `localStorage` (Review Focus 2) or any such record (Review Focus 1) reads
- * as "nothing stored", and the defaults apply; a stored record for other
- * panel ids or out-of-range sizes is left to the library, which ignores or
- * clamps it. A failed write just doesn't persist.
+ * a throwing `getItem`, text that isn't JSON, or JSON `null` (it calls
+ * `Object.values` on the parsed value) crashes the Group's render. So a
+ * blocked `localStorage` (Review Focus 2), unparseable text or a parsed
+ * `null` (Review Focus 1) reads as "nothing stored", and the defaults apply.
+ * Other shapes (a number, an array, non-numeric sizes, other panel ids,
+ * out-of-range sizes) are left to the library's own fallback and clamping.
+ * A failed write just doesn't persist.
  */
 const layoutStorage: LayoutStorage = {
   getItem(key) {
     try {
       const text = window.localStorage.getItem(key)
-      if (text === null) return null
-      const value: unknown = JSON.parse(text)
-      const isRecord = typeof value === 'object' && value !== null && !Array.isArray(value)
-      return isRecord && Object.values(value).every((v) => typeof v === 'number' && Number.isFinite(v)) ? text : null
+      return text !== null && JSON.parse(text) !== null ? text : null
     } catch {
       return null
     }

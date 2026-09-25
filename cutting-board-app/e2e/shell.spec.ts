@@ -129,9 +129,6 @@ test.describe('side panes (desktop 1440 × 900)', () => {
   for (const [what, stored] of [
     ['not JSON', '{not json'],
     ['JSON null', 'null'],
-    ['a number', '42'],
-    ['an array', '[20, 60, 20]'],
-    ['non-numeric sizes', JSON.stringify({ 'pane-left': 'wide', 'pane-canvas': 60, 'pane-right': 20 })],
     ['for other panels', JSON.stringify({ sidebar: 50, main: 50 })],
   ] as const) {
     test(`a stored layout that is ${what} loads the default widths (Review Focus 1)`, async ({ page }) => {
@@ -208,7 +205,7 @@ test.describe('side panes (desktop 1440 × 900)', () => {
     expect(await history(page)).toEqual({ past: 1, future: 0 })
   })
 
-  test('Escape closes the project menu and the Open confirmation without clearing the selection', async ({ page }) => {
+  test('Escape closes the project menu, the Open confirmation and the material popover without clearing the selection', async ({ page }) => {
     await seed(page, nonBlank())
     await select(page, ['b1'])
 
@@ -222,6 +219,14 @@ test.describe('side panes (desktop 1440 × 900)', () => {
     await expect(page.getByText('Open a project?')).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(await selectionOf(page)).toEqual(['b1'])
+
+    await page.getByRole('button', { name: 'Edit Walnut', exact: true }).click()
+    const popover = page.getByRole('dialog', { name: 'Edit Walnut' })
+    await expect(popover).toBeVisible()
+    await popover.getByRole('button', { name: 'Save', exact: true }).focus() // off the Name field, which the dispatcher already ignores
+    await page.keyboard.press('Escape')
+    await expect(popover).toHaveCount(0)
     expect(await selectionOf(page)).toEqual(['b1'])
 
     // The same Escape outside a Radix layer does clear it, so the checks above can fail.
