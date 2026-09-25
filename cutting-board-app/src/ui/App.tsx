@@ -9,6 +9,7 @@ import { Breadcrumb } from './Breadcrumb.tsx'
 import { Inspector } from './Inspector/Inspector.tsx'
 import { ProjectMenu } from './ProjectMenu.tsx'
 import { RecoveryBanner } from './RecoveryBanner.tsx'
+import { ShortcutsDialog } from './ShortcutsDialog.tsx'
 import { StatusBar } from './StatusBar.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { useThemeSync } from './theme.ts'
@@ -70,8 +71,13 @@ function App(): JSX.Element {
   useThemeSync()
   const { recoveredText, dismissRecovery } = usePersistence()
 
+  // disableHoverableContent: Hint tooltips are read-only (no content to move the mouse onto), and
+  // Radix's default hoverable grace-area polygon can get stuck open — it's cleared by a document
+  // pointermove listener attached only after the trigger-leave that creates it, so if the pointer
+  // comes to rest (as synthetic input from Playwright/CDP does) with no further move, the previous
+  // tooltip never closes and every later trigger stays blocked.
   return (
-    <Tooltip.Provider delayDuration={400}>
+    <Tooltip.Provider delayDuration={400} skipDelayDuration={300} disableHoverableContent>
       <div className="app">
         {recoveredText !== null && <RecoveryBanner text={recoveredText} onDiscard={dismissRecovery} />}
         <div className="app-top-bar">
@@ -88,6 +94,7 @@ function App(): JSX.Element {
           <Inspector />
         </div>
       </div>
+      <ShortcutsDialog />
     </Tooltip.Provider>
   )
 }

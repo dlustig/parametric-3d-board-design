@@ -511,3 +511,153 @@ input[type='number'] {
   min-width: 20rem;
   color: var(--text);
 }
+
+/* Shell spec §12.3 tooltips, keycaps, shortcuts sheet. `.hint` takes the
+   dark token set in both themes (top of this file). Secondary text on the
+   --tip-bg surface (.hint-line, "or", and the "Off" state) uses --tip-hint,
+   not --muted: --muted fails 4.5:1 contrast against --tip-bg. `.hint-or` is
+   shared with the shortcuts sheet (on --panel, not --tip-bg), so its
+   --tip-hint override is scoped to `.hint` — unscoped, it would fail
+   contrast against the sheet's light-theme --panel (white). */
+.hint-trigger {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hint-disabled {
+  display: inline-flex;
+}
+
+.hint {
+  z-index: 6;
+  max-width: 280px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--tip-bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  animation: hint-fade 100ms ease-out;
+}
+
+@keyframes hint-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.hint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint-label {
+  flex: 1;
+}
+
+.hint-state {
+  color: var(--tip-hint);
+}
+
+.hint-on {
+  color: var(--ok);
+}
+
+.hint-keys,
+.shortcuts-row dd {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hint-or {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.hint .hint-or {
+  color: var(--tip-hint);
+}
+
+.hint-line {
+  margin-top: 2px;
+  color: var(--tip-hint);
+  font-weight: 400;
+}
+
+.chord {
+  display: inline-flex;
+  gap: 2px;
+}
+
+/* Keycap fill and edge are fixed values from §12.3, not theme tokens. */
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  border: 1px solid #4a5059;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #3a3f47;
+  color: #e7e9ec;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.keycap-muted {
+  border-color: var(--line-strong);
+  background: var(--raised);
+  color: var(--muted);
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.shortcuts-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.shortcuts-group h3 {
+  margin: 12px 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.shortcuts-group dl {
+  margin: 0;
+}
+
+.shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.shortcuts-row dt,
+.shortcuts-row dd {
+  margin: 0;
+}

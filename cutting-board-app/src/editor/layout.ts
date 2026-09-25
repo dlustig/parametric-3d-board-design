@@ -40,6 +40,8 @@ export interface LayoutState {
   setTheme(t: ThemePref): void
   setLeftTab(t: LeftTab): void
   setToolsDocked(d: boolean): void
+  shortcutsOpen: boolean // not persisted
+  setShortcutsOpen(o: boolean): void
 }
 
 const guardedStorage: StateStorage = {
@@ -79,6 +81,8 @@ export const useLayout = create<LayoutState>()(
       setTheme: (theme) => set({ theme }),
       setLeftTab: (leftTab) => set({ leftTab }),
       setToolsDocked: (toolsDocked) => set({ toolsDocked }),
+      shortcutsOpen: false,
+      setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
     }),
     {
       name: PREFS_KEY,

@@ -5,9 +5,11 @@
 import type { ChangeEvent, JSX } from 'react'
 import { createMotifFromSelection, pasteClipboard, repeatSelection } from '@/editor/keyboard'
 import { fitView, zoomViewBy } from '@/editor/input'
+import { SHORTCUTS } from '@/editor/shortcuts'
 import type { Tool } from '@/editor/store'
 import { useEditor } from '@/editor/store'
 import { fixtures } from '@/fixtures'
+import { Hint } from './Hint.tsx'
 
 const ZOOM_STEP = 1.25
 
@@ -55,19 +57,21 @@ export function Toolbar(): JSX.Element {
   const showGrid = useEditor((s) => s.showGrid)
   const addToSelection = useEditor((s) => s.addToSelection)
   const hasSelection = useEditor((s) => s.selection.length > 0)
-  const toolButton = (t: Tool, label: string, key: string): JSX.Element => (
-    <button type="button" aria-pressed={tool === t} title={`${label} (${key})`} onClick={() => setTool(t)}>
-      {label}
-    </button>
+  const toolButton = (t: Tool): JSX.Element => (
+    <Hint shortcut={t} side="right">
+      <button type="button" aria-pressed={tool === t} onClick={() => setTool(t)}>
+        {SHORTCUTS[t].label}
+      </button>
+    </Hint>
   )
   return (
     <header className="toolbar">
-      {toolButton('select', 'Select', 'V')}
-      {toolButton('hand', 'Hand', 'H')}
-      {toolButton('band', 'Band', 'B')}
-      {toolButton('rect', 'Rectangle', 'R')}
-      {toolButton('polygon', 'Polygon', 'P')}
-      {toolButton('crossing', 'Crossing', 'X')}
+      {toolButton('select')}
+      {toolButton('hand')}
+      {toolButton('band')}
+      {toolButton('rect')}
+      {toolButton('polygon')}
+      {toolButton('crossing')}
       <button type="button" aria-pressed={snapEnabled} onClick={() => useEditor.setState({ snapEnabled: !snapEnabled })}>
         Snap
       </button>

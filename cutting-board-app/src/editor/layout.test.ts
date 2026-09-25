@@ -59,7 +59,7 @@ async function freshLayoutModule(): Promise<typeof import('./layout.ts')> {
 
 beforeEach(() => {
   vi.unstubAllGlobals()
-  useLayout.setState({ theme: 'dark', leftTab: 'layers', toolsDocked: true })
+  useLayout.setState({ theme: 'dark', leftTab: 'layers', toolsDocked: true, shortcutsOpen: false })
 })
 
 afterEach(() => {
@@ -93,6 +93,7 @@ describe('useLayout persistence', () => {
     const s = new MemoryStorage()
     vi.stubGlobal('localStorage', s)
     useLayout.getState().setLeftTab('wood')
+    useLayout.getState().setShortcutsOpen(true)
     expect(JSON.parse(s.getItem(PREFS_KEY)!)).toEqual({ state: { theme: 'dark', leftTab: 'wood', toolsDocked: true }, version: 1 })
   })
 

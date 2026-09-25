@@ -26,12 +26,14 @@
 // wired (SelectionPanel, BandPanel) straight to the same domain commands
 // this dispatcher calls, so nothing here duplicates them. `Ctrl/Cmd+G` is
 // Create Motif.
+// `?` opens the keyboard shortcuts sheet (shell spec §10.3).
 
 import type { Clipboard } from '@/domain/commands'
 import { copyObjects, createMotif, deleteObjects, duplicateObjects, makeRepeat, pasteObjects, translateObjects } from '@/domain/commands'
 import type { Id } from '@/domain/model'
 import { childrenOf } from '@/domain/project'
 import { apply, invert } from '@/geometry/affine'
+import { useLayout } from './layout.ts'
 import { cancelDrawing, finishDrawing, undoPoint } from './tools/draw.ts'
 import type { EditorState, Tool } from './store.ts'
 import { contextMatrix, currentContext, useEditor } from './store.ts'
@@ -238,6 +240,13 @@ export function installKeyboardDispatcher(): () => void {
 
     if (key === 'Escape') {
       handleEscape()
+      e.preventDefault()
+      return
+    }
+
+    // Shell spec §12.1: `?` matches e.key with Shift ignored (it is Shift+/ on most layouts).
+    if (key === '?' && !ctrlOrMeta && !e.altKey) {
+      useLayout.getState().setShortcutsOpen(true)
       e.preventDefault()
       return
     }
