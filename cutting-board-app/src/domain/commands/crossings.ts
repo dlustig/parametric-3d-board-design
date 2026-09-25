@@ -3,7 +3,7 @@
 import { apply, invert } from '@/geometry/affine'
 import { pathMatrix } from '@/geometry/expand'
 import type { Intersection } from '@/geometry/intersections'
-import { contextIntersections, intersectionKey, paintIndexOf, resolveIntersection, sideRef } from '@/geometry/resolve'
+import { intersectionKey, listedKeys, paintIndexOf, resolveIntersection, sideRef } from '@/geometry/resolve'
 import { canonicalize, canonicalKey, commonPrefix, contextsAlong, pairKey, recordsOf, withRecords } from '@/domain/crossings'
 import { newId } from '@/domain/ids'
 import type { ContextId, Crossing, Id, Project } from '@/domain/model'
@@ -44,7 +44,7 @@ function writeRecord(p: Project, i: Intersection, depth: number, ctx: ContextId,
 function nearestUnresolvedOfPair(p: Project, ctx: ContextId, records: Crossing[], pair: string, hint: { x: number; y: number }): Crossing | undefined {
   const samePair = records.filter((c) => pairKey(c.a, c.b) === pair)
   if (samePair.length === 0) return undefined
-  const listed = new Set(contextIntersections(p, ctx).map((i) => intersectionKey(i)))
+  const listed = new Set(listedKeys(p, ctx))
   const distance = (c: Crossing): number => Math.hypot(c.hint.x - hint.x, c.hint.y - hint.y)
   return samePair.filter((c) => !listed.has(canonicalKey(c))).sort((m, n) => distance(m) - distance(n))[0]
 }

@@ -12,7 +12,7 @@ import type { XY } from './footprint.ts'
 import { footprint } from './footprint.ts'
 import type { Intersection } from './intersections.ts'
 import type { Resolved } from './resolve.ts'
-import { contextIntersections, contextListing, intersectionKey, resolveIntersection } from './resolve.ts'
+import { contextListing, listedKeys, resolveIntersection } from './resolve.ts'
 
 export type PatchElement = { kind: 'patch'; over: BandOccurrence; segment: [XY, XY]; clip: XY[] }
 
@@ -38,15 +38,15 @@ function xy(pt: XY): XY {
  * is painted before the under one, keyed by the under occurrence's key and
  * ordered by the intersection's canonical key.
  */
-function patchesByUnder(intersections: Array<{ i: Intersection; over: 'a' | 'b' }>, paintIndex: (key: string) => number, clipExtendMm: number): Map<string, PatchElement[]> {
+function patchesByUnder(intersections: Array<{ i: Intersection; key: string; over: 'a' | 'b' }>, paintIndex: (key: string) => number, clipExtendMm: number): Map<string, PatchElement[]> {
   const keyed: Array<{ underKey: string; key: string; patch: PatchElement }> = []
-  for (const { i, over } of intersections) {
+  for (const { i, key, over } of intersections) {
     if (i.cls !== 'eligible') continue
     const o = over === 'a' ? i.a : i.b
     const u = over === 'a' ? i.b : i.a
     if (paintIndex(o.occ.key) > paintIndex(u.occ.key)) continue
     const clip = footprint(o.seg, o.occ.worldWidth + 2 * clipExtendMm, u.seg, u.occ.worldWidth)
-    keyed.push({ underKey: u.occ.key, key: intersectionKey(i), patch: { kind: 'patch', over: o.occ, segment: [xy(o.seg.a), xy(o.seg.b)], clip } })
+    keyed.push({ underKey: u.occ.key, key, patch: { kind: 'patch', over: o.occ, segment: [xy(o.seg.a), xy(o.seg.b)], clip } })
   }
   keyed.sort((m, n) => (m.key < n.key ? -1 : m.key > n.key ? 1 : 0))
 
@@ -81,7 +81,7 @@ function unresolvedMarkers(p: Project, occurrences: Occurrence[]): UnresolvedMar
   for (const ctx of [null, ...Object.keys(p.motifs)]) {
     const records = recordsOf(p, ctx)
     if (records.length === 0) continue
-    const listed = new Set(contextIntersections(p, ctx).map((i) => intersectionKey(i)))
+    const listed = new Set(listedKeys(p, ctx))
     const lost = records.filter((c) => !listed.has(canonicalKey(c)))
     if (lost.length === 0) continue
 
@@ -102,9 +102,11 @@ export function buildScene(p: Project, clipExtendMm: number): Scene {
   const paintIndex = new Map(occurrences.map((o, index) => [o.key, index]))
   const byKey = (key: string): number => paintIndex.get(key)!
 
-  const resolved = intersections.map((i) => {
-    const { over, source } = resolveIntersection(p, i, byKey)
-    return { i, over, source }
+  const keys = listedKeys(p, null)
+  const resolved = intersections.map((i, n) => {
+    const key = keys[n]!
+    const { over, source } = resolveIntersection(p, i, byKey, key)
+    return { i, key, over, source }
   })
   const patches = patchesByUnder(resolved, byKey, clipExtendMm)
 

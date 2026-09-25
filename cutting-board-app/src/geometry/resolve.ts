@@ -64,18 +64,50 @@ export function contextIntersections(p: Project, ctx: ContextId): Intersection[]
   return contextListing(p, ctx).intersections
 }
 
+const keysOfListing = new WeakMap<Intersection[], string[]>()
+
+/** `intersectionKey` of every listed intersection of `ctx`, aligned with `contextIntersections(p, ctx)`; computed once per listing. */
+export function listedKeys(p: Project, ctx: ContextId): string[] {
+  const list = contextIntersections(p, ctx)
+  let keys = keysOfListing.get(list)
+  if (keys === undefined) {
+    keys = list.map((i) => intersectionKey(i))
+    keysOfListing.set(list, keys)
+  }
+  return keys
+}
+
+const recordIndexes = new WeakMap<Crossing[], Map<string, Crossing>>()
+
+/** A context's records by canonical key (the first record of a key, as a linear search finds it); computed once per record list. */
+function recordsByKey(records: Crossing[]): Map<string, Crossing> {
+  let index = recordIndexes.get(records)
+  if (index === undefined) {
+    index = new Map()
+    for (const c of records) {
+      const key = canonicalKey(c)
+      if (!index.has(key)) index.set(key, c)
+    }
+    recordIndexes.set(records, index)
+  }
+  return index
+}
+
 /**
  * SPEC §5.3: look up the intersection's canonical key in each context from
  * the root inward along the common path prefix; the outermost record wins.
- * With no record, the later occurrence in paint order is over.
+ * With no record, the later occurrence in paint order is over. `worldKey`
+ * is `intersectionKey(i)`, when the caller already has it.
  */
-export function resolveIntersection(p: Project, i: Intersection, paintIndex: (key: string) => number): Resolved {
+export function resolveIntersection(p: Project, i: Intersection, paintIndex: (key: string) => number, worldKey?: string): Resolved {
   const prefix = commonPrefix(i.a.occ.path, i.b.occ.path)
   const contexts = contextsAlong(p, prefix)
 
   for (const [depth, ctx] of contexts.entries()) {
-    const key = intersectionKey(i, depth)
-    const record = recordsOf(p, ctx).find((c) => canonicalKey(c) === key)
+    const records = recordsOf(p, ctx)
+    if (records.length === 0) continue
+    const key = depth === 0 && worldKey !== undefined ? worldKey : intersectionKey(i, depth)
+    const record = recordsByKey(records).get(key)
     if (record === undefined) continue
     const overRef = record.over === 'a' ? record.a : record.b
     return {
@@ -97,8 +129,7 @@ export function paintIndexOf(p: Project): (key: string) => number {
 
 /** Whether the record's refs yield a listed intersection in its context. */
 export function isRecordResolved(p: Project, ctx: ContextId, c: Crossing): boolean {
-  const key = canonicalKey(c)
-  return contextIntersections(p, ctx).some((i) => intersectionKey(i) === key)
+  return listedKeys(p, ctx).includes(canonicalKey(c))
 }
 
 /**
@@ -115,16 +146,16 @@ export function rematchCrossings(before: Project, after: Project): Project {
     const records = recordsOf(after, ctx)
     if (records.length === 0) continue
 
-    const beforeKeys = new Set(contextIntersections(before, ctx).map((i) => intersectionKey(i)))
+    const beforeKeys = new Set(listedKeys(before, ctx))
     const wasResolved = new Set(recordsOf(before, ctx).filter((c) => beforeKeys.has(canonicalKey(c))).map((c) => c.id))
-    const next = rematchContext(records, wasResolved, beforeKeys, contextIntersections(after, ctx))
+    const next = rematchContext(records, wasResolved, beforeKeys, contextIntersections(after, ctx), listedKeys(after, ctx))
     if (next !== records) result = withRecords(result, ctx, next)
   }
   return result
 }
 
-function rematchContext(records: Crossing[], wasResolved: Set<string>, beforeKeys: Set<string>, afterList: Intersection[]): Crossing[] {
-  const afterByKey = new Map(afterList.map((i) => [intersectionKey(i), i]))
+function rematchContext(records: Crossing[], wasResolved: Set<string>, beforeKeys: Set<string>, afterList: Intersection[], afterKeys: string[]): Crossing[] {
+  const afterByKey = new Map(afterList.map((i, n) => [afterKeys[n]!, i]))
   // Keys of intersections some record in this context currently binds.
   const bound = new Set(records.map((c) => canonicalKey(c)).filter((key) => afterByKey.has(key)))
   const next = [...records]
