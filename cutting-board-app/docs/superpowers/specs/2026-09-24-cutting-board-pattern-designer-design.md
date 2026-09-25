@@ -339,10 +339,10 @@ The editor draws the whole scene unclipped, then a mat (a rect with an even-odd 
 `parseLength(text, defaultUnit)`: grammar, case-insensitive, after trimming:
 
 ```
-^([+-])?\s*(\d+(?:[.,]\d*)?|[.,]\d+)?(?:(?:\s+|-)?(\d+)\s*/\s*(\d+))?\s*(in|"|”|″|mm)?$
+^([+-])?\s*(?:(\d+(?:[.,]\d*)?|[.,]\d+)|(?:(\d+)(?:\s+|-))?(\d+)\s*/\s*(\d+))\s*(in|"|”|″|mm)?$
 ```
 
-with at least one of the number or fraction present, `,` accepted as the decimal separator, the sign applying to the whole value, a non-zero denominator, and the unit suffix overriding `defaultUnit`. Integer arithmetic (numerator/denominator) then `× 25.4` for inches. Rejected: empty, `1 - 1/8`, exponents, feet, expressions, two units. No fraction library is used (rationale in the reconciliation document).
+i.e. either a decimal, or a fraction with an optional whole number that must be separated from it by whitespace or a hyphen (so `13/16` is thirteen sixteenths, never 1 3/16); `,` accepted as the decimal separator, the sign applying to the whole value, a non-zero denominator, and the unit suffix overriding `defaultUnit`. Integer arithmetic (numerator/denominator) then `× 25.4` for inches. Rejected: empty, `1 - 1/8`, exponents, feet, expressions, two units. No fraction library is used (rationale in the reconciliation document).
 
 `formatLength(mm, unit)`: inches — if within 0.0005" of `k/64`, a reduced mixed fraction (`1 1/8`, `3/16`, `2`); otherwise three decimals. mm — up to two decimals, trailing zeros trimmed. Angles: one decimal, trailing zero trimmed. Units are shown beside the field.
 
@@ -474,5 +474,6 @@ src/
 | Product 14, 16, 17, 20, 22 | G6 scope, F counts, grid/zoom/outside view, seam markers, ½ step | Adopted |
 | Product 15 | Current material undefined | §3 |
 | Editor 30 | Show `≈` for inexact fractions | Declined: adds a display state for no workflow gain |
+| Final review C1 | The §8 regex let `13/16` backtrack into `1` + `3/16` | Fraction branch requires a separator between whole and fraction (§8) |
 | Product 4 (part) | Draggable pivot point | Declined: vertex-snapped move and typed lengths cover alignment |
 | Product 8 (part) | Separate "Move by" field | Declined: bounds X/Y covers it |
