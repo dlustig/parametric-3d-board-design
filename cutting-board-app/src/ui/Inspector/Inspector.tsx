@@ -1,12 +1,11 @@
 // SPEC §7.5: the right-hand inspector panel, routed by selection. Nothing
-// selected → Board. Any non-empty selection → the Selection panel (bounds,
-// rotate, mirror, order), plus the type-specific panel when exactly one
-// Band, Region, Instance, or Repeat is selected. Multi-selection gets the
-// Selection panel only.
+// selected → Board. Any non-empty selection → the Selection panel, plus the
+// type-specific panel when exactly one Band, Region, Instance, or Repeat is
+// selected. Multi-selection gets the Selection panel only. The materials
+// palette moved to the Wood pane (shell §6.3).
 
 import type { JSX } from 'react'
 import { useEditor } from '@/editor/store'
-import { MaterialPalette } from '../MaterialPalette.tsx'
 import { BandPanel } from './BandPanel.tsx'
 import { BoardPanel } from './BoardPanel.tsx'
 import { InstancePanel } from './InstancePanel.tsx'
@@ -20,8 +19,7 @@ export function Inspector(): JSX.Element {
 
   if (selection.length === 0) {
     return (
-      <aside className="inspector">
-        <MaterialPalette />
+      <aside className="inspector" aria-label="Inspector">
         <BoardPanel />
       </aside>
     )
@@ -30,8 +28,7 @@ export function Inspector(): JSX.Element {
   const single = selection.length === 1 ? project.objects[selection[0]!] : undefined
 
   return (
-    <aside className="inspector">
-      <MaterialPalette />
+    <aside className="inspector" aria-label="Inspector">
       <SelectionPanel />
       {single?.type === 'band' && <BandPanel key={single.id} band={single} />}
       {single?.type === 'region' && <RegionPanel region={single} />}

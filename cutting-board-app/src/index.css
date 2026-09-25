@@ -2,7 +2,6 @@
    resolved theme (§3). Tooltips are dark in both themes (--tip-bg), so the
    tooltip surfaces take the dark set too. */
 :root[data-theme='dark'],
-.tooltip,
 .hint {
   color-scheme: dark;
   --paste: #1a1c20;
@@ -89,63 +88,12 @@ input[type='number'] {
   }
 }
 
-#root,
-.app {
+#root {
   height: 100%;
 }
 
-.app {
-  display: flex;
-  flex-direction: column;
-}
-
-/* SPEC §7.5 Inspector layout: three-column flex — left Toolbar rail, centre
-   Canvas, right Inspector. */
-.app-body {
-  display: flex;
-  flex-direction: row;
-  flex: 1;
-  min-height: 0;
-}
-
-.toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 6px;
-  overflow-y: auto;
-  border-right: 1px solid var(--line);
-}
-
-.toolbar button {
-  min-width: 44px;
-  min-height: 44px;
-}
-
-.toolbar button[aria-pressed='true'],
 .tool-options button[aria-pressed='true'] {
   font-weight: 700;
-}
-
-.toolbar-gap {
-  flex: 1;
-}
-
-.canvas-host {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  background: var(--paste);
-}
-
-.inspector {
-  flex: 0 0 280px;
-  width: 280px;
-  box-sizing: border-box;
-  padding: 10px 12px;
-  overflow-y: auto;
-  border-left: 1px solid var(--line);
 }
 
 .panel {
@@ -290,68 +238,6 @@ input[type='number'] {
   width: 6rem;
 }
 
-/* SPEC §3 materials palette. */
-.materials-panel {
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-.materials-hint {
-  margin: 0 0 8px;
-  font-size: 0.75rem;
-  font-style: italic;
-  opacity: 0.8;
-}
-
-.materials-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 8px;
-}
-
-.material-swatch-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.material-swatch {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 2px 6px;
-  text-align: left;
-}
-
-.material-swatch[aria-pressed='true'] {
-  outline: 2px solid var(--acc);
-  outline-offset: -2px;
-}
-
-.material-swatch-color {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  border: 1px solid var(--line-strong);
-  flex: 0 0 auto;
-}
-
-.material-swatch-name {
-  font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.material-editor-trigger {
-  flex: 0 0 auto;
-  min-width: 28px;
-  min-height: 28px;
-}
-
 .material-editor-popover {
   z-index: 2;
   display: flex;
@@ -371,15 +257,6 @@ input[type='number'] {
 
 .popover-arrow {
   fill: var(--panel);
-}
-
-.tooltip {
-  z-index: 3;
-  padding: 4px 8px;
-  font-size: 0.75rem;
-  background: var(--tip-bg);
-  color: var(--text);
-  border-radius: 4px;
 }
 
 /* SPEC §7.6 edit context: the scrim over the full scene, and the breadcrumb. */
@@ -448,45 +325,7 @@ input[type='number'] {
   border: 0;
 }
 
-/* SPEC §9 persistence: Project menu + save status bar, the recovery banner,
-   and the New/Open confirmation dialog. */
-.app-top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--line);
-}
-
-.project-menu {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.status-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-}
-
-.status-bar-message {
-  color: var(--danger);
-}
-
-.recovery-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  background: var(--raised);
-  border-left: 3px solid var(--attn);
-  border-bottom: 1px solid var(--line);
-  font-size: 0.85rem;
-}
-
+/* SPEC §9 persistence: the New/Open confirmation dialog. */
 .dialog-overlay {
   position: fixed;
   inset: 0;
@@ -660,4 +499,593 @@ input[type='number'] {
 .shortcuts-row dt,
 .shortcuts-row dd {
   margin: 0;
+}
+
+/* ---- Shell frame (shell spec §4, §5, §6, §7.2, §8, §10.1; Task 3) ---- */
+
+.app {
+  display: grid;
+  grid-template-rows: 44px auto minmax(0, 1fr);
+  height: 100%;
+  background: var(--paste);
+  color: var(--text);
+}
+
+.top-bar {
+  grid-row: 1;
+}
+
+.recovery-banner {
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--raised);
+  border-left: 3px solid var(--attn);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.app-body {
+  grid-row: 3;
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.shell-group {
+  height: 100%;
+  min-width: 0;
+}
+
+.pane {
+  height: 100%;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.canvas-pane {
+  height: 100%;
+}
+
+.canvas-host {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--paste);
+}
+
+.pane-separator {
+  width: 1px;
+  background: var(--line);
+  outline: none;
+}
+
+.pane-separator[data-separator='hover'],
+.pane-separator[data-separator='active'],
+.pane-separator[data-separator='focus'] {
+  background: var(--acc);
+  box-shadow: 0 0 0 0.5px var(--acc);
+}
+
+.pane-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  max-width: calc(100% - 52px);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.pane-overlay-left {
+  left: 52px;
+  border-right: 1px solid var(--line);
+}
+
+.pane-overlay-right {
+  right: 0;
+  border-left: 1px solid var(--line);
+}
+
+/* Buttons shared by the bars and panes. */
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.icon-button[aria-pressed='true'] {
+  background: var(--acc-soft);
+  color: var(--acc);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.text-button {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.text-button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.primary-button {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--acc);
+  color: var(--acc-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bar-divider {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+/* Top bar (§8). */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 8px;
+  overflow: hidden;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.project-menu {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.project-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: min(40vw, 360px);
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.project-name:hover {
+  background: var(--raised);
+}
+
+.project-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-name svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.project-name-input {
+  width: min(40vw, 360px);
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--acc);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+}
+
+.top-bar-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.save-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.save-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.save-status[data-status='unsaved'] .save-dot {
+  background: var(--danger);
+}
+
+.save-status[data-status='other-tab'] .save-dot {
+  background: var(--attn);
+}
+
+.top-bar-notice {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-bar-spacer {
+  flex: 1 1 0;
+  min-width: 8px;
+}
+
+.top-bar-divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+/* Menus (§10.1; the Order menu in Task 4 reuses these). */
+.menu {
+  z-index: 6;
+  min-width: 220px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.menu-item[data-highlighted] {
+  background: var(--raised);
+}
+
+.menu-item[data-disabled] {
+  color: var(--muted);
+  cursor: default;
+}
+
+.menu-item svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.menu-item-label {
+  flex: 1;
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line);
+}
+
+@keyframes shell-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .menu {
+    animation: shell-fade-in 100ms ease-out;
+  }
+}
+
+/* Icon column (§5). */
+.icon-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  overflow-y: auto;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+
+.icon-column .icon-button {
+  width: 36px;
+  height: 36px;
+}
+
+.icon-column-separator {
+  flex: none;
+  width: 32px;
+  height: 2px;
+  margin: 8px 0;
+  border-radius: 1px;
+  background: var(--line-strong);
+}
+
+.wood-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wood-chip-column {
+  width: 30px;
+  padding: 0;
+}
+
+.wood-chip-swatch {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.wood-chip-text {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Left pane (§6) and the Wood pane (§6.3). */
+.left-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.pane-title {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pane-title h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.pane-note {
+  margin: 8px 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wood-list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+.wood-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+}
+
+.wood-row:hover {
+  background: var(--raised);
+}
+
+.wood-swatch {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wood-swatch[aria-pressed='true'] {
+  background: var(--acc-soft);
+}
+
+.wood-swatch:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.wood-swatch-color {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+}
+
+.wood-swatch-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wood-usage {
+  flex: none;
+  min-width: 20px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.material-editor-trigger.icon-button {
+  width: 28px;
+  height: 28px;
+}
+
+/* Inspector frame (restyled in Task 9). */
+.inspector {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 10px 12px;
+  overflow-y: auto;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+}
+
+/* Canvas controls (§7.2) and the transitional canvas strip (removed in Task 4). */
+.canvas-controls,
+.canvas-actions {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.canvas-controls {
+  right: 14px;
+  bottom: 14px;
+}
+
+.canvas-actions {
+  top: 8px;
+  right: 8px;
+  gap: 4px;
+}
+
+.zoom-readout {
+  min-width: 52px;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.zoom-readout:hover {
+  background: var(--raised);
+}
+
+/* Touch (§5, V1 §7.4): 44 px hit areas; the column widens to 56 px. */
+@media (pointer: coarse) {
+  .app-body {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .pane-overlay-left {
+    left: 56px;
+  }
+
+  .icon-button,
+  .wood-chip,
+  .zoom-readout,
+  .canvas-actions .text-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }

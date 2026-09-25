@@ -7,7 +7,7 @@
 // small listener of its own.
 //
 // Review ruling (Task 16 fix round 1): the store's `message` (last command
-// failure/notice) is shown only in StatusBar now, not here — this bar shows
+// failure/notice) is shown only in TopBar now, not here — this bar shows
 // tool-specific state only (`crossingNotice`, drawing hints), so it doesn't
 // go stale or blank when the current tool has nothing to do with a message
 // set elsewhere.

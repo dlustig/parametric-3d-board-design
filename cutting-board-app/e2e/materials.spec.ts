@@ -1,10 +1,11 @@
-// SPEC §3 materials palette and §7.4 keyboard dispatch, end to end.
+// SPEC §3 materials palette (the Wood pane, shell §6.3) and §7.4 keyboard
+// dispatch, end to end.
 
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { Band, Material, Project } from '../src/domain/model.ts'
 import { band, instance, MAT2, project } from '../src/domain/test-builders.ts'
-import { getProject, history, seed, select, toClient } from './helpers.ts'
+import { getProject, history, projectMenuItem, seed, select, toClient } from './helpers.ts'
 
 function bandOf(p: Project, id: string): Band {
   return p.objects[id] as Band
@@ -149,12 +150,13 @@ test.describe('paste cycle prevention', () => {
 })
 
 test.describe('keyboard dispatch ignores fields', () => {
-  test('typing "b" in the project-name field does not switch tools', async ({ page }) => {
+  test('typing "b" in the project Rename field does not switch tools', async ({ page }) => {
     await seed(page, project([]))
     expect(await tool(page)).toBe('select')
 
+    await projectMenuItem(page, 'Rename')
     const name = page.getByLabel('Name', { exact: true })
-    await name.click()
+    await expect(name).toBeFocused()
     await name.press('b')
 
     expect(await tool(page)).toBe('select')

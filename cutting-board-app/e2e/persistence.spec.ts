@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { band, project } from '../src/domain/test-builders.ts'
 import { PROJECT_KEY, RECOVERED_KEY } from '../src/storage/local.ts'
-import { getProject, history, open, seed } from './helpers.ts'
+import { getProject, history, open, projectMenuItem, seed } from './helpers.ts'
 
 declare global {
   interface Window {
@@ -39,7 +39,7 @@ test.describe('autosave failure and recovery', () => {
     await page.waitForFunction(() => window.__cbpd!.getState().saveStatus === 'unsaved')
     await expect(page.getByText('Not saved in this browser')).toBeVisible()
 
-    const downloadButton = page.locator('.status-bar').getByRole('button', { name: 'Download' })
+    const downloadButton = page.getByRole('banner').getByRole('button', { name: 'Download', exact: true })
     const [download] = await Promise.all([page.waitForEvent('download'), downloadButton.click()])
     expect(download.suggestedFilename()).toBe('Test.cbpd.json') // test-builders' project() names it "Test"
 
@@ -64,7 +64,7 @@ test.describe('storage unavailable', () => {
     await expect(page.getByText('Not saved in this browser')).toBeVisible()
     await page.evaluate(() => window.__cbpd!.run((p) => ({ ...p, name: 'Renamed' })))
     expect((await getProject(page)).name).toBe('Renamed')
-    await expect(page.locator('.status-bar').getByRole('button', { name: 'Download' })).toBeVisible()
+    await expect(page.getByRole('banner').getByRole('button', { name: 'Download', exact: true })).toBeVisible()
   })
 })
 
@@ -99,8 +99,8 @@ test.describe('Open Project', () => {
     const fileInput = page.locator('input[type="file"]')
     await fileInput.setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('not json{') })
 
-    // message renders only in StatusBar (review ruling, Task 16 fix round 1).
-    await expect(page.locator('.status-bar-message')).toContainText('not valid JSON')
+    // message renders only in the top bar's notice (shell §8).
+    await expect(page.locator('.top-bar-notice')).toContainText('not valid JSON')
     expect(await getProject(page)).toEqual(before)
     expect(await history(page)).toEqual(historyBefore)
   })
@@ -111,7 +111,7 @@ test.describe('Open Project', () => {
     const before = await getProject(page)
     const historyBefore = await history(page)
 
-    await page.getByRole('button', { name: 'Open Project', exact: true }).click()
+    await projectMenuItem(page, 'Open project…')
 
     await expect(page.getByRole('dialog')).toBeVisible()
     await expect(page.getByText('Open a project?')).toBeVisible()
@@ -126,7 +126,7 @@ test.describe('Open Project', () => {
   test('Open on a blank project reaches the file chooser directly, without a confirmation', async ({ page }) => {
     await seed(page, project([]))
 
-    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: 'Open Project', exact: true }).click()])
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), projectMenuItem(page, 'Open project…')])
 
     expect(chooser.isMultiple()).toBe(false)
     await expect(page.getByRole('dialog')).toBeHidden()
@@ -139,7 +139,7 @@ test.describe('New Project confirmation', () => {
     await seed(page, seeded)
     const before = await getProject(page)
 
-    await page.getByRole('button', { name: 'New Project', exact: true }).click()
+    await projectMenuItem(page, 'New project…')
     await expect(page.getByRole('dialog')).toBeVisible()
     await expect(page.getByText('Start a new project?')).toBeVisible()
 
@@ -153,7 +153,7 @@ test.describe('New Project confirmation', () => {
     await seed(page, project([]))
     const before = await getProject(page)
 
-    await page.getByRole('button', { name: 'New Project', exact: true }).click()
+    await projectMenuItem(page, 'New project…')
 
     await expect(page.getByRole('dialog')).toBeHidden()
     const after = await getProject(page)
@@ -166,7 +166,7 @@ test.describe('Download Project filename', () => {
   test('sanitises characters outside [A-Za-z0-9 _-]', async ({ page }) => {
     await seed(page, { ...project([]), name: 'My/Project: "Board" #1?' })
 
-    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download Project', exact: true }).click()])
+    const [download] = await Promise.all([page.waitForEvent('download'), projectMenuItem(page, 'Download project')])
 
     expect(download.suggestedFilename()).toBe('My_Project_ _Board_ _1_.cbpd.json')
   })
@@ -174,7 +174,7 @@ test.describe('Download Project filename', () => {
   test('falls back to "project" when the name is empty', async ({ page }) => {
     await seed(page, { ...project([]), name: '' })
 
-    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download Project', exact: true }).click()])
+    const [download] = await Promise.all([page.waitForEvent('download'), projectMenuItem(page, 'Download project')])
 
     expect(download.suggestedFilename()).toBe('project.cbpd.json')
   })

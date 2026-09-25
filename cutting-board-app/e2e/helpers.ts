@@ -51,7 +51,13 @@ export async function select(page: Page, ids: string[]): Promise<void> {
   await nextFrame(page)
 }
 
-/** Turns snapping off with the rail's Snap toggle, for tests asserting raw pointer deltas (SPEC §7.7 would snap them). */
+/** Opens the top bar's project menu and chooses `item` (shell §10.1). */
+export async function projectMenuItem(page: Page, item: string): Promise<void> {
+  await page.locator('.project-name').click()
+  await page.getByRole('menuitem', { name: item, exact: true }).click()
+}
+
+/** Turns snapping off with the canvas controls' Snap toggle, for tests asserting raw pointer deltas (SPEC §7.7 would snap them). */
 export async function snapOff(page: Page): Promise<void> {
   const toggle = page.getByRole('button', { name: 'Snap', exact: true })
   await toggle.click()

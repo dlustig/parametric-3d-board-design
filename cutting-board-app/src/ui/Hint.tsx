@@ -21,7 +21,7 @@ export interface HintProps {
   keys?: readonly string[]
   hint?: string
   state?: 'on' | 'off'
-  disabledReason?: string
+  disabledReason?: string | undefined // undefined: enabled (callers pass `cond ? reason : undefined`)
   side?: 'top' | 'right' | 'bottom' | 'left'
 }
 

@@ -1,15 +1,16 @@
 // SPEC §3: add / rename+recolour / delete (when unused) / Replace
-// everywhere, for one material — a Radix Popover triggered from the
-// palette's "+" (add) button or a swatch's own edit button.
+// everywhere, for one material — a Radix Popover triggered from the Wood
+// pane's Add material button or a row's Edit <name> button. Escape closes
+// the popover without reaching the app's keyboard dispatcher.
 
 import * as Popover from '@radix-ui/react-popover'
-import * as Tooltip from '@radix-ui/react-tooltip'
+import { PencilLine, Plus } from 'lucide-react'
 import type { JSX } from 'react'
-// Tooltip.Provider is hoisted to App.tsx (one per app, not one per trigger).
 import { useEffect, useState } from 'react'
 import { addMaterial, deleteMaterial, materialUsageCount, replaceMaterial, updateMaterial } from '@/domain/commands'
 import type { Material, Project } from '@/domain/model'
 import { useEditor } from '@/editor/store'
+import { Hint } from './Hint.tsx'
 
 const DEFAULT_COLOR = '#808080'
 
@@ -60,22 +61,15 @@ export function MaterialEditor({ project, material }: Props): JSX.Element {
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Tooltip.Root>
-        <Tooltip.Trigger asChild>
-          <Popover.Trigger asChild>
-            <button type="button" className="material-editor-trigger" aria-label={triggerLabel}>
-              {material === undefined ? '+' : '✎'}
-            </button>
-          </Popover.Trigger>
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Content className="tooltip" sideOffset={4}>
-            {triggerLabel}
-          </Tooltip.Content>
-        </Tooltip.Portal>
-      </Tooltip.Root>
+      <Hint label={triggerLabel}>
+        <Popover.Trigger asChild>
+          <button type="button" className="icon-button material-editor-trigger" aria-label={triggerLabel}>
+            {material === undefined ? <Plus size={16} strokeWidth={1.6} /> : <PencilLine size={16} strokeWidth={1.6} />}
+          </button>
+        </Popover.Trigger>
+      </Hint>
       <Popover.Portal>
-        <Popover.Content className="material-editor-popover" sideOffset={6} aria-label={triggerLabel}>
+        <Popover.Content className="material-editor-popover" sideOffset={6} aria-label={triggerLabel} onEscapeKeyDown={(e) => e.stopPropagation()}>
           <div className="field">
             <label htmlFor="material-editor-name">Name</label>
             <input id="material-editor-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />

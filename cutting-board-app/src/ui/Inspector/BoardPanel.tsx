@@ -1,48 +1,13 @@
-// SPEC §7.5 Board panel: shown when nothing is selected. Name, width,
-// height, background material, display units, grid spacing.
+// SPEC §7.5 Board panel: shown when nothing is selected. Width, height,
+// background material, display units, grid spacing. The project name is
+// edited from the top bar's Rename (shell §10.1).
 
 import type { JSX } from 'react'
-import { useEffect, useState } from 'react'
-import { setBoardBackground, setBoardSize, setDisplayUnits, setProjectName } from '@/domain/commands'
+import { setBoardBackground, setBoardSize, setDisplayUnits } from '@/domain/commands'
 import { useEditor } from '@/editor/store'
 import { NumberField } from './NumberField.tsx'
 
 const NONE = ''
-
-function NameField(): JSX.Element {
-  const name = useEditor((s) => s.project.name)
-  const [text, setText] = useState(name)
-  useEffect(() => setText(name), [name])
-
-  const commit = (): void => {
-    if (text === name) return
-    if (text.trim() === '') {
-      setText(name)
-      return
-    }
-    useEditor.getState().run((p) => setProjectName(p, text))
-  }
-
-  return (
-    <div className="field">
-      <label htmlFor="board-name">Name</label>
-      <input
-        id="board-name"
-        type="text"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur()
-          else if (e.key === 'Escape') {
-            e.stopPropagation()
-            setText(name)
-          }
-        }}
-      />
-    </div>
-  )
-}
 
 export function BoardPanel(): JSX.Element {
   const project = useEditor((s) => s.project)
@@ -52,7 +17,6 @@ export function BoardPanel(): JSX.Element {
   return (
     <section className="panel" aria-label="Board">
       <h2>Board</h2>
-      <NameField />
       <NumberField
         label="Width"
         value={project.board.widthMm}

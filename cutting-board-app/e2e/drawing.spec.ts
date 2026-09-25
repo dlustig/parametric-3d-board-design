@@ -81,8 +81,8 @@ test.describe('mouse', () => {
     const a = await at(page, { x: 50, y: 50 })
     await page.mouse.click(a.x, a.y)
     await page.getByLabel('Length').fill('4')
-    await page.getByLabel('Angle').fill('30')
-    await page.getByLabel('Angle').press('Enter')
+    await page.getByLabel('Angle', { exact: true }).fill('30')
+    await page.getByLabel('Angle', { exact: true }).press('Enter')
 
     // 4·(cos 30°, sin 30°) = (3.4641…, 2) in y-down space.
     expectPoints(await drawnPoints(page), [{ x: 50, y: 50 }, { x: 50 + 2 * Math.sqrt(3), y: 52 }])

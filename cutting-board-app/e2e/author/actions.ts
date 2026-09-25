@@ -221,9 +221,9 @@ export class Author {
     await this.key('ControlOrMeta+g')
   }
 
-  /** Toolbar Repeat: Create Motif then a 2×2 field, or 2×2 of one selected instance (SPEC §7.4). */
+  /** Canvas Repeat: Create Motif then a 2×2 field, or 2×2 of one selected instance (SPEC §7.4). */
   async repeat(): Promise<void> {
-    await this.page.getByRole('banner').getByRole('button', { name: 'Repeat', exact: true }).click()
+    await this.page.getByRole('toolbar', { name: 'Canvas actions' }).getByRole('button', { name: 'Repeat', exact: true }).click()
     await this.tick()
   }
 

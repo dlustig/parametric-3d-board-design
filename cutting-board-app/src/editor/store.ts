@@ -31,7 +31,7 @@ import { pruneCurrentMaterial, pruneEditContext, pruneSelection } from './select
 
 export type Tool = 'select' | 'hand' | 'band' | 'rect' | 'polygon' | 'crossing'
 
-/** SPEC §9: local autosave status, surfaced by `StatusBar` (`storage/local.ts` drives it). */
+/** SPEC §9: local autosave status, surfaced by `TopBar` (`storage/local.ts` drives it). */
 export type SaveStatus = 'saved' | 'unsaved' | 'other-tab'
 
 export interface Preview {

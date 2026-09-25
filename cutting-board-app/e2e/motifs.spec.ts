@@ -138,7 +138,7 @@ test.describe('motifs', () => {
     await drawBand(page, { x: 40, y: 40 }, { x: 100, y: 40 })
     await page.keyboard.press('v')
     await mouseDrag(page, await at(page, { x: 20, y: 5 }), await at(page, { x: 120, y: 90 }))
-    await page.getByRole('banner').getByRole('button', { name: 'Repeat', exact: true }).click() // toolbar: Create Motif, then Repeat
+    await page.getByRole('toolbar', { name: 'Canvas actions' }).getByRole('button', { name: 'Repeat', exact: true }).click() // Create Motif, then Repeat
     const p = await getProject(page)
     const fieldId = p.rootChildren[0]!
     const field = p.objects[fieldId] as RepeatField

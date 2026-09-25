@@ -154,9 +154,9 @@ test.describe('tablet gate (G7)', () => {
     expect(sel).toHaveLength(2)
   })
 
-  test('every rail button meets the 44×44 px touch target', async ({ page }) => {
+  test('every icon button meets the 44×44 px touch target', async ({ page }) => {
     await seed(page)
-    const buttons = page.locator('.toolbar button')
+    const buttons = page.locator('.icon-column button, .canvas-controls button, .canvas-actions button, .top-bar .icon-button')
     const count = await buttons.count()
     expect(count).toBeGreaterThan(0)
     const undersized: string[] = []
@@ -166,7 +166,7 @@ test.describe('tablet gate (G7)', () => {
       const label = (await btn.getAttribute('aria-label')) ?? (await btn.innerText())
       if (box === null || box.width < 44 || box.height < 44) undersized.push(`${label} (${box?.width}×${box?.height})`)
     }
-    expect(undersized, `rail buttons under 44×44 px: ${undersized.join(', ')}`).toEqual([])
+    expect(undersized, `icon buttons under 44×44 px: ${undersized.join(', ')}`).toEqual([])
   })
 
   test('the selection outline draws both strokes: #ffffff over the accent', async ({ page }) => {

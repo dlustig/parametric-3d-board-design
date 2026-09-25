@@ -49,13 +49,15 @@ test.describe('accessibility (G11)', () => {
     )
   }
 
-  test('every toolbar, tool-options, and project-menu button has an accessible name', async ({ page }) => {
+  test('every top-bar, icon-column, Wood pane, canvas-bar and tool-options button has an accessible name', async ({ page }) => {
     await seed(page, project([]))
 
     const offenders: string[] = []
-    offenders.push(...(await unlabeledButtons(page, '.toolbar button')))
-    offenders.push(...(await unlabeledButtons(page, '.project-menu button')))
-    offenders.push(...(await unlabeledButtons(page, '.materials-panel button'))) // the palette, always visible in the Inspector
+    offenders.push(...(await unlabeledButtons(page, '.top-bar button')))
+    offenders.push(...(await unlabeledButtons(page, '.icon-column button')))
+    offenders.push(...(await unlabeledButtons(page, '.left-pane button'))) // the Wood pane, open by default
+    offenders.push(...(await unlabeledButtons(page, '.canvas-controls button')))
+    offenders.push(...(await unlabeledButtons(page, '.canvas-actions button')))
 
     // The Band tool's options bar (Length/Angle fields, Finish/Undo point/Cancel) renders regardless of project content.
     await page.getByRole('button', { name: 'Band', exact: true }).click()

@@ -1,48 +1,72 @@
-// SPEC §9: New / Open / Download Project. New and Open confirm (Radix
-// Dialog) unless the current project is blank; Open reads a `<input
-// type="file">` via `File.text()` and `importProject`, leaving project and
-// history untouched on failure. Export SVG (SPEC §10) downloads the
-// standalone SVG serialisation of the committed project.
+// Shell §10.1: the project menu, a Radix DropdownMenu on the top bar's
+// project-name button.
 //
-// Review ruling (Task 16 fix round 1): the store's `message` is rendered in
-// exactly one place — StatusBar — so this component only ever sets it (on
-// an Open failure); `replaceProject` itself clears a stale message on
-// success, so no manual clear is needed here.
+// - New project… keeps V1 §9's confirm-unless-blank flow until Task 10's
+//   dialog.
+// - Open project… keeps V1 §9's "Open a project?" confirmation and its
+//   failure behaviour: project and history untouched, and the error goes to
+//   the store's `message`, which only TopBar renders. `replaceProject` clears
+//   a stale message on success.
+// - Rename turns the name button into a text field labelled Name, under the
+//   V1 §7.5 rules: Enter or blur commits, Esc reverts, and an empty name
+//   reverts.
+// - Escape in the menu or the confirmation closes that layer only: Radix
+//   preventDefaults it without stopping it, and the app's keyboard dispatcher
+//   would otherwise also clear the selection.
+//
+// Mod+O reaches the Open flow through `openProjectRef`, which App's
+// `uiActions.openProject` calls.
 
 import * as Dialog from '@radix-ui/react-dialog'
-import type { ChangeEvent, JSX } from 'react'
-import { useRef, useState } from 'react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { ChevronDown, Download, FileOutput, FilePlus, FolderOpen, Keyboard, PencilLine } from 'lucide-react'
+import type { ChangeEvent, JSX, ReactElement, RefObject } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { setProjectName } from '@/domain/commands'
 import { importProject } from '@/domain/migrate'
 import type { Project } from '@/domain/model'
 import { newProject } from '@/domain/project'
+import { useLayout } from '@/editor/layout'
+import type { ShortcutId } from '@/editor/shortcuts'
+import { SHORTCUTS } from '@/editor/shortcuts'
 import { useEditor } from '@/editor/store'
-import { downloadText } from '@/export/download'
-import { exportSvg } from '@/export/svg'
+import { downloadExportSvg, downloadProject } from '@/export/download'
+import { ChordKeys } from './Keycap.tsx'
+
+const ICON = { size: 16, strokeWidth: 1.6 } as const
 
 /** SPEC §9: the blank starter — no objects (root or definition-owned) — is silently replaceable. */
 export function isBlankProject(project: Project): boolean {
   return Object.keys(project.objects).length === 0
 }
 
-/** Replaces characters a filesystem might reject with `_`; an all-disallowed (or empty) name falls back to "project". */
-export function sanitizeFilenamePart(name: string): string {
-  const sanitized = name.replace(/[^A-Za-z0-9 _-]/g, '_')
-  return sanitized === '' ? 'project' : sanitized
-}
-
-export function downloadProject(project: Project): void {
-  downloadText(`${sanitizeFilenamePart(project.name)}.cbpd.json`, JSON.stringify(project, null, 2), 'application/json')
-}
-
-export function downloadExportSvg(project: Project): void {
-  downloadText(`${sanitizeFilenamePart(project.name)}.svg`, exportSvg(project), 'image/svg+xml')
+function MenuItem({ icon, label, shortcut, onSelect }: { icon: ReactElement; label: string; shortcut?: ShortcutId; onSelect(): void }): JSX.Element {
+  return (
+    <DropdownMenu.Item className="menu-item" onSelect={onSelect}>
+      {icon}
+      <span className="menu-item-label">{label}</span>
+      {shortcut !== undefined && (
+        <span className="menu-item-keys" aria-hidden="true">
+          <ChordKeys chord={SHORTCUTS[shortcut].keys[0]!} muted />
+        </span>
+      )}
+    </DropdownMenu.Item>
+  )
 }
 
 type PendingAction = 'new' | 'open' | null
 
-export function ProjectMenu(): JSX.Element {
+export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() => void> }): JSX.Element {
+  const name = useEditor((s) => s.project.name)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<PendingAction>(null)
+  const [renaming, setRenaming] = useState(false)
+  const [text, setText] = useState('')
+  // Refs, not state: the menu's close-autofocus handler and the field's blur
+  // run before a re-render could show them the new value.
+  const renamingRef = useRef(false)
+  const reverted = useRef(false)
 
   const startNew = (): void => {
     const displayUnits = useEditor.getState().project.displayUnits
@@ -59,6 +83,10 @@ export function ProjectMenu(): JSX.Element {
     else setPending('open')
   }
 
+  useEffect(() => {
+    openProjectRef.current = onOpenClick
+  })
+
   const onConfirm = (): void => {
     if (pending === 'new') startNew()
     else if (pending === 'open') fileInputRef.current?.click()
@@ -69,8 +97,8 @@ export function ProjectMenu(): JSX.Element {
     const file = e.target.files?.[0]
     e.target.value = '' // allow reselecting the same filename after a failure
     if (file === undefined) return
-    void file.text().then((text) => {
-      const result = importProject(text)
+    void file.text().then((fileText) => {
+      const result = importProject(fileText)
       if (!result.ok) {
         useEditor.setState({ message: result.error.path === '' ? result.error.message : `${result.error.path}: ${result.error.message}` })
         return
@@ -79,33 +107,75 @@ export function ProjectMenu(): JSX.Element {
     })
   }
 
-  const onDownload = (): void => {
-    downloadProject(useEditor.getState().project)
+  const startRename = (): void => {
+    renamingRef.current = true
+    reverted.current = false
+    setText(name)
+    setRenaming(true)
   }
 
-  const onExportSvg = (): void => {
-    downloadExportSvg(useEditor.getState().project)
+  const finishRename = (): void => {
+    if (!reverted.current && text.trim() !== '' && text !== name) useEditor.getState().run((p) => setProjectName(p, text))
+    renamingRef.current = false
+    setRenaming(false)
   }
 
   return (
     <div className="project-menu">
-      <button type="button" onClick={onNewClick}>
-        New Project
-      </button>
-      <button type="button" onClick={onOpenClick}>
-        Open Project
-      </button>
+      <DropdownMenu.Root modal={false}>
+        {renaming ? (
+          <input
+            ref={nameInputRef}
+            className="project-name-input"
+            aria-label="Name"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={finishRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              else if (e.key === 'Escape') {
+                e.stopPropagation()
+                reverted.current = true
+                e.currentTarget.blur()
+              }
+            }}
+          />
+        ) : (
+          <DropdownMenu.Trigger asChild>
+            <button type="button" className="project-name" title={name}>
+              <span className="project-name-text">{name}</span>
+              <ChevronDown {...ICON} />
+            </button>
+          </DropdownMenu.Trigger>
+        )}
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            className="menu"
+            align="start"
+            sideOffset={6}
+            onEscapeKeyDown={(e) => e.stopPropagation()}
+            onCloseAutoFocus={(e) => {
+              if (!renamingRef.current) return
+              e.preventDefault() // the trigger is gone: focus the Name field instead
+              nameInputRef.current?.focus()
+            }}
+          >
+            <MenuItem icon={<FilePlus {...ICON} />} label="New project…" onSelect={onNewClick} />
+            <MenuItem icon={<FolderOpen {...ICON} />} label="Open project…" shortcut="openProject" onSelect={onOpenClick} />
+            <MenuItem icon={<Download {...ICON} />} label="Download project" shortcut="downloadProject" onSelect={() => downloadProject(useEditor.getState().project)} />
+            <DropdownMenu.Separator className="menu-separator" />
+            <MenuItem icon={<PencilLine {...ICON} />} label="Rename" onSelect={startRename} />
+            <MenuItem icon={<FileOutput {...ICON} />} label="Export SVG" shortcut="exportSvg" onSelect={() => downloadExportSvg(useEditor.getState().project)} />
+            <DropdownMenu.Separator className="menu-separator" />
+            <MenuItem icon={<Keyboard {...ICON} />} label="Keyboard shortcuts" shortcut="shortcuts" onSelect={() => useLayout.getState().setShortcutsOpen(true)} />
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
       <input ref={fileInputRef} type="file" accept=".json,application/json" className="visually-hidden" aria-label="Open project file" onChange={onFileChange} />
-      <button type="button" onClick={onDownload}>
-        Download Project
-      </button>
-      <button type="button" onClick={onExportSvg}>
-        Export SVG
-      </button>
       <Dialog.Root open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content className="dialog-content" aria-describedby="project-menu-confirm-description">
+          <Dialog.Content className="dialog-content" aria-describedby="project-menu-confirm-description" onEscapeKeyDown={(e) => e.stopPropagation()}>
             <Dialog.Title>{pending === 'new' ? 'Start a new project?' : 'Open a project?'}</Dialog.Title>
             <Dialog.Description id="project-menu-confirm-description">This replaces the current project. Download it first if you want to keep it.</Dialog.Description>
             <div className="button-row">

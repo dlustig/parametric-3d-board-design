@@ -252,7 +252,7 @@ describe('replaceProject', () => {
   })
 
   // Review ruling (Task 16 fix round 1): message is shown in exactly one
-  // place (StatusBar) now, so a stale failure/notice must not survive a
+  // place (the top bar) now, so a stale failure/notice must not survive a
   // project replacement (New/Open/fixture load) that has nothing to do
   // with it.
   it('clears a stale message', () => {
