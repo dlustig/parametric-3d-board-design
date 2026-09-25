@@ -4,18 +4,19 @@
 // `drawing` field; pointer coordinates map into the current context through
 // `invert(contextMatrix)` (SPEC §7.6) and snap per SPEC §7.7.
 //
-// Band/Polygon: a press becomes a point on pointerup when it moved less than
-// TAP_SLOP_PX and no second pointer arrived (a second pointer cancels the
-// pending point, not the drawing). A second tap within DOUBLE_TAP_MS and
-// 10 px of the first finishes and is itself discarded. Rectangle: press, drag,
-// release → a 4-point Region.
+// Band/Polygon: a press that is a tap (`tapTracker.ts`: it moved less than
+// TAP_SLOP_PX and no second pointer spoiled it) becomes a point on pointerup;
+// a spoiled press drops the pending point, not the drawing. The second tap of
+// a double-tap finishes and is itself discarded. Rectangle: press, drag,
+// release → a 4-point Region; a second pointer drops the rectangle.
 
 import { addBand, addRegion } from '@/domain/commands'
 import { apply, invert } from '@/geometry/affine'
 import type { SegmentSnap, SnapTargets } from '@/geometry/snap'
 import { dist, segmentMeasure, snapPoint, snapSegmentEnd } from '@/geometry/snap'
-import { DOUBLE_TAP_MS, MIN_SEGMENT_MM, TAP_SLOP_PX } from '@/geometry/tolerance'
+import { MIN_SEGMENT_MM, TAP_SLOP_PX } from '@/geometry/tolerance'
 import { gestureSnapTargets, toleranceMm } from '@/editor/snap'
+import { createTapTracker, isTap } from '../tapTracker.ts'
 import { screenToWorld } from '../camera.ts'
 import type { EditorState, Tool } from '../store.ts'
 import { contextMatrix, currentContext, useEditor } from '../store.ts'
@@ -23,8 +24,6 @@ import { contextMatrix, currentContext, useEditor } from '../store.ts'
 type XY = { x: number; y: number }
 
 export type DrawTool = 'band' | 'polygon' | 'rect'
-
-const DOUBLE_TAP_PX = 10
 
 export function isDrawTool(t: Tool): t is DrawTool {
   return t === 'band' || t === 'polygon' || t === 'rect'
@@ -145,30 +144,23 @@ export function placeTyped(lengthMm: number, angleDeg: number): void {
 // Pointer bookkeeping, valid only while the Canvas's draw listeners are
 // bound: the Canvas calls `resetDrawInput` when it unbinds them (tool switch),
 // so a pointer lifted while no listener was bound cannot stay "down".
-const down = new Map<number, XY>() // active pointers, client px
-let press: { id: number; start: XY; maxMove: number; spoiled: boolean } | null = null
-let lastTap: { time: number; at: XY } | null = null
+const taps = createTapTracker()
 
 export function resetDrawInput(): void {
-  down.clear()
-  press = null
-  lastTap = null
+  taps.reset()
 }
 
 // The handlers below are bound by the Canvas only while `tool` is a draw tool.
 
 export function drawPointerDown(svg: SVGSVGElement, e: PointerEvent, tool: DrawTool, panning: boolean): void {
-  const client = { x: e.clientX, y: e.clientY }
-  down.set(e.pointerId, client)
   const s = useEditor.getState()
-  if (down.size > 1) {
+  if (!taps.down(e)) {
     // A second pointer: use-gesture pans/zooms; the pending point (or rectangle) is dropped.
-    if (press !== null) press.spoiled = true
     if (s.drawing?.tool === 'rect') useEditor.setState({ drawing: null })
     return
   }
   if (panning || e.button !== 0) return
-  press = { id: e.pointerId, start: client, maxMove: 0, spoiled: false }
+  taps.begin(e)
   if (tool === 'rect') {
     const cursor = cursorFor({ ...s, drawing: null }, 'rect', toContext(s, svg, e), e.altKey)
     setDrawing('rect', [cursor.point], cursor)
@@ -176,10 +168,8 @@ export function drawPointerDown(svg: SVGSVGElement, e: PointerEvent, tool: DrawT
 }
 
 export function drawPointerMove(svg: SVGSVGElement, e: PointerEvent, tool: DrawTool): void {
-  const client = { x: e.clientX, y: e.clientY }
-  if (down.has(e.pointerId)) down.set(e.pointerId, client)
-  if (press !== null && press.id === e.pointerId) press.maxMove = Math.max(press.maxMove, dist(press.start, client))
-  if (down.size > 1) return
+  const press = taps.move(e)
+  if (taps.pointers > 1) return
   const s = useEditor.getState()
   const d = s.drawing
   if (tool === 'rect' && (d === null || press === null)) return // hover before a drag: nothing to show
@@ -187,11 +177,8 @@ export function drawPointerMove(svg: SVGSVGElement, e: PointerEvent, tool: DrawT
 }
 
 export function drawPointerUp(svg: SVGSVGElement, e: PointerEvent, tool: DrawTool): void {
-  down.delete(e.pointerId)
-  const p = press
-  if (p === null || p.id !== e.pointerId) return
-  press = null
-  if (p.spoiled) return
+  const p = taps.up(e)
+  if (p === null || p.spoiled) return
   const s = useEditor.getState()
 
   if (tool === 'rect') {
@@ -205,20 +192,16 @@ export function drawPointerUp(svg: SVGSVGElement, e: PointerEvent, tool: DrawToo
     return
   }
 
-  if (p.maxMove >= TAP_SLOP_PX) return
-  const now = performance.now()
-  const client = { x: e.clientX, y: e.clientY }
-  if (lastTap !== null && now - lastTap.time <= DOUBLE_TAP_MS && dist(lastTap.at, client) <= DOUBLE_TAP_PX) {
-    lastTap = null // the second tap of a double-tap finishes and is discarded
+  if (!isTap(p)) return
+  if (taps.doubleTap({ x: e.clientX, y: e.clientY })) {
+    // The second tap of a double-tap finishes and is discarded.
     if ((s.drawing?.points.length ?? 0) > 0) finishDrawing()
     return
   }
-  lastTap = { time: now, at: client }
   placeTapped(tool, cursorFor(s, tool, toContext(s, svg, e), e.altKey))
 }
 
 export function drawPointerCancel(e: PointerEvent): void {
-  down.delete(e.pointerId)
-  if (press?.id === e.pointerId) press = null
+  taps.cancel(e)
   if (useEditor.getState().drawing?.tool === 'rect') useEditor.setState({ drawing: null })
 }

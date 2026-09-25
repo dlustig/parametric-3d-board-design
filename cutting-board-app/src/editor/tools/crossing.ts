@@ -3,16 +3,16 @@
 // with the options bar's scope ("All instances" only where the pair has a
 // common motif ancestor, else this occurrence); an unsupported one shows its
 // class and reason in the options bar; an unresolved ring explains itself
-// (an explicit toggle of the pair rebinds it, §5.5). Taps follow the drawing
-// tools' rule: movement under TAP_SLOP_PX and no second pointer.
+// (an explicit toggle of the pair rebinds it, §5.5). Taps are recognised by
+// `tapTracker.ts`, like the drawing tools'.
 
 import { toggleCrossing } from '@/domain/commands/crossings'
 import { commonPrefix } from '@/domain/crossings'
 import type { Scene, SceneIntersection } from '@/geometry/scene'
-import { TAP_SLOP_PX } from '@/geometry/tolerance'
 import { worldToScreen } from '@/editor/camera'
 import { editorScene } from '@/editor/scene'
 import { useEditor } from '@/editor/store'
+import { createTapTracker, isTap } from '../tapTracker.ts'
 
 type XY = { x: number; y: number }
 
@@ -77,37 +77,26 @@ function tap(svg: SVGSVGElement, client: XY, pointerType: string): void {
 }
 
 // Pointer bookkeeping, valid while the Canvas has the crossing listeners bound.
-const down = new Set<number>()
-let press: { id: number; start: XY; spoiled: boolean } | null = null
+const taps = createTapTracker()
 
 export function resetCrossingInput(): void {
-  down.clear()
-  press = null
+  taps.reset()
 }
 
 export function crossingPointerDown(e: PointerEvent, panning: boolean): void {
-  down.add(e.pointerId)
-  if (down.size > 1) {
-    if (press !== null) press.spoiled = true
-    return
-  }
-  if (panning || e.button !== 0) return
-  press = { id: e.pointerId, start: { x: e.clientX, y: e.clientY }, spoiled: false }
+  if (!taps.down(e) || panning || e.button !== 0) return
+  taps.begin(e)
 }
 
 export function crossingPointerMove(e: PointerEvent): void {
-  if (press?.id === e.pointerId && Math.hypot(e.clientX - press.start.x, e.clientY - press.start.y) >= TAP_SLOP_PX) press.spoiled = true
+  taps.move(e)
 }
 
 export function crossingPointerUp(svg: SVGSVGElement, e: PointerEvent): void {
-  down.delete(e.pointerId)
-  const p = press
-  if (p === null || p.id !== e.pointerId) return
-  press = null
-  if (!p.spoiled) tap(svg, { x: e.clientX, y: e.clientY }, e.pointerType)
+  const p = taps.up(e)
+  if (p !== null && isTap(p)) tap(svg, { x: e.clientX, y: e.clientY }, e.pointerType)
 }
 
 export function crossingPointerCancel(e: PointerEvent): void {
-  down.delete(e.pointerId)
-  if (press?.id === e.pointerId) press = null
+  taps.cancel(e)
 }

@@ -45,3 +45,6 @@ export const TAP_SLOP_PX = 6
 
 /** Double-tap detection window, in ms. */
 export const DOUBLE_TAP_MS = 300
+
+/** Double-tap detection radius: the second tap lands within this distance of the first, in px. */
+export const DOUBLE_TAP_PX = 10

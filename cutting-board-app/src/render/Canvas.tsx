@@ -14,7 +14,8 @@
 // §7.4). Their presses are caught on pointerdown (capture, before Selecto's
 // mousedown/touchstart) by the nearest handle centre within the hit radius,
 // run as a gesture over raw Pointer Events, and stop Selecto so Moveable's
-// drag never starts from a handle.
+// drag never starts from a handle. Handle taps and the Select tool's
+// double-tap go through `tapTracker.ts`, like the drawing and Crossing tools.
 
 import type { JSX } from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -26,11 +27,12 @@ import type { OnDragStart as OnSelectoDragStart, OnSelectEnd } from 'react-selec
 import { useShallow } from 'zustand/react/shallow'
 import { unionBoxes } from '@/geometry/bounds'
 import { apply } from '@/geometry/affine'
-import { DOUBLE_TAP_MS, TAP_SLOP_PX } from '@/geometry/tolerance'
+import { TAP_SLOP_PX } from '@/geometry/tolerance'
 import { screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
 import { useScene } from '@/editor/scene'
 import { contextMatrix, useEditor } from '@/editor/store'
+import { createTapTracker, isTap } from '@/editor/tapTracker'
 import {
   crossingPointerCancel,
   crossingPointerDown,
@@ -102,9 +104,10 @@ export function Canvas(): JSX.Element {
   const gestureRef = useRef<Gesture | null>(null)
   /** The current press selected its object itself, so its tap must not toggle it again. */
   const pressSelectedRef = useRef(false)
-  const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null)
-  /** The pointer pressing a vertex/midpoint handle, and its gesture (also in `gestureRef` so aborts reach it). */
-  const handlePressRef = useRef<{ id: number; start: XY; maxMove: number; gesture: Gesture; objectId: string } | null>(null)
+  /** Select-tool pointers: vertex/midpoint handle presses and double-tap detection. */
+  const [taps] = useState(createTapTracker)
+  /** The vertex/midpoint handle gesture of the press in `taps` (also in `gestureRef` so aborts reach it). */
+  const handleRef = useRef<{ gesture: Gesture; objectId: string } | null>(null)
   const [spaceDown, setSpaceDown] = useState(false)
   const [multiTouch, setMultiTouch] = useState(false)
   const [rotating, setRotating] = useState(false)
@@ -216,19 +219,11 @@ export function Canvas(): JSX.Element {
     gestureRef.current = null
     endGesture(e.isDrag, e.inputEvent as Event | undefined)
   }
-  /** Own double-tap detection (SPEC §4.6: DOUBLE_TAP_MS, ≤ 10 px) over completed Select taps, mouse and touch alike. */
-  const isDoubleTap = (client: XY): boolean => {
-    const now = performance.now()
-    const last = lastTapRef.current
-    const double = last !== null && now - last.t <= DOUBLE_TAP_MS && Math.hypot(client.x - last.x, client.y - last.y) <= 10
-    lastTapRef.current = double ? null : { t: now, ...client }
-    return double
-  }
   /** A drag that never moved is a tap on the selection: re-select from domain geometry (SPEC §7.4); a double-tap enters the instance/cell (SPEC §7.6). */
   const onDragEnd = (e: OnDragEnd): void => {
     finish(e)
     if (e.isDrag) return
-    if (isDoubleTap(clientOf(e)) && enterAt(svg(), clientOf(e))) return
+    if (taps.doubleTap(clientOf(e)) && enterAt(svg(), clientOf(e))) return
     if (pressSelectedRef.current) return
     const input = e.inputEvent as MouseEvent | TouchEvent | undefined
     clickSelect(svg(), clientOf(e), input?.shiftKey === true || useEditor.getState().addToSelection)
@@ -250,7 +245,7 @@ export function Canvas(): JSX.Element {
   const onSelectoDragStart = (e: OnSelectoDragStart): void => {
     const moveable = moveableRef.current!
     const input = e.inputEvent as MouseEvent | TouchEvent
-    if (handlePressRef.current !== null || moveable.isMoveableElement(input.target as Element)) {
+    if (handleRef.current !== null || moveable.isMoveableElement(input.target as Element)) {
       e.stop() // a vertex/midpoint or Moveable handle owns this press
       return
     }
@@ -271,7 +266,7 @@ export function Canvas(): JSX.Element {
   }
   /** A Select tap that no object press owned: double-tap entry, re-targeting, else tap-select (SPEC §7.4, §7.6). */
   const tapAt = (client: XY, toggle: boolean): void => {
-    if (isDoubleTap(client) && enterAt(svg(), client)) return
+    if (taps.doubleTap(client) && enterAt(svg(), client)) return
     if (retargetAt(svg(), client)) return
     clickSelect(svg(), client, toggle)
   }
@@ -324,17 +319,17 @@ export function Canvas(): JSX.Element {
 
   // Vertex/midpoint handle presses (SPEC §7.4): a drag past TAP_SLOP_PX
   // commits once on release; a tap cancels and acts as a plain Select tap
-  // there; a second pointer or pointercancel cancels.
+  // there; a second pointer (spoiling the press) or pointercancel cancels.
   useEffect(() => {
     if (!selecting || wrapper === null || svgEl === null) return
-    const cancel = (): void => {
-      if (handlePressRef.current === null) return
-      handlePressRef.current = null
+    const drop = (): void => {
+      if (handleRef.current === null) return
+      handleRef.current = null
       abortRef.current()
     }
     const onDown = (e: PointerEvent): void => {
-      if (handlePressRef.current !== null) {
-        cancel() // a second pointer
+      if (!taps.down(e)) {
+        drop()
         return
       }
       if (e.button !== 0 || spaceRef.current || gestureRef.current !== null || moveableRef.current?.isMoveableElement(e.target as Element) === true) return
@@ -350,36 +345,43 @@ export function Canvas(): JSX.Element {
       const handle = handles[k]!
       const gesture = startHandleDrag(svgEl, handle)
       gestureRef.current = gesture
-      handlePressRef.current = { id: e.pointerId, start: client, maxMove: 0, gesture, objectId: handle.objectId }
+      taps.begin(e)
+      handleRef.current = { gesture, objectId: handle.objectId }
     }
     const onMove = (e: PointerEvent): void => {
-      const press = handlePressRef.current
-      if (press === null || press.id !== e.pointerId || gestureRef.current !== press.gesture) return
-      press.maxMove = Math.max(press.maxMove, Math.hypot(e.clientX - press.start.x, e.clientY - press.start.y))
-      if (press.maxMove >= TAP_SLOP_PX) press.gesture.move(clientOf(e), e)
+      const press = taps.move(e)
+      const h = handleRef.current
+      if (press === null || h === null || gestureRef.current !== h.gesture) return
+      if (press.maxMove >= TAP_SLOP_PX) h.gesture.move(clientOf(e), e)
     }
     const onUp = (e: PointerEvent): void => {
-      const press = handlePressRef.current
-      if (press === null || press.id !== e.pointerId) return
-      handlePressRef.current = null
-      if (gestureRef.current !== press.gesture) return // aborted meanwhile
+      const press = taps.up(e)
+      const h = handleRef.current
+      if (press === null || h === null) return
+      handleRef.current = null
+      if (gestureRef.current !== h.gesture) return // aborted meanwhile
       gestureRef.current = null
-      const dragged = press.maxMove >= TAP_SLOP_PX
-      endGesture(dragged && pointsChanged(useEditor.getState(), press.objectId), e)
-      if (!dragged) tapRef.current(clientOf(e), e.shiftKey || useEditor.getState().addToSelection)
+      const tapped = isTap(press)
+      endGesture(!tapped && pointsChanged(useEditor.getState(), h.objectId), e)
+      if (tapped) tapRef.current(clientOf(e), e.shiftKey || useEditor.getState().addToSelection)
+    }
+    const onCancel = (e: PointerEvent): void => {
+      taps.cancel(e)
+      drop()
     }
     wrapper.addEventListener('pointerdown', onDown, { capture: true })
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', cancel)
+    window.addEventListener('pointercancel', onCancel)
     return () => {
       wrapper.removeEventListener('pointerdown', onDown, { capture: true })
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', cancel)
-      cancel()
+      window.removeEventListener('pointercancel', onCancel)
+      taps.reset()
+      drop()
     }
-  }, [selecting, wrapper, svgEl])
+  }, [selecting, wrapper, svgEl, taps])
 
   // The Crossing tool owns single-pointer taps the same way (SPEC §7.4).
   useEffect(() => {
