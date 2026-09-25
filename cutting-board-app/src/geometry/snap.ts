@@ -3,7 +3,8 @@
 // inside an entered definition the other occurrences of it and its siblings
 // are included); `snapPoint` picks point > line > grid within tolerance, and
 // `snapSegmentEnd` adds the drawing rules (point target, else 15° angle
-// capture then length along the ray to a line target or the grid).
+// capture then the end along the ray at a crossing line target or a grid
+// point on or near the ray); `snapDelta` snaps a moving selection's sources.
 //
 // The grid is the context's own grid (definition space when entered): the
 // SPEC names grid points as targets without saying which space inside a
@@ -19,7 +20,7 @@ import type { Box } from './bounds.ts'
 import { objectBounds, paintedBounds, unionBoxes } from './bounds.ts'
 import type { Occurrence } from './expand.ts'
 import type { Intersection } from './intersections.ts'
-import { ANGLE_SNAP_CAPTURE_DEG, ANGLE_SNAP_DEG } from './tolerance.ts'
+import { ANGLE_SNAP_CAPTURE_DEG, ANGLE_SNAP_DEG, EPS_GEOMETRY } from './tolerance.ts'
 
 type XY = { x: number; y: number }
 
@@ -36,6 +37,12 @@ export type SnapResult = { point: XY; guide: SnapGuide; line: SnapLine | null }
 
 export type SegmentSnap = SnapResult & { angleDeg: number; lengthMm: number }
 
+/** What moves with a selection (SPEC §7.7 sources): vertices/endpoints and bounds centres as points, bounds edges as lines. */
+export type SnapSources = { points: XY[]; lines: SnapLine[] }
+
+/** `snapDelta`'s result: the adjusted Δ, and the guide (`point` is the snapped target location; meaningless when `guide` is `null`). */
+export type DeltaSnap = SnapResult & { delta: XY }
+
 function boxLines(b: Box): SnapLine[] {
   return [
     { a: { x: b.minX, y: b.minY }, b: { x: b.maxX, y: b.minY } },
@@ -46,7 +53,7 @@ function boxLines(b: Box): SnapLine[] {
 }
 
 /** Painted-bounds edges (lines) and centre (point) of `b`, mapped by `m`. */
-function boundsTargets(b: Box, m: Mat): { lines: SnapLine[]; centre: XY } {
+export function boundsTargets(b: Box, m: Mat): { lines: SnapLine[]; centre: XY } {
   return {
     lines: boxLines(b).map((l) => ({ a: apply(m, l.a), b: apply(m, l.b) })),
     centre: apply(m, { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }),
@@ -132,6 +139,29 @@ function nearestPoint(pt: XY, points: XY[], tol: number): XY | null {
   return best
 }
 
+/** Grid points in the square of half-size `r` around `c`. */
+function gridPointsNear(c: XY, r: number, g: number): XY[] {
+  const out: XY[] = []
+  for (let i = Math.ceil((c.x - r) / g); i <= Math.floor((c.x + r) / g); i++) {
+    for (let j = Math.ceil((c.y - r) / g); j <= Math.floor((c.y + r) / g); j++) out.push({ x: i * g, y: j * g })
+  }
+  return out
+}
+
+/** The grid point lying on `line` nearest `q` within `tol`, as a point snap (line ∩ grid, G6 finding 1). */
+function gridOnLine(q: XY, line: SnapLine, g: number, tol: number): SnapResult | null {
+  let best: XY | null = null
+  let bestD = tol
+  for (const gp of gridPointsNear(q, tol, g)) {
+    const d = dist(gp, q)
+    if (d <= bestD && dist(gp, project(gp, line)) <= EPS_GEOMETRY) {
+      best = gp
+      bestD = d
+    }
+  }
+  return best === null ? null : { point: best, guide: 'point', line: null }
+}
+
 /** SPEC §7.7: the nearest point target, else the nearest line target, else the nearest grid point — each only within `toleranceMm`. */
 export function snapPoint(pt: XY, targets: SnapTargets, toleranceMm: number): SnapResult {
   const point = nearestPoint(pt, targets.points, toleranceMm)
@@ -147,7 +177,7 @@ export function snapPoint(pt: XY, targets: SnapTargets, toleranceMm: number): Sn
       bestD = d
     }
   }
-  if (best !== null) return best
+  if (best !== null) return gridOnLine(best.point, best.line!, targets.gridMm, toleranceMm) ?? best
 
   const g = targets.gridMm
   const grid = { x: Math.round(pt.x / g) * g, y: Math.round(pt.y / g) * g }
@@ -183,8 +213,8 @@ function rayMeets(start: XY, dir: XY, line: SnapLine): XY | null {
 /**
  * SPEC §7.7 while drawing: a point target within tolerance wins; else, with
  * `angleSnap`, the segment's angle is captured to a 15° multiple within ±4°
- * and its end snaps along that ray to a crossing line target or a whole grid
- * length; else the free end snaps like `snapPoint`.
+ * and its end snaps along that ray to a crossing line target or a grid point
+ * on or near it; else the free end snaps like `snapPoint`.
  */
 export function snapSegmentEnd(start: XY, pt: XY, targets: SnapTargets, toleranceMm: number, angleSnap: boolean): SegmentSnap {
   const measured = (r: SnapResult, angleDeg?: number): SegmentSnap => {
@@ -204,26 +234,77 @@ export function snapSegmentEnd(start: XY, pt: XY, targets: SnapTargets, toleranc
     const onRay = { x: start.x + along * dir.x, y: start.y + along * dir.y }
     const angleDeg = normalizeDeg(step)
 
+    // Candidates along the ray: where line targets cross it, and grid points
+    // within tolerance of it (at their projection onto the ray, or exactly
+    // when on it); the one nearest the pointer wins. Never whole grid steps
+    // from `start` (G6 finding 2).
     let best: SnapResult | null = null
     let bestD = toleranceMm
-    for (const line of targets.lines) {
-      const q = rayMeets(start, dir, line)
-      if (q === null) continue
+    const consider = (q: XY, r: SnapResult): void => {
       const d = dist(q, onRay)
-      if (d <= bestD) {
-        best = { point: q, guide: 'line', line }
+      if (d < bestD || (d === bestD && best === null)) {
+        best = r
         bestD = d
       }
     }
+    for (const line of targets.lines) {
+      const q = rayMeets(start, dir, line)
+      if (q !== null) consider(q, { point: q, guide: 'line', line })
+    }
+    for (const gp of gridPointsNear(onRay, toleranceMm * Math.SQRT2, targets.gridMm)) {
+      const t = (gp.x - start.x) * dir.x + (gp.y - start.y) * dir.y
+      const q = { x: start.x + t * dir.x, y: start.y + t * dir.y }
+      const off = dist(gp, q)
+      if (t > 0 && off <= toleranceMm) consider(q, { point: off <= EPS_GEOMETRY ? gp : q, guide: 'grid', line: null })
+    }
     if (best !== null) return measured(best, angleDeg)
 
-    const g = targets.gridMm
-    const snappedLength = Math.round(along / g) * g
-    if (snappedLength > 0 && Math.abs(snappedLength - along) <= toleranceMm) {
-      return measured({ point: { x: start.x + snappedLength * dir.x, y: start.y + snappedLength * dir.y }, guide: 'grid', line: null }, angleDeg)
-    }
     return measured({ point: onRay, guide: null, line: null }, angleDeg)
   }
 
   return measured(snapPoint(pt, targets, toleranceMm))
+}
+
+function parallel(l: SnapLine, m: SnapLine): boolean {
+  const ux = l.b.x - l.a.x
+  const uy = l.b.y - l.a.y
+  const vx = m.b.x - m.a.x
+  const vy = m.b.y - m.a.y
+  return Math.abs(ux * vy - uy * vx) <= 1e-9 * Math.hypot(ux, uy) * Math.hypot(vx, vy)
+}
+
+/**
+ * SPEC §7.7 while moving: the source–target pair nearest after applying
+ * `delta`, within `toleranceMm`, adjusts `delta` by its residual — source
+ * points onto point targets first, then source points onto line targets and
+ * source lines onto parallel line targets, then source points onto the grid.
+ */
+export function snapDelta(sources: SnapSources, targets: SnapTargets, delta: XY, toleranceMm: number): DeltaSnap {
+  const moved = sources.points.map((q) => ({ x: q.x + delta.x, y: q.y + delta.y }))
+  let best: DeltaSnap | null = null
+  let bestD = toleranceMm
+  const consider = (from: XY, to: XY, guide: SnapGuide, line: SnapLine | null): void => {
+    const d = dist(from, to)
+    if (d <= bestD) {
+      best = { delta: { x: delta.x + to.x - from.x, y: delta.y + to.y - from.y }, point: to, guide, line }
+      bestD = d
+    }
+  }
+
+  for (const s of moved) for (const t of targets.points) consider(s, t, 'point', null)
+  if (best !== null) return best
+
+  for (const line of targets.lines) {
+    for (const s of moved) consider(s, project(s, line), 'line', line)
+    for (const l of sources.lines) {
+      if (!parallel(l, line)) continue
+      const a = { x: l.a.x + delta.x, y: l.a.y + delta.y }
+      consider(a, project(a, line), 'line', line)
+    }
+  }
+  if (best !== null) return best
+
+  const g = targets.gridMm
+  for (const s of moved) consider(s, { x: Math.round(s.x / g) * g, y: Math.round(s.y / g) * g }, 'grid', null)
+  return best ?? { delta, point: delta, guide: null, line: null }
 }

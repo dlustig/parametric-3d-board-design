@@ -4,7 +4,7 @@ import { fromTransform, IDENTITY } from './affine.ts'
 import { expand } from './expand.ts'
 import { findIntersections } from './intersections.ts'
 import type { SnapTargets } from './snap.ts'
-import { collectSnapTargets, snapPoint, snapSegmentEnd } from './snap.ts'
+import { collectSnapTargets, snapDelta, snapPoint, snapSegmentEnd } from './snap.ts'
 
 type XY = { x: number; y: number }
 
@@ -35,10 +35,31 @@ describe('snapPoint', () => {
   })
 
   it('a line target beats the grid within tolerance, projecting onto the line', () => {
-    const r = snapPoint(pt, targets({ lines: [vertical10] }), 1)
+    const horizontal = { a: { x: 0, y: 0.3 }, b: { x: 100, y: 0.3 } } // no grid point on it
+    const r = snapPoint({ x: 10.2, y: 0.6 }, targets({ lines: [horizontal] }), 1)
     expect(r.guide).toBe('line')
-    expectXY(r.point, { x: 10, y: 10.4 })
-    expect(r.line).toEqual(vertical10)
+    expectXY(r.point, { x: 10.2, y: 0.3 })
+    expect(r.line).toEqual(horizontal)
+  })
+
+  it('after a line snap, a grid point on that line within tolerance wins as a point', () => {
+    const r = snapPoint(pt, targets({ lines: [vertical10] }), 1)
+    expect(r.guide).toBe('point')
+    expectXY(r.point, { x: 10, y: 10 })
+  })
+
+  it('a grid point on a Board centre line snaps exactly to the grid point', () => {
+    const p = project([])
+    const t = collectSnapTargets(p, null, IDENTITY, [], [], [], 5) // Board 300 × 450: centre line x = 150
+    const r = snapPoint({ x: 150.3, y: 20.2 }, t, 1)
+    expect(r.guide).toBe('point')
+    expect(r.point).toEqual({ x: 150, y: 20 })
+  })
+
+  it('keeps the line snap when the grid points on the line are out of tolerance', () => {
+    const r = snapPoint({ x: 10.5, y: 12.4 }, targets({ lines: [vertical10] }), 1)
+    expect(r.guide).toBe('line')
+    expectXY(r.point, { x: 10, y: 12.4 })
   })
 
   it('falls back to the nearest grid point within tolerance', () => {
@@ -108,12 +129,78 @@ describe('snapSegmentEnd', () => {
     expect(r.line).toEqual(line)
   })
 
+  it('a 45° ray from a grid point snaps to the grid point on it (60√2), not a whole grid length (85)', () => {
+    const r = snapSegmentEnd(start, { x: 60.4, y: 59.8 }, targets({}), 1, true)
+    expect(r.angleDeg).toBe(45)
+    expect(r.guide).toBe('grid')
+    expectXY(r.point, { x: 60, y: 60 })
+    expect(r.lengthMm).toBeCloseTo(60 * Math.SQRT2, 9)
+  })
+
+  it('grid candidates near the ray snap to their projection on the ray, not to whole grid steps from the start', () => {
+    // From (1, 1) at 0°: grid point (5, 0) is 1 off the ray → end (5, 1), length 4 (whole steps would give 5).
+    const r = snapSegmentEnd({ x: 1, y: 1 }, { x: 5.3, y: 1.2 }, targets({}), 1.5, true)
+    expect(r.guide).toBe('grid')
+    expectXY(r.point, { x: 5, y: 1 })
+    expect(r.lengthMm).toBeCloseTo(4, 9)
+  })
+
+  it('the candidate nearest the pointer wins between a line crossing and a grid point', () => {
+    const line = { a: { x: 10.5, y: -50 }, b: { x: 10.5, y: 50 } }
+    const nearLine = snapSegmentEnd(start, { x: 10.3, y: 0.2 }, targets({ lines: [line] }), 1, true)
+    expect(nearLine.guide).toBe('line')
+    expectXY(nearLine.point, { x: 10.5, y: 0 })
+    const nearGrid = snapSegmentEnd(start, { x: 10.1, y: 0.2 }, targets({ lines: [line] }), 1, true)
+    expect(nearGrid.guide).toBe('grid')
+    expectXY(nearGrid.point, { x: 10, y: 0 })
+  })
+
   it('a point target within tolerance overrides the angle', () => {
     // (10.1, 0.4) is ≈ 2.3°, inside the 0° capture; the point target at ≈ 3.4° is 0.2 away.
     const r = snapSegmentEnd(start, { x: 10.1, y: 0.4 }, targets({ points: [{ x: 10, y: 0.6 }] }), 0.5, true)
     expect(r.guide).toBe('point')
     expectXY(r.point, { x: 10, y: 0.6 })
     expect(r.angleDeg).toBeCloseTo((Math.atan2(0.6, 10) * 180) / Math.PI, 9)
+  })
+})
+
+describe('snapDelta', () => {
+  const none = { points: [], lines: [] }
+
+  it('moves the nearest source point onto a point target (point beats line and grid)', () => {
+    const r = snapDelta({ ...none, points: [{ x: 0, y: 0 }, { x: 50, y: 0 }] }, targets({ points: [{ x: 10.3, y: 0.2 }, { x: 60.6, y: 0 }], lines: [vertical10] }), { x: 10, y: 0 }, 1)
+    expect(r.guide).toBe('point')
+    expectXY(r.delta, { x: 10.3, y: 0.2 })
+    expectXY(r.point, { x: 10.3, y: 0.2 })
+  })
+
+  it('else moves a source point onto the nearest line target, keeping the other axis', () => {
+    const line = { a: { x: 10.5, y: -100 }, b: { x: 10.5, y: 100 } }
+    const r = snapDelta({ ...none, points: [{ x: 0, y: 0 }] }, targets({ lines: [line], gridMm: 100 }), { x: 10, y: 3.2 }, 1)
+    expect(r.guide).toBe('line')
+    expectXY(r.delta, { x: 10.5, y: 3.2 })
+    expect(r.line).toEqual(line)
+  })
+
+  it('a source line (bounds edge) snaps onto a parallel target line', () => {
+    const edge = { a: { x: 0, y: 0 }, b: { x: 20, y: 0 } }
+    const target = { a: { x: -100, y: 10.4 }, b: { x: 100, y: 10.4 } }
+    const r = snapDelta({ ...none, lines: [edge] }, targets({ lines: [target], gridMm: 100 }), { x: 3.3, y: 10 }, 1)
+    expect(r.guide).toBe('line')
+    expectXY(r.delta, { x: 3.3, y: 10.4 })
+  })
+
+  it('else moves the nearest source point to the grid', () => {
+    const r = snapDelta({ ...none, points: [{ x: 1.2, y: 0 }] }, targets({}), { x: 3.5, y: 0.3 }, 1)
+    expect(r.guide).toBe('grid')
+    expectXY(r.delta, { x: 3.8, y: 0 })
+    expectXY(r.point, { x: 5, y: 0 })
+  })
+
+  it('leaves the delta alone when nothing is within tolerance', () => {
+    const r = snapDelta({ ...none, points: [{ x: 1.2, y: 0 }] }, targets({ points: [{ x: 20, y: 20 }] }), { x: 1.3, y: 2.5 }, 0.5)
+    expect(r.guide).toBeNull()
+    expectXY(r.delta, { x: 1.3, y: 2.5 })
   })
 })
 
