@@ -21,15 +21,11 @@ import { gestureSnapTargets, toleranceMm } from '@/editor/snap'
 import { MIN_SEGMENT_MM } from '@/geometry/tolerance'
 import { screenToWorld } from '../camera.ts'
 import type { EditContextLevel } from '../selection.ts'
+import { contextPrefix } from '../selection.ts'
 import type { EditorState } from '../store.ts'
 import { contextMatrix, useEditor } from '../store.ts'
 
 type XY = { x: number; y: number }
-
-/** The world path of the entered occurrence: each level's path is relative to the previous level. */
-export function contextPrefix(editContext: EditContextLevel[]): Step[] {
-  return editContext.flatMap((level) => level.path)
-}
 
 /** The top-level object of the current context that `o` belongs to, or `null` if `o` is outside the context. */
 function ownerIn(o: Occurrence, prefix: Step[], prefixKeys: string[]): Id | null {

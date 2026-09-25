@@ -31,6 +31,7 @@ import { TAP_SLOP_PX } from '@/geometry/tolerance'
 import { screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
 import { useScene } from '@/editor/scene'
+import { contextPrefix } from '@/editor/selection'
 import { contextMatrix, useEditor } from '@/editor/store'
 import { createTapTracker, isTap } from '@/editor/tapTracker'
 import {
@@ -47,7 +48,6 @@ import { drawPointerCancel, drawPointerDown, drawPointerMove, drawPointerUp, isD
 import type { Gesture } from '@/editor/tools/select'
 import {
   clickSelect,
-  contextPrefix,
   endGesture,
   enterAt,
   handlesFor,

@@ -1,6 +1,7 @@
-// SPEC §7.1: after undo, redo, or import, drop selection ids that no longer
-// exist and pop edit-context levels whose occurrence no longer resolves.
-// Pure helpers over a Project; no store dependency.
+// SPEC §7.1, §7.6: the edit context's world path, and, after undo, redo, or
+// import, dropping selection ids that no longer exist and popping edit-context
+// levels whose occurrence no longer resolves. Pure helpers over a Project; no
+// store dependency.
 
 import type { ContextId, Id, Project, Step } from '@/domain/model'
 import { stepObjectId } from '@/domain/keys'
@@ -9,6 +10,11 @@ import { childrenOf } from '@/domain/project'
 export interface EditContextLevel {
   motifId: Id
   path: Step[]
+}
+
+/** The world path of the entered occurrence: each level's path is relative to the previous level. */
+export function contextPrefix(editContext: EditContextLevel[]): Step[] {
+  return editContext.flatMap((level) => level.path)
 }
 
 /**

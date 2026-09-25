@@ -13,7 +13,7 @@ import type { UnresolvedMarker } from '@/geometry/scene'
 import { useScene } from '@/editor/scene'
 import { useEditor } from '@/editor/store'
 import { toggleAt } from '@/editor/tools/crossing'
-import { contextPrefix } from '@/editor/tools/select'
+import { contextPrefix } from '@/editor/selection'
 
 export function CrossingList({ bandId }: { bandId: Id }): JSX.Element {
   const scene = useScene()

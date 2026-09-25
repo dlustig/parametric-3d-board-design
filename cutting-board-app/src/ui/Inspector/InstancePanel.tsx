@@ -16,7 +16,7 @@ import { intersectionKey } from '@/geometry/resolve'
 import type { UnresolvedMarker } from '@/geometry/scene'
 import { useScene } from '@/editor/scene'
 import { contextMatrix, useEditor } from '@/editor/store'
-import { contextPrefix } from '@/editor/tools/select'
+import { contextPrefix } from '@/editor/selection'
 import { UnresolvedList } from './CrossingList.tsx'
 import { NumberField } from './NumberField.tsx'
 
