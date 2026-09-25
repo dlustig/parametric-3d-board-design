@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { fixtures } from '../../fixtures/index.ts'
 import { expand } from '../../geometry/expand.ts'
 import { findIntersections } from '../../geometry/intersections.ts'
-import type { Band, Id, Project, Step } from '../model.ts'
+import type { Band, Id, Project, RepeatField, Step } from '../model.ts'
 import { newProject } from '../project.ts'
 import { band, instance, MAT, MAT2, project, record, ref, repeat } from '../test-builders.ts'
 import { countOccurrences, validateProject } from '../validate.ts'
@@ -51,6 +51,29 @@ const nested = project(
 const twoBand = { id: 'M2', children: [band('H2', [[-20, 0], [20, 0]]), band('V2', [[0, -20], [0, 20]])] }
 const atCap = project([repeat('F2', 'M2', { rows: 50, columns: 50 })], [twoBand])
 
+/**
+ * Fixture F at 2×2 (Ruling 19): the full 5×5 field is covered by
+ * fixtures.test.ts; here every command re-runs rematchCrossings, which at
+ * 25 cells takes ~0.1 s per command. The root overrides move from cells
+ * (1,2) and (3,3) to (1,0) and (1,1) — same row/column parity, so the same
+ * alternate mirror — with their hints shifted by whole steps.
+ */
+function interlace2x2(): Project {
+  const p = structuredClone(fixtures.interlace)
+  const f = p.objects['interlace-field'] as RepeatField
+  p.objects['interlace-field'] = { ...f, rows: 2, columns: 2 }
+  const moves: Record<string, { row: number; column: number; dx: number; dy: number }> = {
+    'override-0': { row: 1, column: 0, dx: -2 * f.stepXMm, dy: 0 },
+    'override-1': { row: 1, column: 1, dx: -2 * f.stepXMm, dy: -2 * f.stepYMm },
+  }
+  p.crossings = p.crossings.map((c) => {
+    const m = moves[c.id]!
+    const cell = (r: typeof c.a): typeof c.a => ({ ...r, path: [{ repeatId: 'interlace-field', row: m.row, column: m.column }] })
+    return { ...c, a: cell(c.a), b: cell(c.b), hint: { x: c.hint.x + m.dx, y: c.hint.y + m.dy } }
+  })
+  return p
+}
+
 const corpus: Array<[string, Project]> = [
   ['blank', newProject('mm')],
   ['stripes-like', stripes],
@@ -63,7 +86,7 @@ const corpus: Array<[string, Project]> = [
   ['fixture: basket weave', fixtures.basketWeave],
   ['fixture: chevron diamond', fixtures.chevronDiamond],
   ['fixture: isometric', fixtures.isometric],
-  ['fixture: interlace', fixtures.interlace],
+  ['fixture: interlace (2×2)', interlace2x2()],
 ]
 
 type Command = [string, (p: Project) => Project | CommandResult]
@@ -175,9 +198,9 @@ function commandsFor(p: Project): Command[] {
 
 describe('every command preserves the §2.1 invariants', () => {
   for (const [name, p] of corpus) {
-    // Interlace's time is dominated by rematchCrossings in its ~170
-    // non-toggle commands (≈ 0.1 s each), not by the capped toggles; the
-    // 20 s timeout is headroom for that, not a sign of a stuck test.
+    // Interlace 2×2 takes ~3 s alone (rematchCrossings in its ~170
+    // commands) and ~4 s under a loaded parallel run: 10 s is headroom over
+    // the 5 s default, not a sign of a stuck test.
     it(
       name,
       () => {
@@ -188,7 +211,7 @@ describe('every command preserves the §2.1 invariants', () => {
           expect({ label, error: validateProject(next) }).toEqual({ label, error: null })
         }
       },
-      20_000,
+      10_000,
     )
   }
 })
