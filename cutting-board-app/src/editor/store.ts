@@ -23,7 +23,6 @@ import { newProject } from '@/domain/project'
 import type { Mat } from '@/geometry/affine'
 import { IDENTITY, multiply } from '@/geometry/affine'
 import { pathMatrix } from '@/geometry/expand'
-import { rematchCrossings } from '@/geometry/resolve'
 import type { SegmentSnap, SnapResult } from '@/geometry/snap'
 import type { EditContextLevel } from './selection.ts'
 import { pruneCurrentMaterial, pruneEditContext, pruneSelection } from './selection.ts'
@@ -146,10 +145,12 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
         set({ preview: { next: freezeInDev(next), onInterrupt } })
       },
 
+      // A preview is always a command's result, and commands already rematch
+      // (SPEC §7.1): the store never rematches, so no preview frame pays twice.
       commit() {
-        const { preview, project } = get()
+        const { preview } = get()
         if (preview === null) return
-        set({ project: freezeInDev(rematchCrossings(project, preview.next)), preview: null, snapGuide: null })
+        set({ project: freezeInDev(preview.next), preview: null, snapGuide: null })
       },
 
       cancelPreview() {
