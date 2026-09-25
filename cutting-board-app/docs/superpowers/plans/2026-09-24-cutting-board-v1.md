@@ -591,3 +591,25 @@ Inputs the spec implies but no task's tests exercise by default; each has been a
 - Spec coverage: §2–§6 → Tasks 2–6; §7.1 → 7; §7.2–7.3 → 8; §7.4 tools → 11, commands → 12, motif ops → 13, crossing → 14; §7.5 → 10, 13; §7.6 → 13; §7.7 → 11; §7.8 → 8; §8 → 10; §9 → 16; §10 → 6, 17; §11 → 19; §12 → 15; §13 gates: G1/G2 → 5, G3 → 3 + 8, G4 → 4, G5 → 9 + 17, G6 → 18, G7 → 19, G8 → 2 + 16, G9 → 20; §15 → 8.
 - Type consistency: `Mat`, `Occurrence`, `Intersection`, `Scene`, `ContextId`, `CommandResult`, `Clipboard` are defined once and referenced by name thereafter.
 - Review Focus items are pinned to Tasks 5, 4, 12, 2, 10 respectively.
+
+---
+
+### Task 22: Spec-gap closure found by the authorability gate (executes between Tasks 18 and 19)
+
+**Files:**
+- Modify: `src/render/Canvas.tsx`, `src/editor/tools/select.ts`, `src/geometry/snap.ts`, `src/editor/tools/draw.ts`, `src/ui/Toolbar.tsx`, `src/domain/commands/property.test.ts`
+- Create: `src/render/overlays/VertexHandles.tsx`
+- Test: `src/geometry/snap.test.ts` (extend), `e2e/vertex-handles.spec.ts`, `e2e/move-snap.spec.ts`
+
+**Interfaces:**
+- Consumes: `setPoint`, `insertPoint`, `deletePoint` (Task 5), `collectSnapTargets`/`snapPoint` (Task 11), Moveable drag path (Task 8).
+- Produces: vertex/midpoint handle overlay for a single selected Band or Region; snapping during Moveable drags; `snapPoint` along-line grid rule; `snapSegmentEnd` grid-points-near-ray rule.
+
+- [ ] **Vertex and midpoint handles** (spec §7.4 Select bullet): when exactly one Band or Region is selected, render a handle at each vertex and at each segment midpoint (screen-px sized, above the selection overlay). Dragging a vertex handle previews `setPoint` with snapping (targets from `collectSnapTargets` excluding the object; point > line > grid) and commits on release; dragging a midpoint handle previews `insertPoint` then moves the new point; dropping a vertex within snap tolerance of a neighbour deletes it (`deletePoint`). Raw Pointer Events on the handle elements; Moveable's drag must not start from a handle press. Touch hit radius 22 px.
+- [ ] **Snapping while moving a selection** (spec §7.7): at Moveable drag start, freeze targets from `project` excluding the selection and compute sources (selection vertices, endpoints, bounds edges/centres); each frame, find the nearest source–target pair within tolerance and apply that offset to Δworld (point > line > grid); show the snap guide; Alt disables.
+- [ ] **Crossing tool button** in the rail (label "Crossing", key X in the tooltip).
+- [ ] **Snap rules:** (a) `snapPoint`: after a line snap, if a grid point on that line is within tolerance of the snapped point, snap to it (guide 'point'); (b) `snapSegmentEnd`: with an angle captured, candidate lengths are the distances to grid points whose perpendicular distance to the ray is within tolerance (grid intersections on or near the ray), plus line-target intersections; choose the nearest to the pointer; never whole grid steps along the ray. Unit tests: a 45° ray from a grid point snaps to 60√2 (grid point (60,60)), not 85; a grid point on a Board centre line snaps exactly to the grid point.
+- [ ] **Property-test runtime:** cap toggle-command generation to the first 40 listed intersections per fixture so the interlace case runs well under 5 s; keep the 20 s timeout as headroom.
+- [ ] e2e: vertex drag with snap to another band's endpoint commits one history entry; midpoint insert; neighbour-merge delete; Moveable drag snaps a band endpoint onto a region vertex (world coordinates exact to 1e-6); Alt held during the drag disables the snap.
+- [ ] Update the G6 workaround notes in `docs/decisions/2026-09-24-gates.md` to say which are now resolved (do not re-run G6 here; Task 21 re-runs everything).
+- [ ] Commit: `Add vertex handles, move snapping, snap rules`.
