@@ -9,6 +9,7 @@ import { expand, expandContext } from './expand.ts'
 import type { Intersection } from './intersections.ts'
 import { findIntersections } from './intersections.ts'
 import { footprint } from './footprint.ts'
+import { conservativeBounds } from './bounds.ts'
 
 const MATERIAL = newId()
 
@@ -317,6 +318,23 @@ describe('findIntersections — occluded', () => {
     const joint = band([arm(30), [v, v], arm(60)])
 
     expect(classes(classify([a(), joint, b()]))).toEqual(['occluded'])
+  })
+
+  it('band painted between O and U whose 20° miter tip, 2.5w–5w from its vertex, enters the footprint → occluded; conservative bounds cover the tip', () => {
+    // Footprint: [46.825, 53.175]². V's vertex is at (50, 70), 16.8 mm = 2.65w beyond the
+    // footprint, with arms at ±10° from +y; the miter tip reaches 6.35 / (2 sin 10°) ≈ 18.28 mm
+    // = 2.88w toward the crossing, to (50, 51.72). U stops at y = 58, clear of V's centreline.
+    const w = 6.35
+    const arm = (deg: number): [number, number] => [50 + 40 * Math.cos((deg * Math.PI) / 180), 70 + 40 * Math.sin((deg * Math.PI) / 180)]
+    const joint = band([arm(80), [50, 70], arm(100)], w)
+    const u = band([[50, 20], [50, 58]], w)
+    const list = classify([a(), joint, u])
+
+    expect(classes(list)).toEqual(['occluded']) // the crossing is listed, and occluded by the tip
+    const tipY = 70 - w / (2 * Math.sin((10 * Math.PI) / 180))
+    expect(tipY).toBeLessThan(53.175 - 1)
+    const bounds = conservativeBounds(expand(rootProject([joint]))[0]!)
+    expect(bounds.minY).toBeLessThanOrEqual(tipY) // 5w pad; 2.5w (54.1) would stop short of the tip
   })
 
   it('the same 30° band without its joint (two separate arms) → eligible', () => {

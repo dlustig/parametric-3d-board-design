@@ -80,15 +80,15 @@ describe('paintedBounds — rotated band segment', () => {
 })
 
 describe('conservativeBounds — band', () => {
-  it('expands the polyline bounds by 2.5 × width', () => {
+  it('expands the polyline bounds by 5 × width (the largest miter tip, SPEC §4.5)', () => {
     const base = newProject('mm')
     const materialId = base.materials[0]!.id
     const b = band(materialId, [pt(0, 0), pt(100, 0)], { widthMm: 10 })
     const p: Project = { ...base, objects: { [b.id]: b }, rootChildren: [b.id] }
 
     const [occ] = expand(p)
-    // Polyline bounds {0,0,100,0} expanded by 2.5 * 10 = 25 on every side.
-    expectBoxClose(conservativeBounds(occ!), { minX: -25, minY: -25, maxX: 125, maxY: 25 })
+    // Polyline bounds {0,0,100,0} expanded by 5 * 10 = 50 on every side.
+    expectBoxClose(conservativeBounds(occ!), { minX: -50, minY: -50, maxX: 150, maxY: 50 })
   })
 })
 

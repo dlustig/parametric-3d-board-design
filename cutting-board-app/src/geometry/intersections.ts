@@ -305,7 +305,7 @@ export function findIntersections(occurrences: Occurrence[], previous?: Occurren
     const occA = occurrences[i]!
     const occB = occurrences[j]!
     if (occA.kind !== 'band' || occB.kind !== 'band' || !boxesOverlap(bounds[i]!, bounds[j]!)) return
-    // Elements painted strictly between i and j; one whose painted box misses the footprint's cannot penetrate it.
+    // Elements painted strictly between i and j; one whose painted box (stroke rectangles and joint triangles, so miter tips included) misses the footprint's cannot penetrate it.
     const occludedBetween = (plain: XY[]): boolean => {
       const box = boxOf(plain)
       for (let k = i + 1; k < j; k++) {

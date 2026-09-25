@@ -55,7 +55,7 @@ export function paintedBounds(o: Occurrence): Box {
   return unionBoxes(segmentsOf(o).map((segment) => segmentStrokeBox(segment.a, segment.b, o.worldWidth)))!
 }
 
-/** SPEC §4.5: a Band's polyline bounds expanded by MITER_EXTENT_FACTOR × width; a Region's painted bounds. (A miter tip can reach 5 × width at a joint sharper than about 23°, past this pad: an open SPEC §4.5 question.) */
+/** SPEC §4.5: a Band's polyline bounds expanded by MITER_EXTENT_FACTOR (5) × width, which contains every miter tip; a Region's painted bounds. */
 export function conservativeBounds(o: Occurrence): Box {
   const box = boxOfPoints(o.worldPoints)
   if (o.kind === 'region') return box

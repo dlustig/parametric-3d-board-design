@@ -22,8 +22,8 @@ export const REMATCH_TOLERANCE_MM = 3
 /** Region same-colour seam stroke width (SPEC §4.3), in mm. */
 export const REGION_SEAM_MM = 0.1
 
-/** Conservative-bounds padding factor: the miter-limit-10 tip extent (SPEC §4.5). */
-export const MITER_EXTENT_FACTOR = 2.5
+/** Conservative-bounds padding factor (SPEC §4.5): at `stroke-miterlimit` 10 a miter tip reaches `w / (2 sin(φ/2)) ≤ 5w` from the centreline vertex. */
+export const MITER_EXTENT_FACTOR = 5
 
 /** Upper bound of any renderer's patch clip enlargement, in mm; also used by `near-joint` (SPEC §5.2). */
 export const MAX_CLIP_EXTEND_MM = 0.5
