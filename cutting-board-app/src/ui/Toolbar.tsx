@@ -1,5 +1,6 @@
-// The tool rail (SPEC §7.4): Select, Hand, Band, Rectangle, Polygon, Crossing; the Snap
-// and Show grid toggles (SPEC §7.7); and −, +, Fit (SPEC §7.2).
+// The tool rail (SPEC §7.4): Select, Hand, Band, Rectangle, Polygon, Crossing; the Snap,
+// Show grid, and Add to selection toggles (SPEC §7.4/§7.7 — Add to selection makes a tap
+// act like Shift+tap, the tablet path to multi-select); and −, +, Fit (SPEC §7.2).
 
 import type { ChangeEvent, JSX } from 'react'
 import { createMotifFromSelection, pasteClipboard, repeatSelection } from '@/editor/keyboard'
@@ -52,6 +53,7 @@ export function Toolbar(): JSX.Element {
   const setTool = useEditor((s) => s.setTool)
   const snapEnabled = useEditor((s) => s.snapEnabled)
   const showGrid = useEditor((s) => s.showGrid)
+  const addToSelection = useEditor((s) => s.addToSelection)
   const hasSelection = useEditor((s) => s.selection.length > 0)
   const toolButton = (t: Tool, label: string, key: string): JSX.Element => (
     <button type="button" aria-pressed={tool === t} title={`${label} (${key})`} onClick={() => setTool(t)}>
@@ -71,6 +73,9 @@ export function Toolbar(): JSX.Element {
       </button>
       <button type="button" aria-pressed={showGrid} onClick={() => useEditor.setState({ showGrid: !showGrid })}>
         Show grid
+      </button>
+      <button type="button" aria-pressed={addToSelection} onClick={() => useEditor.setState({ addToSelection: !addToSelection })}>
+        Add to selection
       </button>
       <button type="button" onClick={pasteClipboard}>
         Paste

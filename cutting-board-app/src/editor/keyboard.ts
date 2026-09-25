@@ -7,6 +7,13 @@
 // field's own handler already reverted it and stopped the event from
 // bubbling here, so this dispatcher takes no further action either way.
 //
+// SPEC §11: `]`/Tab and `[`/Shift+Tab cycle the selection through the
+// current context's objects (`cycleSelection`), the no-pointer path to an
+// object's Inspector panel and crossing list. `[`/`]` always apply (nothing
+// else wants those keys); Tab/Shift+Tab apply only while focus hasn't
+// already landed on a more specific control (`tabOwnedByCanvas`), so normal
+// Tab-through-the-toolbar keyboard navigation is untouched.
+//
 // `Space` stays owned by Canvas.tsx (pan-vs-drag input ownership, SPEC
 // §7.2) — a second, narrowly-scoped listener, not folded in here, so there
 // is still exactly one owner per key.
@@ -20,6 +27,7 @@
 import type { Clipboard } from '@/domain/commands'
 import { copyObjects, createMotif, deleteObjects, duplicateObjects, makeRepeat, pasteObjects, translateObjects } from '@/domain/commands'
 import type { Id } from '@/domain/model'
+import { childrenOf } from '@/domain/project'
 import { apply, invert } from '@/geometry/affine'
 import { cancelDrawing, finishDrawing, undoPoint } from './tools/draw.ts'
 import type { EditorState, Tool } from './store.ts'
@@ -111,6 +119,34 @@ export function repeatSelection(): void {
     return makeRepeat(created.project, created.instanceId)
   })
   if (fieldId !== null && Object.hasOwn(useEditor.getState().project.objects, fieldId)) useEditor.setState({ selection: [fieldId] })
+}
+
+/**
+ * SPEC §11: Tab / `[` / `]` cycle the selection through the current context's
+ * objects (its `childrenOf` order), wrapping at either end. A selection of
+ * anything other than exactly one of those objects (empty, multi, or an
+ * object from a different context) starts the cycle from the first (`]`/Tab)
+ * or last (`[`/Shift+Tab) object instead of stepping from it.
+ */
+function cycleSelection(direction: 1 | -1): void {
+  const s = useEditor.getState()
+  const children = childrenOf(s.project, currentContext(s))
+  if (children.length === 0) return
+  const at = s.selection.length === 1 ? children.indexOf(s.selection[0]!) : -1
+  const next = at === -1 ? (direction === 1 ? 0 : children.length - 1) : (at + direction + children.length) % children.length
+  s.select([children[next]!])
+}
+
+/**
+ * Tab only cycles selection when nothing more specific already owns focus —
+ * the body (nothing focused yet) or the canvas wrapper itself — so it keeps
+ * its ordinary browser behaviour of moving focus through the toolbar,
+ * inspector, and every other control (SPEC §11: Tab must not steal focus
+ * from a toolbar button). Field targets (inputs, textareas, selects) are
+ * already excluded before this dispatcher gets this far.
+ */
+function tabOwnedByCanvas(target: EventTarget | null): boolean {
+  return target === document.body || (target instanceof HTMLElement && target.classList.contains('canvas'))
 }
 
 /** Maps a world-space delta vector into the current context's space (a vector, not a point: no translation term). */
@@ -222,6 +258,18 @@ export function installKeyboardDispatcher(): () => void {
         return
       }
       return // an unrecognized modified chord: never falls through to a plain-key binding
+    }
+
+    if (!ctrlOrMeta && !e.altKey && (key === ']' || key === '[')) {
+      cycleSelection(key === ']' ? 1 : -1)
+      e.preventDefault()
+      return
+    }
+
+    if (!ctrlOrMeta && !e.altKey && key === 'Tab' && tabOwnedByCanvas(e.target)) {
+      cycleSelection(e.shiftKey ? -1 : 1)
+      e.preventDefault()
+      return
     }
 
     if (noModifiers) {

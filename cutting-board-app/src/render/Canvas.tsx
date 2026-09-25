@@ -399,7 +399,7 @@ export function Canvas(): JSX.Element {
   }, [tool, wrapper, svgEl])
 
   return (
-    <div className="canvas" ref={setWrapper}>
+    <div className="canvas" ref={setWrapper} tabIndex={0}>
       <svg ref={setSvgEl} className="canvas-svg" viewBox={viewBoxFor(camera, view)} width={view.w} height={view.h}>
         <rect className="board" width={bw} height={bh} fill={boardFill} />
         <SceneSvg scene={scene} materials={shown.materials} clipPrefix="cbpd-clip" />

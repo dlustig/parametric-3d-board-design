@@ -271,7 +271,7 @@ test.describe('mouse', () => {
     expectClose(cam5.x, cam4.x + 20 / cam4.zoom, 1e-6)
     expectClose(cam5.y, cam4.y - 15 / cam4.zoom, 1e-6)
     expect(await history(page)).toEqual({ past: 0, future: 0 })
-    await page.getByRole('button', { name: 'Select' }).click()
+    await page.getByRole('button', { name: 'Select', exact: true }).click()
 
     // And a plain mouse drag of the selection still commits (raw Δ, so Snap off).
     await snapOff(page)
