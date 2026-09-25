@@ -290,6 +290,8 @@ The scene is flat occurrences, so Moveable and Selecto need one DOM target per s
 
 ### 7.4 Tools and commands
 
+> Amended by `2026-09-25-editor-shell-redesign-design.md` §5, 7, 9.4, 12.2; that spec governs presentation where the two differ.
+
 Tool keys: `V` select, `H` hand, `B` band, `R` rectangle region, `P` polygon region, `X` crossing. The rail shows the same tools with ≥ 44 px targets plus toggles **Snap**, **Add to selection** (tap acts as Shift+tap), and **Show grid**.
 
 - **Select**: tap selects the topmost object at the point; Shift or Add-to-selection toggles; marquee selects objects whose painted bounds intersect it. Moveable handles: drag (translate), rotate handle about the selection's painted-bounds centre (snaps to 15° with Shift or when snap is on within ±4°). No resize/scale handles. A single selected Band or Region also shows **vertex handles** (drag with snapping) and **midpoint handles** (drag to insert a vertex); dragging a vertex onto its neighbour within snap tolerance deletes it. Double-tap an instance or repeat cell enters its definition (§7.6).
@@ -305,6 +307,8 @@ Keyboard dispatch is one listener that ignores events whose target is an input, 
 
 ### 7.5 Inspector (right panel)
 
+> Amended by `2026-09-25-editor-shell-redesign-design.md` §6.3, 10.1, 13; that spec governs presentation where the two differ.
+
 - Board: name, width, height, background material, display units, grid spacing.
 - Any selection: bounds X/Y (edits translate), Rotate by, Mirror X/Y, material (Bands/Regions), order buttons.
 - Band: material, width, closed, per-point X/Y with per-segment length and angle (editing a segment moves its end point and translates the points after it), insert/delete vertex; **crossings list** (each listed intersection of this Band with an over/under toggle button — the keyboard path for crossings) and unresolved records with Remove.
@@ -316,6 +320,8 @@ Numeric fields are `<input type="text" inputMode="text" autocapitalize="off" aut
 
 ### 7.6 Edit context
 
+> Amended by `2026-09-25-editor-shell-redesign-design.md` §8, 9.7; that spec governs presentation where the two differ.
+
 Entering a definition (double-tap an instance/cell, or **Edit Motif**) pushes `{ motifId, path }` for the tapped occurrence. Breadcrumb `Board / Motif: Name` with **Done**. While entered:
 
 - Only the definition's children are selectable and drawable. Tapping another occurrence of the same definition re-targets `path` to it.
@@ -325,6 +331,8 @@ Entering a definition (double-tap an instance/cell, or **Edit Motif**) pushes `{
 
 ### 7.7 Snapping
 
+> Amended by `2026-09-25-editor-shell-redesign-design.md` §9.2 (grid drawn clipped to the Board); that spec governs presentation where the two differ.
+
 Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`ed); the rail toggle persists. Grid spacing is an editor setting (not in the document), set to 3.175 mm for inch projects and 5 mm for mm projects whenever a project is opened or its display units change (a user edit to the spacing lasts until then); the grid is drawn when **Show grid** is on. The grid is drawn and snapped in the current context's space (definition axes while editing a motif), like the length and angle labels.
 
 - **Targets** (computed once at gesture start from `project`, excluding the moving selection; inside an edit context they include the other occurrences of the entered definition and its siblings, mapped into definition space): grid points; Board edges and centre lines; Band endpoints and vertices; Region vertices; listed intersection points; painted-bounds edges and centres of other objects.
@@ -333,6 +341,8 @@ Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`
 - Moveable's own `snappable` is disabled.
 
 ### 7.8 Board view
+
+> Amended by `2026-09-25-editor-shell-redesign-design.md` §9.8 (mat colour is the `--paste` token); that spec governs presentation where the two differ.
 
 The editor draws the whole scene unclipped, then a mat (a rect with an even-odd hole at the Board) at 70% opacity in the background colour, so outside-Board geometry is visible dimmed and remains hit-testable. Selection overlays draw above the mat. Selection outline is a double stroke (light over dark) so it reads on any material.
 
@@ -351,6 +361,8 @@ i.e. either a decimal, or a fraction with an optional whole number that must be 
 Field policies: widths, board dimensions, grid spacing, scale > 0; steps and offsets any finite; coordinates any finite; rows/columns integers 1–50.
 
 ## 9. Persistence
+
+> Amended by `2026-09-25-editor-shell-redesign-design.md` §10.2 (the New Project dialog is New's confirmation); that spec governs presentation where the two differ.
 
 - Autosave: 500 ms after a commit, undo, or redo, write the project JSON to `localStorage` key `cbpd:project:v1`; flush on `pagehide` and `visibilitychange: hidden`. On failure show **Not saved in this browser — download your project** with a Download button; retry on the next change; clear the status on success.
 - Startup: if the key validates, open it. If it exists but fails, move its text to `cbpd:recovered` (so autosave cannot destroy it), start blank, and show a banner with **Download recovered file** and **Discard**.
@@ -376,9 +388,13 @@ Field policies: widths, board dimensions, grid spacing, scale > 0; steps and off
 
 ## 11. Accessibility
 
+> Amended by `2026-09-25-editor-shell-redesign-design.md` §4.1, 6.1, 12; that spec governs presentation where the two differ.
+
 Native `button`/`input`/`select` or Radix primitives (Dialog, Tooltip, Popover). Every control has a visible label or `aria-label`. Inspector fields have `<label>`s. `[` / `]` cycle selection through the current context's objects (with the canvas focused), so the inspector and the crossing list are reachable without a pointer; Tab keeps its native focus movement so the canvas is never a focus trap. Selection is indicated by outline and inspector heading, not colour alone. Material names are visible. Every drag has a numeric equivalent (bounds X/Y, Rotate by, per-point fields, crossing list). Layout is rem/flex; the canvas fills the remainder and stays correct at 200% browser zoom.
 
 ## 12. Fixtures (`src/fixtures/`, original designs; JSON plus UI authoring tests)
+
+> Amended by `2026-09-25-editor-shell-redesign-design.md` §10.2 (fixtures ship as New Project samples); that spec governs presentation where the two differ.
 
 - A `stripes` — 4 materials, 7 flush parallel Bands of different widths.
 - B `checker` — one 2-Region motif, 6×6 with row offset.
@@ -490,3 +506,8 @@ src/
 | Walkthrough | Duplicate in place gave no visible result | Copy offset by one grid step (§7.4) |
 | Product 4 (part) | Draggable pivot point | Declined: vertex-snapped move and typed lengths cover alignment |
 | Product 8 (part) | Separate "Move by" field | Declined: bounds X/Y covers it |
+| Shell redesign (2026-09-25) | Rail is one undifferentiated column of 15 text buttons; toggles look like tools | §7.4 rail replaced by the icon column / undockable tool bar, canvas controls and actions bar (shell spec §5, §7, §9.4) |
+| Shell redesign (2026-09-25) | Materials and Board name crowd the inspector | Materials move to the Wood pane, name to top-bar Rename (shell spec §6.3, §10.1) |
+| Shell redesign (2026-09-25) | Edit context is easy to miss | Edit pill, canvas frame and top-bar breadcrumb (shell spec §8, §9.7) |
+| Shell redesign (2026-09-25) | Grid clutters the pasteboard | Grid drawn clipped to the Board; snapping unchanged (shell spec §9.2) |
+| Shell redesign (2026-09-25) | New Project is confirm-then-blank | New Project dialog with samples is the confirmation; fixtures ship in production (shell spec §10.2) |
