@@ -41,6 +41,10 @@ test.describe('materials palette', () => {
     expect(bandOf(p, 'b1').materialId).toBe(walnut)
     expect(bandOf(p, 'b2').materialId).toBe(walnut)
     expect(await history(page)).toEqual({ past: 1, future: 0 })
+    // The canvas repaints both (SceneSvg memoises each path on its geometry and colour).
+    const walnutColor = p.materials.find((m) => m.id === walnut)!.color
+    await expect(page.locator('svg.canvas-svg .scene path')).toHaveCount(2)
+    for (const path of await page.locator('svg.canvas-svg .scene path').all()) await expect(path).toHaveAttribute('stroke', walnutColor)
   })
 
   test('clicking a swatch with an empty selection sets the current material instead', async ({ page }) => {
