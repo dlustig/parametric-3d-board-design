@@ -2,13 +2,14 @@
 // above the Band/Region panel for a single object of that type). Bounds
 // X/Y translate the selection; Rotate by rotates about the bounds centre
 // and resets to 0; Mirror X/Y and the paint-order buttons act in place.
+// Bounds, X/Y and the pivot are in the current context's space, like the
+// commands they drive.
 
 import type { JSX } from 'react'
 import { mirrorObjects, reorder, rotateObjects, translateObjects } from '@/domain/commands'
-import { unionBoxes } from '@/geometry/bounds'
 import { copySelection, createMotifFromSelection, deleteSelection, duplicateSelection, repeatSelection } from '@/editor/keyboard'
 import { useEditor } from '@/editor/store'
-import { selectableBounds } from '@/editor/tools/select'
+import { selectionBounds } from '@/editor/tools/select'
 import type { PreviewOutcome } from './NumberField.tsx'
 import { NumberField } from './NumberField.tsx'
 
@@ -18,10 +19,7 @@ export function SelectionPanel(): JSX.Element | null {
   const editContext = useEditor((s) => s.editContext)
   const commit = (): void => useEditor.getState().commit()
 
-  const boxes = selectableBounds(project, editContext)
-    .filter((b) => selection.includes(b.id))
-    .map((b) => b.box)
-  const bounds = unionBoxes(boxes)
+  const bounds = selectionBounds(project, editContext, selection)
   if (bounds === null) return null
 
   const centre = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }

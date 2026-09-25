@@ -12,7 +12,7 @@ import { childrenOf } from '@/domain/project'
 import type { Mat } from '@/geometry/affine'
 import { apply, invert, isMirrored } from '@/geometry/affine'
 import type { Box } from '@/geometry/bounds'
-import { paintedBounds, unionBoxes } from '@/geometry/bounds'
+import { objectBounds, paintedBounds, unionBoxes } from '@/geometry/bounds'
 import type { Occurrence } from '@/geometry/expand'
 import { expand, segmentsOf } from '@/geometry/expand'
 import type { SnapResult, SnapSources } from '@/geometry/snap'
@@ -66,6 +66,21 @@ export function selectableBounds(p: Project, editContext: EditContextLevel[]): A
     if (box !== null) out.push({ id, box })
   }
   return out
+}
+
+/**
+ * The painted bounds of the selection's objects in the current context, in
+ * the context's own space (definition axes inside an entered motif): the
+ * pivot and X/Y the Selection panel's commands take, since the commands work
+ * in context space (SPEC §7.4, §7.5). World bounds would be wrong inside a
+ * rotated, scaled or mirrored occurrence.
+ */
+export function selectionBounds(p: Project, editContext: EditContextLevel[], selection: Id[]): Box | null {
+  const ctx = editContext[editContext.length - 1]?.motifId ?? null
+  const boxes = childrenOf(p, ctx)
+    .filter((id) => selection.includes(id))
+    .map((id) => objectBounds(p, id))
+  return unionBoxes(boxes.filter((b): b is Box => b !== null))
 }
 
 function distanceToSegment(q: XY, a: XY, b: XY): number {

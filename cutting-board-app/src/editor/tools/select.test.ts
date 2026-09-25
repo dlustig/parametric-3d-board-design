@@ -2,8 +2,10 @@
 // selection rule, on small hand-built projects.
 
 import { describe, expect, it } from 'vitest'
+import { mirrorObjects, rotateObjects, translateObjects } from '@/domain/commands'
 import { band, instance, project, region, repeat } from '@/domain/test-builders'
-import { objectAt, selectableBounds, toggleSelection } from './select.ts'
+import { objectBounds } from '@/geometry/bounds'
+import { objectAt, selectableBounds, selectionBounds, toggleSelection } from './select.ts'
 
 const square = (id: string, x0: number, y0: number, size: number): ReturnType<typeof region> =>
   region(id, [
@@ -69,6 +71,36 @@ describe('selectableBounds', () => {
     const p = project([instance('i1', 'm', { x: 100, y: 0, scale: 2 })], [{ id: 'm', children: [band('mb', [[0, 0], [10, 0]], { widthMm: 2 })] }])
     expect(selectableBounds(p, [])).toEqual([{ id: 'i1', box: { minX: 100, minY: -2, maxX: 120, maxY: 2 } }])
     expect(selectableBounds(p, [{ motifId: 'm', path: [{ instanceId: 'i1' }] }])).toEqual([{ id: 'mb', box: { minX: 100, minY: -2, maxX: 120, maxY: 2 } }])
+  })
+})
+
+describe('selectionBounds', () => {
+  // Inside a rotated, scaled and mirrored occurrence the Selection panel's
+  // pivot and X/Y must be in definition space, where the commands work.
+  const p = project(
+    [instance('i1', 'm', { x: 120, y: 60, rotationDeg: 30, scale: 2, mirrorX: true })],
+    [{ id: 'm', children: [band('a', [[0, 0], [10, 0]], { widthMm: 2 }), band('b', [[20, 5], [30, 15]], { widthMm: 2 })] }],
+  )
+  const inI1 = [{ motifId: 'm', path: [{ instanceId: 'i1' }] }]
+
+  it('gives the selection’s painted bounds in the context’s own space', () => {
+    expect(selectionBounds(p, inI1, ['a'])).toEqual({ minX: 0, minY: -1, maxX: 10, maxY: 1 })
+    expect(selectionBounds(p, [], ['i1'])).toEqual(objectBounds(p, 'i1'))
+    expect(selectionBounds(p, inI1, ['i1'])).toBeNull() // not in this context
+  })
+
+  it('makes Mirror and Rotate 180° pivot in place and X/Y move to the typed definition coordinate', () => {
+    const box = selectionBounds(p, inI1, ['a'])!
+    const centre = { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 }
+    const same = (q: typeof p): void => {
+      const b = objectBounds(q, 'a')!
+      for (const k of ['minX', 'minY', 'maxX', 'maxY'] as const) expect(b[k]).toBeCloseTo(box[k], 9)
+    }
+    same(mirrorObjects(p, ['a'], 'x', centre))
+    same(mirrorObjects(p, ['a'], 'y', centre))
+    same(rotateObjects(p, ['a'], 180, centre))
+    const moved = translateObjects(p, ['a'], 4 - box.minX, 0)
+    expect(selectionBounds(moved, inI1, ['a'])!.minX).toBeCloseTo(4, 9)
   })
 })
 
