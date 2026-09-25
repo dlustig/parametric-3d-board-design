@@ -613,3 +613,20 @@ Inputs the spec implies but no task's tests exercise by default; each has been a
 - [ ] e2e: vertex drag with snap to another band's endpoint commits one history entry; midpoint insert; neighbour-merge delete; Moveable drag snaps a band endpoint onto a region vertex (world coordinates exact to 1e-6); Alt held during the drag disables the snap.
 - [ ] Update the G6 workaround notes in `docs/decisions/2026-09-24-gates.md` to say which are now resolved (do not re-run G6 here; Task 21 re-runs everything).
 - [ ] Commit: `Add vertex handles, move snapping, snap rules`.
+
+---
+
+### Task 23: Diagnose and fix the middle-button pan race (executes after Task 20, before Task 21)
+
+**Files:**
+- Modify: `src/editor/input.ts` and/or `src/render/Canvas.tsx` (only if the cause is in the app); `e2e/interaction-proof.spec.ts` (only if the cause is test authorship)
+- Test: `e2e/interaction-proof.spec.ts` (i), run `--repeat-each 10 --workers=1` in chromium and webkit
+
+**Interfaces:** consumes the §7.2 input-ownership table; produces no new interface.
+
+- [ ] Reproduce: `pnpm exec playwright test e2e/interaction-proof.spec.ts -g "(i)" --project=chromium --repeat-each 10 --workers=1` (Task 19 measured 3/8 failures single-worker on the middle-button drag pan assertion).
+- [ ] Apply the systematic-debugging discipline: capture the failing assertion's actual vs expected camera values and the sequence of pointer/mouse events use-gesture received (instrument with a temporary console log read via Playwright, removed before commit). Form a hypothesis (candidates: use-gesture's drag `filterTaps`/threshold before the first move; the middle-button `pointerdown` arriving before `mousedown` ordering with Selecto; the test's `page.mouse` sequence not awaiting a frame; a `passive` wheel/gesture option racing). Test the hypothesis with a minimal change.
+- [ ] Fix the cause. If the cause is in the app (a real race in the pan path), fix it in `input.ts`/`Canvas.tsx` and keep the test unchanged. If the cause is the test (missing `nextFrame` waits, unrealistic event timing), fix the test and say so in the report. Do not widen tolerances.
+- [ ] Verify: `--repeat-each 10 --workers=1` passes 10/10 in chromium and webkit; full `pnpm test:e2e --project=chromium` green.
+- [ ] Record the root cause in `docs/decisions/2026-09-24-gates.md` next to the §15 row (replace the flake footnote).
+- [ ] Commit: `Fix middle-button pan race` (or `Fix flaky pan proof test`).
