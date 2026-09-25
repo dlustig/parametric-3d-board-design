@@ -1,6 +1,6 @@
 # Cutting Board Pattern Designer — V1 SPEC
 
-Status: revision 4 (rev 3 plus one implementation-time correction, §16 last row) (slop audit; geometry/crossing/export; editor/tablet/persistence; product/authorability). Resolutions are logged in §16. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
+Status: revision 4 (rev 3 plus the Task 4 implementation-time correction in §16) (slop audit; geometry/crossing/export; editor/tablet/persistence; product/authorability), amended during implementation afterwards: the rows after the Task 4 row in §16 log the larger amendments, and `git log` on this file records every one. Resolutions are logged in §16. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
 
 This document is the contract for V1: document model, geometry semantics, crossing identity and compositing, editor behaviour, persistence, export, and acceptance gates. Product intent, scope, and non-goals come from the research packet and are not restated except where a rule depends on them.
 
@@ -127,23 +127,25 @@ Each occurrence carries `key` (§5.1), `kind`, `sourceId`, `path`, `matrix`, `ma
 - **Conservative bounds**: polyline bounds expanded by `5 × w` (a miter tip at `stroke-miterlimit` 10 reaches `w / (2 sin(φ/2)) ≤ 5w` from the centreline vertex). Used only to prefilter pair tests and painted-geometry overlap tests.
 - Region bounds are polygon bounds. Instance/repeat bounds are the union of their occurrences' painted bounds.
 
-### 4.6 Tolerances and constants (`geometry/tolerance.ts`)
+### 4.6 Tolerances and constants (`geometry/tolerance.ts`; `MIN_SEGMENT_MM` and `MAX_OCCURRENCES` are defined in `domain/limits.ts` and re-exported there)
 
 | Name | Value | Use |
 | --- | --- | --- |
 | `EPS_GEOMETRY` | 1e-6 mm | point equality, parameter interior test |
+| `EPS_RELATIVE` | 1e-9 | unit-free comparisons: parallel directions, miter reversal, scale equal to 1 |
 | `MIN_SEGMENT_MM` | 0.01 mm | shortest legal segment; closer points are merged by commands |
 | `MIN_CROSSING_ANGLE_DEG` | 10° | below this an intersection is `near-parallel` |
 | `EPS_OVERLAP_MM` | 0.01 mm | minimum footprint penetration to count as overlap |
 | `REMATCH_TOLERANCE_MM` | 3 mm | rebind radius around `hint` (§5.5) |
 | `MAX_OCCURRENCES` | 5000 | expansion cap |
 | `REGION_SEAM_MM` | 0.1 mm | §4.3 |
+| `MITER_EXTENT_FACTOR` | 5 | conservative-bounds pad, × width (§4.5) |
 | `MAX_CLIP_EXTEND_MM` | 0.5 mm | upper bound of any renderer's patch clip enlargement; also used by `near-joint` |
 | `EXPORT_CLIP_EXTEND_MM` | 0.2 mm | §6.2 patch clip enlargement in export |
 | `EDITOR_CLIP_EXTEND_PX` | 1.5 px | §6.2 patch clip enlargement in the editor: `min(1.5 / zoom, MAX_CLIP_EXTEND_MM)` mm |
 | `SNAP_TOLERANCE_PX` | 8 px | converted to mm through zoom (and occurrence scale in edit context) |
-| `ANGLE_SNAP_DEG` | 15° step, ±4° capture | while drawing segments |
-| `TAP_SLOP_PX`, `DOUBLE_TAP_MS` | 6 px, 300 ms | tap vs drag, double-tap detection |
+| `ANGLE_SNAP_DEG`, `ANGLE_SNAP_CAPTURE_DEG` | 15° step, ±4° capture | while drawing segments |
+| `TAP_SLOP_PX`, `DOUBLE_TAP_MS`, `DOUBLE_TAP_PX` | 6 px, 300 ms, 10 px | tap vs drag, double-tap detection |
 
 ## 5. Crossings: identity, scope, resolution
 
@@ -280,7 +282,7 @@ Input ownership (the proof in Slice 1 verifies each row):
 | Single pointer in drawing tools | tool code (Pointer Events) | Moveable and Selecto are unmounted |
 | `pointercancel` | tool/use-gesture | cancel preview, restore state |
 
-Never `preventDefault` on canvas `pointerdown`: it suppresses the compatibility mouse events Moveable and Selecto (Gesto) rely on. Zoom limits 0.05–50 px/mm. Fit: Board bounds + 5% margin. Top bar has −, +, Fit.
+Never `preventDefault` on canvas `pointerdown`: it suppresses the compatibility mouse events Moveable and Selecto (Gesto) rely on. Zoom limits 0.05–50 px/mm. Fit: Board bounds + 5% margin. The rail has −, +, Fit.
 
 ### 7.3 Selection proxies
 
@@ -407,17 +409,24 @@ Product success test (packet): performed manually at the end and reported with t
 
 ```
 src/
-  domain/      model.ts  ids.ts  units.ts  validate.ts  migrate.ts  crossings.ts  commands/*.ts
-  geometry/    affine.ts  tolerance.ts  expand.ts  intersections.ts  footprint.ts  scene.ts  bounds.ts  offset.ts  snap.ts
-  editor/      store.ts  camera.ts  keyboard.ts  input.ts  tools/*.ts
-  render/      Canvas.tsx  SceneSvg.tsx  Proxies.tsx  overlays/*.tsx
+  main.tsx  index.css
+  domain/      model.ts  schema.ts  ids.ts  keys.ts  limits.ts  project.ts  units.ts  validate.ts  migrate.ts  crossings.ts  freeze.ts  test-builders.ts
+  domain/commands/  index.ts  shared.ts  board.ts  clipboard.ts  crossings.ts  duplicate.ts  materials.ts  motifs.ts  objects.ts  order.ts  points.ts
+  geometry/    affine.ts  tolerance.ts  expand.ts  intersections.ts  footprint.ts  resolve.ts  scene.ts  bounds.ts  offset.ts  snap.ts
+  editor/      store.ts  camera.ts  keyboard.ts  input.ts  scene.ts  selection.ts  snap.ts  tapTracker.ts  testHook.ts
+  editor/tools/  select.ts  draw.ts  crossing.ts
+  render/      Canvas.tsx  SceneSvg.tsx  Proxies.tsx
+  render/overlays/  ContextScrim.tsx  CrossingMarkers.tsx  DrawPreview.tsx  Grid.tsx  Pivot.tsx  Selection.tsx  SnapGuide.tsx  VertexHandles.tsx
   export/      svg.ts  download.ts
   storage/     local.ts
-  ui/          App.tsx  Toolbar.tsx  Inspector/*.tsx  MaterialPalette.tsx  Breadcrumb.tsx  StatusBar.tsx
-  fixtures/    *.json  index.ts
+  ui/          App.tsx  Toolbar.tsx  ToolOptions.tsx  ProjectMenu.tsx  StatusBar.tsx  RecoveryBanner.tsx  Breadcrumb.tsx  MaterialPalette.tsx  MaterialEditor.tsx
+  ui/Inspector/  Inspector.tsx  BoardPanel.tsx  SelectionPanel.tsx  BandPanel.tsx  RegionPanel.tsx  InstancePanel.tsx  RepeatPanel.tsx  CrossingList.tsx  PointRow.tsx  NumberField.tsx  shared.ts
+  fixtures/    stripes.json  checker.json  basket-weave.json  chevron-diamond.json  isometric.json  interlace.json  index.ts
 ```
 
-`domain/` and `geometry/` import nothing from React or the DOM; `geometry/` may import `@flatten-js/core`, `domain/` may not. Tests sit beside sources as `*.test.ts`; Playwright tests in `e2e/`.
+(Unit tests, `*.test.ts`, are omitted above.)
+
+`domain/` and `geometry/` import nothing from React or the DOM; `geometry/` may import `@flatten-js/core`, `domain/` may not. One exception to `domain/` importing nothing from `geometry/`: the commands `domain/commands/{crossings,motifs,objects,points}.ts` import `geometry/` modules (`affine`, `bounds`, `expand`, `offset`, `resolve`, and the `Intersection` type from `intersections`), because commands own rematching (§5.5, §7.1) and Create Motif, Repeat and Offset copy need bounds and offsets; through them those commands depend on Flatten transitively. No other `domain/` file imports `geometry/`. Tests sit beside sources as `*.test.ts`; Playwright tests in `e2e/`.
 
 ## 15. Slice-1 interaction proof (assertions, from the editor review)
 

@@ -1,5 +1,5 @@
 // SPEC §12: the six original acceptance fixtures, loaded as JSON (committed,
-// hand-generated data — see the task's report for how). Each round-trips
+// hand-generated data). Each round-trips
 // through `importProject` (fixtures.test.ts); the cast below only bridges
 // the JSON module's structurally-inferred type to the exact domain type.
 

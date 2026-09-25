@@ -1,6 +1,6 @@
 # Cutting Board Pattern Designer — V1 report
 
-Status: final. Branch `feat/v1`, local only (no remote yet).
+Status: final. Built on branch `feat/v1` and merged to `main` (merge commit 2698014); local only (no remote).
 
 ## What was built
 
@@ -22,11 +22,11 @@ Dependencies actually used: react, react-dom, zustand, zundo, zod, @flatten-js/c
 | G6 authorability (A–F from a blank project, UI only) | PASS with friction logged; 21–127 actions per family |
 | G7 tablet | automated PASS (Chromium touch); manual iPad Safari checklist pending (`2026-09-24-ipad-checklist.md`) |
 | G8 persistence | PASS (unit + browser, three engines) |
-| G9 performance | FINDING: on a 3,151-occurrence fixture (about 9,100 rendered elements, nine times the packet's ~1,000-element target) a drag of one band runs at a 27 ms median / 36 ms p95 frame; moving every occurrence at once runs at 158 / 200 ms. The 16 ms median target is missed; the 50 ms p95 target is met in the typical case. At the packet's stated scale (8×8, 897 occurrences) the drag runs at 20 ms median / 25 ms p95. |
-| §11 accessibility | PASS (names on every control, keyboard-only flow, 200% zoom via viewport halving) |
-| Product success test | PASS 9/9 steps by scripted walkthrough (`.superpowers` walkthrough report); manual pass by the owner still recommended |
+| G9 performance | FINDING: on a 3,151-occurrence fixture (about 9,100 rendered elements, nine times the packet's ~1,000-element target) a drag of one band runs at a 28 ms median / 39 ms p95 frame; moving every occurrence at once runs at 200 / 249 ms. The 16 ms median target is missed; the 50 ms p95 target is met in the typical case. At the packet's stated scale (8×8, 897 occurrences) the drag runs at 17 ms median / 25 ms p95. |
+| §11 accessibility | PASS (names on every control, keyboard-only flow, 200% zoom via a 640×480 reduced-viewport substitution) |
+| Product success test | PASS 9/9 steps by scripted walkthrough (its report was kept in the session's `.superpowers/` workspace, since deleted, and is not in the repository); manual pass by the owner still recommended |
 
-Full verification after the final fix wave: typecheck clean, 383 unit tests, production build, 338 Playwright tests passed across four projects (Chromium 100, Firefox 94, WebKit 94, Chromium-touch 50) with 0 failures, perf suite 9 passed.
+Full verification after the final fix wave (at 2698014; details in the gates doc's final verification run): typecheck clean, 383 unit tests, production build, 338 Playwright tests passed across four projects (Chromium 100, Firefox 94, WebKit 94, Chromium-touch 50) with 0 failures, perf suite 9 passed.
 
 ## Intentionally unsupported crossing classes
 
@@ -54,7 +54,7 @@ End-to-end contacts of collinear bands (repeat seams) are ignored entirely. Unsu
 - Performance: see G9. The remaining per-frame cost is O(occurrences) re-resolution and element diffing; three next steps are recorded in the gates doc (per-intersection resolution memo, patch memo, repeat-cell subtree reuse). Canvas rendering was not evaluated, per the packet's order.
 - PNG export is not in V1. One active project; no project gallery.
 
-## Departures from the research packet (all recorded in `2026-09-24-reconciliation.md` and spec §16)
+## Departures from the research packet (1–5 recorded in `2026-09-24-reconciliation.md`; 6 and 7 in spec §7.4 and §11, the Duplicate offset also in §16)
 
 1. Bands and Regions carry no transform; points are baked in parent space. Numeric rotate and bounds X/Y fields provide the equivalents.
 2. `fraction.js` dropped for an owned grammar (evidence above).
@@ -73,4 +73,4 @@ End-to-end contacts of collinear bands (repeat seams) are ignored entirely. Unsu
 
 ## Process record
 
-Ninety-nine commits before the fix wave and about thirty in it; every task had an implementer, a task-scoped reviewer, and a scoped re-review; the spec went through one slop audit, three adversarial reviews, a second slop audit, and was amended during implementation when reviewers or gates proved it wrong (rev 4 plus later one-line corrections). Rulings taken on the owner's behalf are listed in the session's closing message and in the SDD ledger.
+One hundred commits on `feat/v1` before the fix wave and thirty-three in it; every task had an implementer, a task-scoped reviewer, and a scoped re-review; the spec went through one slop audit, three adversarial reviews, a second slop audit, and was amended during implementation when reviewers or gates proved it wrong (rev 4 plus later one-line corrections). Rulings taken on the owner's behalf were listed in the session's closing message and in the SDD ledger in the since-deleted `.superpowers/` workspace; neither is in the repository, and git history records the resulting spec and code changes.

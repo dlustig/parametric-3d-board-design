@@ -1,5 +1,7 @@
 # Cutting Board Pattern Designer V1 — Implementation Plan
 
+> **Historical record.** This is the execution plan as written on 2026-09-24 (including that day's amendments, which added Tasks 22 and 23). It was not updated for the final fix wave, and some mechanics it describes were superseded by reviews and gates. Where it differs from the spec (`docs/superpowers/specs/2026-09-24-cutting-board-pattern-designer-design.md`) or the decision documents in `docs/decisions/`, those are authoritative; git history records what was actually done.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Every task: write the failing tests first, run them red, implement, run green, run `pnpm typecheck && pnpm test`, commit.
 
 **Goal:** A client-only React/TypeScript/Vite/SVG editor where a woodworker draws dimensioned Bands and Regions, builds and repeats Motifs, toggles local over/under crossings, saves JSON, and exports a standalone SVG.

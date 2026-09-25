@@ -4,8 +4,8 @@ SPEC §13 G7 also requires a manual pass on real iPad Safari hardware — CDP to
 (`e2e/tablet.spec.ts`) exercises the DOM-level touch/gesture handling in headless
 Chromium, but only a real device exercises Safari's own gesture recognizer,
 its on-screen keyboard, and native pinch-zoom. Run each row on an iPad (any
-recent iPadOS) in Safari against a `pnpm dev` build (or the deployed build),
-then fill in Result and Notes. A row that can't be exercised (no trackpad
+recent iPadOS) in Safari against `pnpm dev --host` reached over the LAN (there
+is no deployed build), then fill in Result and Notes. A row that can't be exercised (no trackpad
 available, etc.) should say so in Notes rather than being left blank.
 
 | # | Item | Steps | Expected | Result (Pass/Fail) | Notes |

@@ -10,7 +10,7 @@ import type { BandOccurrence, Occurrence } from './expand.ts'
 import { segmentsOf } from './expand.ts'
 import type { Seg, XY } from './footprint.ts'
 import { footprint, polygonsPenetrate } from './footprint.ts'
-import { EPS_GEOMETRY, EPS_OVERLAP_MM, MAX_CLIP_EXTEND_MM, MIN_CROSSING_ANGLE_DEG } from './tolerance.ts'
+import { EPS_GEOMETRY, EPS_OVERLAP_MM, MAX_CLIP_EXTEND_MM, MIN_CROSSING_ANGLE_DEG, MITER_EXTENT_FACTOR } from './tolerance.ts'
 
 export type IntersectionClass = 'eligible' | 'collinear' | 'endpoint' | 'near-parallel' | 'near-joint' | 'occluded' | 'crowded'
 
@@ -98,7 +98,7 @@ function miterExtent(prev: XY, vertex: XY, next: XY, w: number): number {
   const vy = next.y - vertex.y
   const cos = (ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy))
   const phi = Math.acos(Math.min(1, Math.max(-1, cos)))
-  return Math.min(w / (2 * Math.sin(phi / 2)), 5 * w)
+  return Math.min(w / (2 * Math.sin(phi / 2)), MITER_EXTENT_FACTOR * w)
 }
 
 /** Whether an interior vertex of `occ` lies within `halfDiagonal + miterExtent(vertex)` of `point`. */
@@ -139,7 +139,7 @@ function jointTriangle(prev: XY, vertex: XY, next: XY, w: number): XY[] | null {
   }
   const sinHalf = Math.sqrt(Math.max(0, 1 - (bLength / 2) ** 2))
   const miter = w / (2 * sinHalf)
-  const tip = miter > 5 * w ? vertex : { x: vertex.x + (bx / bLength) * miter, y: vertex.y + (by / bLength) * miter }
+  const tip = miter > MITER_EXTENT_FACTOR * w ? vertex : { x: vertex.x + (bx / bLength) * miter, y: vertex.y + (by / bLength) * miter }
   return [outer(u1), tip, outer(u2)]
 }
 
