@@ -1,0 +1,113 @@
+// SPEC §6.1: the crossing footprint, and the polygon penetration test used by
+// classification (SPEC §5.2). Flatten shapes are built at the boundary only.
+
+import Flatten from '@flatten-js/core'
+
+export type XY = { x: number; y: number }
+export type Seg = { a: XY; b: XY }
+
+function unitNormal(s: Seg): XY {
+  const dx = s.b.x - s.a.x
+  const dy = s.b.y - s.a.y
+  const length = Math.hypot(dx, dy)
+  return { x: -dy / length, y: dx / length }
+}
+
+/** The point where the lines `n1 · p = c1` and `n2 · p = c2` meet. */
+function meet(n1: XY, c1: number, n2: XY, c2: number): XY {
+  const det = n1.x * n2.y - n1.y * n2.x
+  return { x: (c1 * n2.y - n1.y * c2) / det, y: (n1.x * c2 - c1 * n2.x) / det }
+}
+
+/**
+ * SPEC §6.1: the parallelogram bounded by `offset(sA, ±wA/2)` and
+ * `offset(sB, ±wB/2)`, corners in cyclic order. Classification uses the plain
+ * widths; only the patch clip and the `near-joint` radius pass enlarged ones.
+ * Undefined for parallel segments.
+ */
+export function footprint(sA: Seg, wA: number, sB: Seg, wB: number): XY[] {
+  const nA = unitNormal(sA)
+  const nB = unitNormal(sB)
+  const cA = nA.x * sA.a.x + nA.y * sA.a.y
+  const cB = nB.x * sB.a.x + nB.y * sB.a.y
+  const hA = wA / 2
+  const hB = wB / 2
+
+  return [meet(nA, cA + hA, nB, cB + hB), meet(nA, cA + hA, nB, cB - hB), meet(nA, cA - hA, nB, cB - hB), meet(nA, cA - hA, nB, cB + hB)]
+}
+
+function signedArea(points: XY[]): number {
+  let sum = 0
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]!
+    const q = points[(i + 1) % points.length]!
+    sum += p.x * q.y - q.x * p.y
+  }
+  return sum / 2
+}
+
+/** Flatten's boolean operations need both operands wound the same way; normalise to positive signed area. */
+function toFlatten(points: XY[]): Flatten.Polygon {
+  const wound = signedArea(points) < 0 ? [...points].reverse() : points
+  return new Flatten.Polygon(wound.map((p): [number, number] => [p.x, p.y]))
+}
+
+function minOf(points: XY[], axis: 'x' | 'y'): number {
+  let m = Infinity
+  for (const pt of points) m = Math.min(m, pt[axis])
+  return m
+}
+
+function maxOf(points: XY[], axis: 'x' | 'y'): number {
+  let m = -Infinity
+  for (const pt of points) m = Math.max(m, pt[axis])
+  return m
+}
+
+/** The length of the overlap of `p`'s and `q`'s projections onto the unit axis (ux, uy); ≤ 0 when they are disjoint. */
+function slabOverlap(p: XY[], q: XY[], ux: number, uy: number): number {
+  let minP = Infinity
+  let maxP = -Infinity
+  for (const pt of p) {
+    const d = pt.x * ux + pt.y * uy
+    minP = Math.min(minP, d)
+    maxP = Math.max(maxP, d)
+  }
+  let minQ = Infinity
+  let maxQ = -Infinity
+  for (const pt of q) {
+    const d = pt.x * ux + pt.y * uy
+    minQ = Math.min(minQ, d)
+    maxQ = Math.max(maxQ, d)
+  }
+  return Math.min(maxP, maxQ) - Math.max(minP, minQ)
+}
+
+/**
+ * Whether `p` and `q` overlap by more than `eps`. "Penetrates by more than
+ * eps" is defined as intersection area > eps²: zero for polygons that only
+ * touch along an edge or at a corner, positive for any real overlap.
+ */
+export function polygonsPenetrate(p: XY[], q: XY[], eps: number): boolean {
+  // The intersection lies inside the bounding boxes' overlap, so its area is at most that overlap's area.
+  const overlapW = Math.min(maxOf(p, 'x'), maxOf(q, 'x')) - Math.max(minOf(p, 'x'), minOf(q, 'x'))
+  if (overlapW <= 0) return false
+  const overlapH = Math.min(maxOf(p, 'y'), maxOf(q, 'y')) - Math.max(minOf(p, 'y'), minOf(q, 'y'))
+  if (overlapH <= 0 || overlapW * overlapH <= eps * eps) return false
+  // The same bound in the frame of each edge direction: a polygon edge normal separates two convex polygons that do not overlap.
+  for (const polygon of [p, q]) {
+    for (let k = 0; k < polygon.length; k++) {
+      const a = polygon[k]!
+      const b = polygon[(k + 1) % polygon.length]!
+      const length = Math.hypot(b.x - a.x, b.y - a.y)
+      if (length === 0) continue
+      const ux = (b.x - a.x) / length
+      const uy = (b.y - a.y) / length
+      const along = slabOverlap(p, q, ux, uy)
+      if (along <= 0) return false
+      const across = slabOverlap(p, q, -uy, ux)
+      if (across <= 0 || along * across <= eps * eps) return false
+    }
+  }
+  return Flatten.BooleanOperations.intersect(toFlatten(p), toFlatten(q)).area() > eps * eps
+}

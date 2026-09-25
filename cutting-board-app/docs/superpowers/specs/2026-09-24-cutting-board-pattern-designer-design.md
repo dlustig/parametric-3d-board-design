@@ -1,6 +1,6 @@
 # Cutting Board Pattern Designer — V1 SPEC
 
-Status: revision 3 after four independent reviews and two slop audits (slop audit; geometry/crossing/export; editor/tablet/persistence; product/authorability). Resolutions are logged in §16. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
+Status: revision 4 (rev 3 plus one implementation-time correction, §16 last row) (slop audit; geometry/crossing/export; editor/tablet/persistence; product/authorability). Resolutions are logged in §16. Companion: `docs/decisions/2026-09-24-reconciliation.md`.
 
 This document is the contract for V1: document model, geometry semantics, crossing identity and compositing, editor behaviour, persistence, export, and acceptance gates. Product intent, scope, and non-goals come from the research packet and are not restated except where a rule depends on them.
 
@@ -122,8 +122,9 @@ Each occurrence carries `key` (§5.1), `kind`, `sourceId`, `path`, `matrix`, `ma
 
 ### 4.5 Bounds
 
-- **Painted bounds** of a Band occurrence: union of its segments' stroke rectangles (each segment's endpoints offset ±`w/2` along the segment normal). Exact at butt ends; miter tips may exceed it slightly. Used for selection proxies, marquee, fit, and the default repeat step.
-- **Conservative bounds**: polyline bounds expanded by `2.5 × w` (the miter-limit-10 tip extent). Used only to prefilter pair tests.
+- **Painted geometry** of a Band occurrence: its segments' stroke rectangles (each segment's endpoints offset ±`w/2` along the segment normal) plus, at each interior joint, the miter triangle between the two rectangles' outer corners and the miter tip (`w / (2 sin(φ/2))` from the vertex, bevelled where that exceeds `5w`, matching `stroke-miterlimit` 10). Used by the `occluded` and `crowded` tests.
+- **Painted bounds**: the bounds of the stroke rectangles only (exact at butt ends; miter tips may exceed it). Used for selection proxies, marquee, fit, and the default repeat step.
+- **Conservative bounds**: polyline bounds expanded by `5 × w` (a miter tip at `stroke-miterlimit` 10 reaches `w / (2 sin(φ/2)) ≤ 5w` from the centreline vertex). Used only to prefilter pair tests and painted-geometry overlap tests.
 - Region bounds are polygon bounds. Instance/repeat bounds are the union of their occurrences' painted bounds.
 
 ### 4.6 Tolerances and constants (`geometry/tolerance.ts`)
@@ -137,9 +138,9 @@ Each occurrence carries `key` (§5.1), `kind`, `sourceId`, `path`, `matrix`, `ma
 | `REMATCH_TOLERANCE_MM` | 3 mm | rebind radius around `hint` (§5.5) |
 | `MAX_OCCURRENCES` | 5000 | expansion cap |
 | `REGION_SEAM_MM` | 0.1 mm | §4.3 |
-| `CLASSIFY_EXTEND_MM` | 0.5 mm | footprint enlargement used by the `occluded` and `crowded` classes; upper bound of any renderer's clip enlargement |
+| `MAX_CLIP_EXTEND_MM` | 0.5 mm | upper bound of any renderer's patch clip enlargement; also used by `near-joint` |
 | `EXPORT_CLIP_EXTEND_MM` | 0.2 mm | §6.2 patch clip enlargement in export |
-| `EDITOR_CLIP_EXTEND_PX` | 1.5 px | §6.2 patch clip enlargement in the editor: `min(1.5 / zoom, CLASSIFY_EXTEND_MM)` mm |
+| `EDITOR_CLIP_EXTEND_PX` | 1.5 px | §6.2 patch clip enlargement in the editor: `min(1.5 / zoom, MAX_CLIP_EXTEND_MM)` mm |
 | `SNAP_TOLERANCE_PX` | 8 px | converted to mm through zoom (and occurrence scale in edit context) |
 | `ANGLE_SNAP_DEG` | 15° step, ±4° capture | while drawing segments |
 | `TAP_SLOP_PX`, `DOUBLE_TAP_MS` | 6 px, 300 ms | tap vs drag, double-tap detection |
@@ -162,9 +163,9 @@ Every intersection point between segments `sA` (occurrence A, width `wA`) and `s
 | `collinear` | the segments overlap along a length |
 | `endpoint` | a parameter is within `EPS_GEOMETRY` (scaled by segment length) of 0 or 1 on either segment, including a crossing exactly at a polyline joint |
 | `near-parallel` | angle between directions outside `[MIN_CROSSING_ANGLE_DEG, 180 − MIN_CROSSING_ANGLE_DEG]` |
-| `near-joint` | an interior vertex of either Band lies within `halfDiagonal(footprint) + miterExtent(vertex)` of the point, where `miterExtent = w / (2 sin(φ/2))` capped at `5w` for joint angle φ |
-| `occluded` | some element strictly between A and B in paint order has painted geometry (segment stroke rectangles or Region polygon) penetrating the classification footprint (§6.1) by more than `EPS_OVERLAP_MM` |
-| `crowded` | the classification footprint penetrates another listed intersection's footprint on either occurrence by more than `EPS_OVERLAP_MM`. Proxy footprints: `collinear` uses the overlap strip; `endpoint` uses a disc of radius `max(w)`. Triple points and adjacent crossings land here. |
+| `near-joint` | an interior vertex of either Band lies within `halfDiagonal(footprint with both widths + 2·MAX_CLIP_EXTEND_MM) + miterExtent(vertex)` of the point, where `miterExtent = w / (2 sin(φ/2))` capped at `5w` for joint angle φ |
+| `occluded` | some element strictly between A and B in paint order has painted geometry (§4.5: stroke rectangles and miter triangles, or the Region polygon) penetrating the footprint (§6.1) by more than `EPS_OVERLAP_MM` |
+| `crowded` | the plain (unenlarged) footprint penetrates another listed intersection's plain footprint on either occurrence by more than `EPS_OVERLAP_MM`. Proxy footprints: `collinear` uses the overlap strip; `endpoint` and `near-parallel` use a disc of radius `max(w)` (a near-parallel footprint is arbitrarily long and would crowd distant crossings). Triple points land here; flush-packed neighbours whose footprints only touch do not. |
 | `eligible` | everything else |
 
 Unsupported classes carry their reason. They are drawn with a distinct marker in the Crossing tool and get no toggle; tapping one shows the reason in the tool options bar. **Render eligibility is always decided per world intersection.** A definition record can be resolved in its own space while a particular world occurrence of it is additionally `unsupported (world)` because of neighbouring cells or root objects; that occurrence renders by paint order and is marked.
@@ -187,7 +188,7 @@ A record lives in exactly one context (`project.crossings` or `motifs[m].crossin
 
 Toggling an eligible intersection flips the effective over/under. The Crossing tool shows a scope control only when the pair has a common motif ancestor: **All instances** (default) or **This occurrence**.
 
-- *All instances*: write (or flip) the record in the innermost common definition; remove records for the same pair from every context outside it, so the toggle is visible everywhere.
+- *All instances*: set the record in the innermost common definition to the opposite of the clicked occurrence's current effective value (creating it if absent); remove records for the same pair from every context outside it. Every occurrence, including the clicked one, then shows the flipped value.
 - *This occurrence*: write (or flip) the root record. If the result equals the value the outer contexts would give without it, delete the root record instead (an override never shadows silently). Overridden occurrences get a distinct badge; the inspector lists a selected instance's/repeat's overrides with **Remove**.
 - If the pair has an unresolved record in the target context, the toggle rebinds it (§5.5) and sets `over`.
 
@@ -205,7 +206,7 @@ Deleting a Band, instance, or repeat removes records that reference it; shrinkin
 
 ### 5.6 Motif operations and records
 
-- **Create Motif** (§7.4): a ref is *inside* the selection if its `bandId` is a selected object or its path begins with a selected instance/repeat. Records with both refs inside move into the new definition unchanged (nested paths included). Records with one ref inside stay in the context with that ref's path prefixed by the new instance step. All moved records are re-canonicalized.
+- **Create Motif** (§7.4): a ref is *inside* the selection if its `bandId` is a selected object or its path begins with a selected instance/repeat. Records with both refs inside move into the new definition unchanged (nested paths included). Records with one ref inside stay in the context with that ref's path prefixed by the new instance step. Records in outer contexts whose path reaches the selection through the context's own instances get the new instance step inserted at that depth. All moved records are re-canonicalized.
 - **Detach instance**: definition children are copied into the context with baked points, widths × scale, and fresh ids for objects, points, and nested instances/repeats; definition records are copied with fresh ids, empty paths, and every copied id remapped in `bandId` and path steps. Context records whose path begins with the instance step have the step removed and all ids remapped. Where a copied definition record and an existing context record collide on canonical key, the context record (the override) wins and the copy is dropped.
 - A definition that loses its last instance/repeat is deleted in the same history step (undo restores both). Motif names are edited from the instance/repeat inspector.
 
@@ -213,11 +214,11 @@ Deleting a Band, instance, or repeat removes records that reference it; shrinkin
 
 ### 6.1 Footprint
 
-For segments `sA` (width `wA`) and `sB` (`wB`) crossing transversely, `footprint(sA, wA, sB, wB)` is the parallelogram bounded by the two stroke edges of each segment: its corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`, computed analytically in `geometry/footprint.ts`. The **classification footprint** is the footprint with both widths enlarged by `2 × CLASSIFY_EXTEND_MM`; it depends only on the document, so classification is independent of the camera and identical in editor and export. Overlap tests use Flatten polygon intersection with the `EPS_OVERLAP_MM` penetration threshold.
+For segments `sA` (width `wA`) and `sB` (`wB`) crossing transversely, `footprint(sA, wA, sB, wB)` is the parallelogram bounded by the two stroke edges of each segment: its corners are the intersections of lines `offset(sA, ±wA/2)` with `offset(sB, ±wB/2)`, computed analytically in `geometry/footprint.ts`. Classification uses only this plain footprint, so it depends only on the document and is identical in editor and export. The footprint is the intersection of two infinite strips: near a butt end it can extend past the painted end of a Band. That is harmless (the patch paints only O's segment, and `occluded` guards elements between), but a pixel test at such a corner sees a legitimate three-way blend with the background, so G5 samples exclude a small clearance around segment ends. Overlap tests use Flatten polygon intersection with the `EPS_OVERLAP_MM` penetration threshold.
 
 ### 6.2 Patch
 
-`buildScene(project, clipExtendMm)` takes only the patch clip enlargement `e` as a parameter (editor: `min(EDITOR_CLIP_EXTEND_PX / zoom, CLASSIFY_EXTEND_MM)`; export: `EXPORT_CLIP_EXTEND_MM`; both ≤ `CLASSIFY_EXTEND_MM`). The **clip polygon** is the footprint with `wA + 2e` and `wB + 2e`. Classification never uses `e`, so a camera change regenerates only clip polygons.
+`buildScene(project, clipExtendMm)` takes only the patch clip enlargement `e` as a parameter (editor: `min(EDITOR_CLIP_EXTEND_PX / zoom, MAX_CLIP_EXTEND_MM)`; export: `EXPORT_CLIP_EXTEND_MM`; both ≤ `MAX_CLIP_EXTEND_MM`). Classification never uses `e`, so a camera change regenerates only clip polygons.
 
 Let `O` be the effective over occurrence and `U` the under at an eligible intersection. If `O` is already after `U` in paint order, nothing is drawn. Otherwise the scene inserts a patch immediately after `U`:
 
@@ -226,7 +227,9 @@ Let `O` be the effective over occurrence and `U` the under at an eligible inters
 <path d="M x1 y1 L x2 y2" fill="none" stroke="{O colour}" stroke-width="{wO}" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt" clip-path="url(#{prefix}-c{n})"/>
 ```
 
-The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach, so O's segment stroke equals O's real paint there). Enlarging across both Bands' edges removes anti-aliasing seams: across O's edges the extra area is limited by O's own stroke; across U's edges it overpaints O's own colour on O's path. The `occluded` class guarantees nothing painted between U and O meets the classification footprint, which contains every clip polygon, so the overpaint is invisible. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
+The path is **only the crossed segment of O** (the `near-joint` class guarantees no joint of O or U lies within reach of the clip, so O's segment stroke equals O's real paint there).
+
+**Clip polygon** = `footprint(sO, wO + 2e, sU, wU)`: enlarged across O's edges only. The extra area is limited by O's own stroke, so the patch never paints outside O's real paint and never beyond U's edges; this removes the anti-aliasing seam along O's edges. The clip is **not** enlarged across U's edges: doing so paints O beyond U into whatever neighbour lies there, and making that safe needs a set of paint-order rules that a review showed to be intricate and still incomplete. The accepted residual is a one-pixel anti-aliased blend of O and U along U's edge where O exits U (about 25% U), the same kind of blend U's edge shows against the background elsewhere. The `occluded` class guarantees nothing between O and U meets the footprint, so the patch never punches through anything. Patches that share the same U are emitted in canonical-key order. Because the patch is right after U, everything above U still covers both; two crossings on the same Band never share paint.
 
 ### 6.3 Scene
 
@@ -252,7 +255,7 @@ One Zustand store with:
 
 - `project` — the document, wrapped by zundo `temporal({ partialize: s => ({ project: s.project }), equality: (a, b) => a.project === b.project, limit: 100 })`. The equality is required: without it camera and selection writes push duplicate entries and clear redo.
 - `preview: { next: Project; onInterrupt: 'commit' | 'cancel' } | null`. Pointer gestures and inspector typing write `next`, always recomputed from `project` with the cumulative gesture arguments (never frame-on-frame). The renderer uses `preview?.next ?? project`.
-- `settlePreview()` runs before **any** command, undo, redo, import, or New Project, so `project` cannot change while a preview exists: inspector previews commit, gesture previews cancel. `commit()` replaces `project` with `rematch(project, next)` and clears the preview. History therefore sees exactly one entry per gesture or field edit, and never a preview frame.
+- `settlePreview()` runs before **any** command, undo, redo, import, or New Project, so `project` cannot change while a preview exists: inspector previews commit, gesture previews cancel. `commit()` replaces `project` with `next` and clears the preview (commands already run `rematchCrossings`; the store never rematches, so no preview frame ever pays for it). History therefore sees exactly one entry per gesture or field edit, and never a preview frame.
 - Ephemeral: `tool`, `selection: Id[]`, `editContext: { motifId, path: Step[] }[]`, `camera`, `snapEnabled`, `addToSelection`, `crossingScope`, `currentMaterialId`, drawing state, save status.
 
 After undo, redo, or import: drop selection ids that no longer exist, pop `editContext` to the deepest level whose motif and path still validate, cancel any drawing. Undo and redo trigger autosave like commits.
@@ -292,9 +295,9 @@ Tool keys: `V` select, `H` hand, `B` band, `R` rectangle region, `P` polygon reg
 - **Rectangle**: drag corner to corner; 4-point Region.
 - **Crossing**: draws markers for every listed intersection (filled = eligible, badge = overridden, hatched = unsupported, ring = unresolved). Tap an eligible marker to toggle per §5.4 using the scope control in the options bar; tap an unsupported marker to read its reason. Hit radius 12 px for mouse, 22 px for touch; nearest centre wins.
 
-Selection commands (toolbar buttons and keys; all operate in the current context): Delete/Backspace; **Duplicate** (`Ctrl/Cmd+D`, in place; arrays are what Repeat is for); copy/paste (`Ctrl/Cmd+C/V`, in place, in-app clipboard including definition-internal records); **Mirror X / Y** about the painted-bounds centre; **Rotate 90° CW/CCW** and **Rotate by °** about the same centre; arrow nudge one grid step (Shift ×10; screen axes, mapped into the context); Bring forward / Send backward / To front / To back; **Offset copy** (Band only: a parallel copy on the chosen side at perpendicular distance `(w + w')/2` with miter-offset joints; width `w'` defaults to `w`); **Create Motif** (`Ctrl/Cmd+G`); **Repeat**; **Detach**.
+Selection commands (toolbar buttons and keys; all operate in the current context): Delete/Backspace; **Duplicate** (`Ctrl/Cmd+D`; the copy is offset by one grid step in +X and +Y so the action is visible; arrays are what Repeat is for); copy/paste (`Ctrl/Cmd+C/V`, in place, in-app clipboard including definition-internal records); **Mirror X / Y** about the painted-bounds centre; **Rotate 90° CW/CCW** and **Rotate by °** about the same centre; arrow nudge one grid step (Shift ×10; screen axes, mapped into the context); Bring forward / Send backward / To front / To back; **Offset copy** (Band only: a parallel copy on the chosen side at perpendicular distance `(w + w')/2` with miter-offset joints; width `w'` defaults to `w`); **Create Motif** (`Ctrl/Cmd+G`); **Repeat**; **Detach**.
 
-**Create Motif**: pivot = centre of the selection's painted bounds. Children are re-based so the pivot is definition `(0,0)`; the new instance has `x, y` = pivot, replacing the selection at the topmost selected child's position in paint order. A pivot marker is drawn on selected instances. **Repeat**: on one instance, replaces it with a 2×2 RepeatField with the same motif and transform and steps equal to the definition's painted-bounds size × scale (seamless by default); on any other selection, performs Create Motif then Repeat.
+**Create Motif**: pivot = centre of the selection's painted bounds. Children are re-based so the pivot is definition `(0,0)`; the new instance has `x, y` = pivot, replacing the selection at the topmost selected child's position in paint order. A pivot marker is drawn on selected instances. **Repeat**: on one instance, replaces it with a 2×2 RepeatField with the same motif and transform and steps equal to the definition's painted-bounds size in definition units (the cell offsets are applied inside the field's transform, so this tiles seamlessly at any scale); on any other selection, performs Create Motif then Repeat.
 
 Keyboard dispatch is one listener that ignores events whose target is an input, textarea, select, or contenteditable (Esc excepted: it reverts the field and stops). Modifiers are matched exactly. Esc order: cancel gesture → cancel drawing → clear selection → pop edit context → Select tool.
 
@@ -320,7 +323,7 @@ Entering a definition (double-tap an instance/cell, or **Edit Motif**) pushes `{
 
 ### 7.7 Snapping
 
-Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`ed); the rail toggle persists. Grid spacing is an editor setting (not in the document), defaulting to 3.175 mm for inch projects and 5 mm for mm projects; the grid is drawn when **Show grid** is on.
+Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`ed); the rail toggle persists. Grid spacing is an editor setting (not in the document), set to 3.175 mm for inch projects and 5 mm for mm projects whenever a project is opened or its display units change (a user edit to the spacing lasts until then); the grid is drawn when **Show grid** is on. The grid is drawn and snapped in the current context's space (definition axes while editing a motif), like the length and angle labels.
 
 - **Targets** (computed once at gesture start from `project`, excluding the moving selection; inside an edit context they include the other occurrences of the entered definition and its siblings, mapped into definition space): grid points; Board edges and centre lines; Band endpoints and vertices; Region vertices; listed intersection points; painted-bounds edges and centres of other objects.
 - **Sources** while moving: the selection's vertices, endpoints, and bounds edges/centres. The nearest source–target pair within tolerance wins; point targets beat line targets beat grid. A guide overlay shows the active snap.
@@ -336,10 +339,10 @@ The editor draws the whole scene unclipped, then a mat (a rect with an even-odd 
 `parseLength(text, defaultUnit)`: grammar, case-insensitive, after trimming:
 
 ```
-^([+-])?\s*(\d+(?:[.,]\d*)?|[.,]\d+)?(?:(?:\s+|-)?(\d+)\s*/\s*(\d+))?\s*(in|"|”|″|mm)?$
+^([+-])?\s*(?:(\d+(?:[.,]\d*)?|[.,]\d+)|(?:(\d+)(?:\s+|-))?(\d+)\s*/\s*(\d+))\s*(in|"|”|″|mm)?$
 ```
 
-with at least one of the number or fraction present, `,` accepted as the decimal separator, the sign applying to the whole value, a non-zero denominator, and the unit suffix overriding `defaultUnit`. Integer arithmetic (numerator/denominator) then `× 25.4` for inches. Rejected: empty, `1 - 1/8`, exponents, feet, expressions, two units. No fraction library is used (rationale in the reconciliation document).
+i.e. either a decimal, or a fraction with an optional whole number that must be separated from it by whitespace or a hyphen (so `13/16` is thirteen sixteenths, never 1 3/16); `,` accepted as the decimal separator, the sign applying to the whole value, a non-zero denominator, and the unit suffix overriding `defaultUnit`. Integer arithmetic (numerator/denominator) then `× 25.4` for inches. Rejected: empty, `1 - 1/8`, exponents, feet, expressions, two units. No fraction library is used (rationale in the reconciliation document).
 
 `formatLength(mm, unit)`: inches — if within 0.0005" of `k/64`, a reduced mixed fraction (`1 1/8`, `3/16`, `2`); otherwise three decimals. mm — up to two decimals, trailing zeros trimmed. Angles: one decimal, trailing zero trimmed. Units are shown beside the field.
 
@@ -371,7 +374,7 @@ Field policies: widths, board dimensions, grid spacing, scale > 0; steps and off
 
 ## 11. Accessibility
 
-Native `button`/`input`/`select` or Radix primitives (Dialog, Tooltip, Popover). Every control has a visible label or `aria-label`. Inspector fields have `<label>`s. Tab / `[` / `]` cycle selection through the current context's objects, so the inspector and the crossing list are reachable without a pointer. Selection is indicated by outline and inspector heading, not colour alone. Material names are visible. Every drag has a numeric equivalent (bounds X/Y, Rotate by, per-point fields, crossing list). Layout is rem/flex; the canvas fills the remainder and stays correct at 200% browser zoom.
+Native `button`/`input`/`select` or Radix primitives (Dialog, Tooltip, Popover). Every control has a visible label or `aria-label`. Inspector fields have `<label>`s. `[` / `]` cycle selection through the current context's objects (with the canvas focused), so the inspector and the crossing list are reachable without a pointer; Tab keeps its native focus movement so the canvas is never a focus trap. Selection is indicated by outline and inspector heading, not colour alone. Material names are visible. Every drag has a numeric equivalent (bounds X/Y, Rotate by, per-point fields, crossing list). Layout is rem/flex; the canvas fills the remainder and stays correct at 200% browser zoom.
 
 ## 12. Fixtures (`src/fixtures/`, original designs; JSON plus UI authoring tests)
 
@@ -458,6 +461,7 @@ src/
 | Slop rev 2 F2 | Duplicate-with-last-offset duplicates Repeat | Removed |
 | Slop rev 2 F3 | Download hash for dirty tracking exceeds the objection | Confirm unless blank |
 | Slop rev 2 F4 | `preview.base` duplicated `project` | Removed |
+| Task 4 implementation | Enlarged-footprint `crowded`/`occluded` made flush-packed weaves unsupported in some paint orders; a per-side enlargement rule was reviewed and found to need four more sub-rules | Classification uses plain footprints only; the clip is enlarged across O's edges only; the U-edge blend is the accepted residual; painted geometry includes miter triangles; `CLASSIFY_EXTEND_MM` renamed `MAX_CLIP_EXTEND_MM` (§4.5, §5.2, §6.1, §6.2) |
 | Editor 23, 24, 25 | Touch marker reason/size, keyboard paths, touch emulation limits | §7.4, §11, G7 |
 | Editor 28, 29 | Grid details, hand tool, aspect | §7.7, §7.2 |
 | Product 2 | Repeat command unspecified; default step leaves gaps | §7.4 Repeat; painted bounds |
@@ -470,5 +474,10 @@ src/
 | Product 14, 16, 17, 20, 22 | G6 scope, F counts, grid/zoom/outside view, seam markers, ½ step | Adopted |
 | Product 15 | Current material undefined | §3 |
 | Editor 30 | Show `≈` for inexact fractions | Declined: adds a display state for no workflow gain |
+| Fix wave | §4.5 padded conservative bounds by 2.5w but a miter tip reaches 5w | Pad is 5w (§4.5); painted-geometry prefilter boxes include joint triangles |
+| Final review C1 | The §8 regex let `13/16` backtrack into `1` + `3/16` | Fraction branch requires a separator between whole and fraction (§8) |
+| Final review I4 | Rematch ran in commands and again in `commit()` | Commands are the only rematch owner (§7.1) |
+| Final review I2, walkthrough | Grid default never followed inch units | Grid spacing set from display units on open and on unit change (§7.7) |
+| Walkthrough | Duplicate in place gave no visible result | Copy offset by one grid step (§7.4) |
 | Product 4 (part) | Draggable pivot point | Declined: vertex-snapped move and typed lengths cover alignment |
 | Product 8 (part) | Separate "Move by" field | Declined: bounds X/Y covers it |

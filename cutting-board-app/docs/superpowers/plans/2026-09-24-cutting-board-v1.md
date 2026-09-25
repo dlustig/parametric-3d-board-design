@@ -20,7 +20,7 @@
 - No dependency outside spec §15 without a note in `docs/decisions/`. No `any`. Explicit return types on exported functions.
 - Commit messages: imperative, ≤ 50-char subject, no agent trailers. Use `FSH_NO_TTY=1 git commit`.
 - Never `preventDefault` on canvas `pointerdown` (spec §7.2).
-- One spec constant is deliberately camera-dependent: only the patch clip enlargement; classification never is.
+- One spec constant is deliberately camera-dependent: only the patch clip enlargement; classification never is. The clip is enlarged across the over band's edges only (spec §6.2, rev 4).
 
 ## Review Focus
 
@@ -281,7 +281,7 @@ Inputs the spec implies but no task's tests exercise by default; each has been a
   ```
 - Consumes: Tasks 2–5.
 
-- [ ] Tests (`scene.test.ts`): band U painted before O with O set over → elements are `[U, patch(O), O]`; patch `segment` is O's crossed segment only; O already after U → no patch; two crossings on U with different over bands → two patches right after U, in intersection order; `clipExtendMm` changes only `clip` polygons, never `intersections[*].cls`; an unsupported world intersection of a resolved definition record appears in `intersections` with its class and the record appears in `unresolved` with a `worldHint` per occurrence only when unresolved in its context.
+- [ ] Tests (`scene.test.ts`): band O painted before U with O set over → elements are `[O, U, patch(O)]`; patch `segment` is O's crossed segment only; patch `clip` equals `footprint(sO, wO + 2e, sU, wU)` (enlarged across O's edges only, never across U's — spec §6.2); O already after U → no patch; two crossings on U with different over bands → two patches right after U, in canonical-key order; `clipExtendMm` changes only `clip` polygons, never `intersections[*].cls`; an unsupported world intersection of a resolved definition record appears in `intersections` with its class and the record appears in `unresolved` with a `worldHint` per occurrence only when unresolved in its context.
 - [ ] Tests (`svg.test.ts`): output starts with `<svg xmlns=…width="300mm" height="450mm" viewBox="0 0 300 450">`; contains `<title>` with `&lt;` for a name `<b>`; a material named `"x"&y` escapes; patch path has `fill="none"` and miter attributes; every `id` starts with the prefix and two calls have different prefixes; no `class=`, `style=`, or `url(` not followed by `#`; the board rect uses the background colour or `none`.
 - [ ] Run red → implement → green → typecheck → commit `Add scene builder and standalone SVG export`.
 
@@ -355,7 +355,7 @@ Inputs the spec implies but no task's tests exercise by default; each has been a
 
 - [ ] `pnpm add @use-gesture/react react-moveable react-selecto` and `pnpm add -D @playwright/test`; `playwright.config.ts` with `webServer: pnpm dev`, projects `chromium`, `firefox`, `webkit`, and a `chromium-touch` project (`hasTouch: true`, `isMobile: true`).
 - [ ] Unit test `camera.test.ts`: `zoomAbout` keeps the anchor fixed; `fitBoard` yields 5% margin.
-- [ ] Render: `Canvas` = wrapper div (`touch-action: none`) → `<svg viewBox>` → `SceneSvg` (flat elements from `buildScene(previewOrProject, min(1.5/zoom, CLASSIFY_EXTEND_MM))`, regions with seam stroke, bands, patches with `<clipPath>` in `<defs>`) → board mat (§7.8) → `Proxies` → selection overlay. Moveable (`container` = wrapper, `draggable`, `rotatable`, `resizable={false}`, `snappable={false}`, `origin={false}`) targets the selected proxies; Selecto (`selectableTargets: ['[data-object-id]']`, `getElementRect` from domain bounds, `hitRate: 0`) marquee on empty space.
+- [ ] Render: `Canvas` = wrapper div (`touch-action: none`) → `<svg viewBox>` → `SceneSvg` (flat elements from `buildScene(previewOrProject, min(EDITOR_CLIP_EXTEND_PX / zoom, MAX_CLIP_EXTEND_MM))`, regions with seam stroke, bands, patches with `<clipPath>` in `<defs>`) → board mat (§7.8) → `Proxies` → selection overlay. Moveable (`container` = wrapper, `draggable`, `rotatable`, `resizable={false}`, `snappable={false}`, `origin={false}`) targets the selected proxies; Selecto (`selectableTargets: ['[data-object-id]']`, `getElementRect` from domain bounds, `hitRate: 0`) marquee on empty space.
 - [ ] Select tool: click → topmost object under point from domain geometry; Shift/addToSelection toggles; Moveable `onDrag` → `setPreview(translateObjects(project, sel, Δworld))` with Δ from `screenToWorld` of the pointer delta (never Moveable's `translate`); `onDragEnd` → `isDrag && inputEvent.type !== 'touchcancel' ? commit() : cancelPreview()`; rotate with a frozen proxy rect and angle from pointer positions about the fixed centre → `rotateObjects`. Second pointer or Space → `moveable.stopDrag()`, cancel preview, abort Selecto (record whether Selecto exposes an abort; if not, unmount it while a second pointer is down).
 - [ ] Write `e2e/interaction-proof.spec.ts` implementing spec §15 (a)–(j) against a seeded project (`window.__cbpd.replaceProject` with one band, one region, one rotated instance, one 2×2 repeat). Each assertion is its own test. Run in chromium and chromium-touch (touch for f, g).
 - [ ] Run the proof. **Gate:** all of (a)–(j) pass, or each failure is recorded in `docs/decisions/2026-09-24-slice1-interaction.md` with the exact library behaviour observed. If a failure is a library coordinate/event limitation that cannot be arbitrated with configuration, STOP and report to the orchestrator (do not build replacement interaction machinery in this task).
@@ -591,3 +591,42 @@ Inputs the spec implies but no task's tests exercise by default; each has been a
 - Spec coverage: §2–§6 → Tasks 2–6; §7.1 → 7; §7.2–7.3 → 8; §7.4 tools → 11, commands → 12, motif ops → 13, crossing → 14; §7.5 → 10, 13; §7.6 → 13; §7.7 → 11; §7.8 → 8; §8 → 10; §9 → 16; §10 → 6, 17; §11 → 19; §12 → 15; §13 gates: G1/G2 → 5, G3 → 3 + 8, G4 → 4, G5 → 9 + 17, G6 → 18, G7 → 19, G8 → 2 + 16, G9 → 20; §15 → 8.
 - Type consistency: `Mat`, `Occurrence`, `Intersection`, `Scene`, `ContextId`, `CommandResult`, `Clipboard` are defined once and referenced by name thereafter.
 - Review Focus items are pinned to Tasks 5, 4, 12, 2, 10 respectively.
+
+---
+
+### Task 22: Spec-gap closure found by the authorability gate (executes between Tasks 18 and 19)
+
+**Files:**
+- Modify: `src/render/Canvas.tsx`, `src/editor/tools/select.ts`, `src/geometry/snap.ts`, `src/editor/tools/draw.ts`, `src/ui/Toolbar.tsx`, `src/domain/commands/property.test.ts`
+- Create: `src/render/overlays/VertexHandles.tsx`
+- Test: `src/geometry/snap.test.ts` (extend), `e2e/vertex-handles.spec.ts`, `e2e/move-snap.spec.ts`
+
+**Interfaces:**
+- Consumes: `setPoint`, `insertPoint`, `deletePoint` (Task 5), `collectSnapTargets`/`snapPoint` (Task 11), Moveable drag path (Task 8).
+- Produces: vertex/midpoint handle overlay for a single selected Band or Region; snapping during Moveable drags; `snapPoint` along-line grid rule; `snapSegmentEnd` grid-points-near-ray rule.
+
+- [ ] **Vertex and midpoint handles** (spec §7.4 Select bullet): when exactly one Band or Region is selected, render a handle at each vertex and at each segment midpoint (screen-px sized, above the selection overlay). Dragging a vertex handle previews `setPoint` with snapping (targets from `collectSnapTargets` excluding the object; point > line > grid) and commits on release; dragging a midpoint handle previews `insertPoint` then moves the new point; dropping a vertex within snap tolerance of a neighbour deletes it (`deletePoint`). Raw Pointer Events on the handle elements; Moveable's drag must not start from a handle press. Touch hit radius 22 px.
+- [ ] **Snapping while moving a selection** (spec §7.7): at Moveable drag start, freeze targets from `project` excluding the selection and compute sources (selection vertices, endpoints, bounds edges/centres); each frame, find the nearest source–target pair within tolerance and apply that offset to Δworld (point > line > grid); show the snap guide; Alt disables.
+- [ ] **Crossing tool button** in the rail (label "Crossing", key X in the tooltip).
+- [ ] **Snap rules:** (a) `snapPoint`: after a line snap, if a grid point on that line is within tolerance of the snapped point, snap to it (guide 'point'); (b) `snapSegmentEnd`: with an angle captured, candidate lengths are the distances to grid points whose perpendicular distance to the ray is within tolerance (grid intersections on or near the ray), plus line-target intersections; choose the nearest to the pointer; never whole grid steps along the ray. Unit tests: a 45° ray from a grid point snaps to 60√2 (grid point (60,60)), not 85; a grid point on a Board centre line snaps exactly to the grid point.
+- [ ] **Property-test runtime:** cap toggle-command generation to the first 40 listed intersections per fixture so the interlace case runs well under 5 s; keep the 20 s timeout as headroom.
+- [ ] e2e: vertex drag with snap to another band's endpoint commits one history entry; midpoint insert; neighbour-merge delete; Moveable drag snaps a band endpoint onto a region vertex (world coordinates exact to 1e-6); Alt held during the drag disables the snap.
+- [ ] Update the G6 workaround notes in `docs/decisions/2026-09-24-gates.md` to say which are now resolved (do not re-run G6 here; Task 21 re-runs everything).
+- [ ] Commit: `Add vertex handles, move snapping, snap rules`.
+
+---
+
+### Task 23: Diagnose and fix the middle-button pan race (executes after Task 20, before Task 21)
+
+**Files:**
+- Modify: `src/editor/input.ts` and/or `src/render/Canvas.tsx` (only if the cause is in the app); `e2e/interaction-proof.spec.ts` (only if the cause is test authorship)
+- Test: `e2e/interaction-proof.spec.ts` (i), run `--repeat-each 10 --workers=1` in chromium and webkit
+
+**Interfaces:** consumes the §7.2 input-ownership table; produces no new interface.
+
+- [ ] Reproduce: `pnpm exec playwright test e2e/interaction-proof.spec.ts -g "(i)" --project=chromium --repeat-each 10 --workers=1` (Task 19 measured 3/8 failures single-worker on the middle-button drag pan assertion).
+- [ ] Apply the systematic-debugging discipline: capture the failing assertion's actual vs expected camera values and the sequence of pointer/mouse events use-gesture received (instrument with a temporary console log read via Playwright, removed before commit). Form a hypothesis (candidates: use-gesture's drag `filterTaps`/threshold before the first move; the middle-button `pointerdown` arriving before `mousedown` ordering with Selecto; the test's `page.mouse` sequence not awaiting a frame; a `passive` wheel/gesture option racing). Test the hypothesis with a minimal change.
+- [ ] Fix the cause. If the cause is in the app (a real race in the pan path), fix it in `input.ts`/`Canvas.tsx` and keep the test unchanged. If the cause is the test (missing `nextFrame` waits, unrealistic event timing), fix the test and say so in the report. Do not widen tolerances.
+- [ ] Verify: `--repeat-each 10 --workers=1` passes 10/10 in chromium and webkit; full `pnpm test:e2e --project=chromium` green.
+- [ ] Record the root cause in `docs/decisions/2026-09-24-gates.md` next to the §15 row (replace the flake footnote).
+- [ ] Commit: `Fix middle-button pan race` (or `Fix flaky pan proof test`).

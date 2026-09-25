@@ -25,6 +25,8 @@ Inputs: the orchestrator handoff and the consolidated research packet (Part I pr
 
 TypeScript 7.x (native compiler) is now the npm latest. The Vite template pins its own TypeScript; keep whatever the template installs unless it breaks Vitest or the React plugin.
 
+`pnpm licenses list` on the Task 1 scaffold's installed graph (react, react-dom, vite, @vitejs/plugin-react, typescript, vitest, and their transitive deps): licence names present are MIT, Apache-2.0 (detect-libc, expect-type, typescript), BSD-3-Clause (source-map-js), ISC (picocolors, siginfo), and MPL-2.0 (lightningcss, lightningcss-linux-x64-gnu); no GPL/AGPL or unlicensed packages.
+
 ## Contradictions and corrections
 
 1. **Band/Region `transform` field removed.** Part I's illustrative model gives Bands and Regions their own Transform. Part II §4.1 defines the transform chain for motif instances and repeats only. Two ways to express the same geometry (points plus a transform) would double every geometry path, snapping rule, and inspector field. Decision: Bands and Regions store points in their parent's coordinate space; move/rotate/mirror bake into points. Only motif instances and repeat fields carry a Transform. Affected acceptance: none; all product tests still pass with baked points. Documented in SPEC §2.

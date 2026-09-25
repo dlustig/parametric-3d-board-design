@@ -1,0 +1,443 @@
+:root {
+  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light dark;
+  --page-bg: #f4f1ea;
+  --ink: #1f1d1a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page-bg: #1e1d1b;
+    --ink: #ece8e0;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--page-bg);
+  color: var(--ink);
+}
+
+#root,
+.app {
+  height: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+}
+
+/* SPEC §7.5 Inspector layout: three-column flex — left Toolbar rail, centre
+   Canvas, right Inspector. */
+.app-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 6px;
+  overflow-y: auto;
+  border-right: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+}
+
+.toolbar button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.toolbar button[aria-pressed='true'],
+.tool-options button[aria-pressed='true'] {
+  font-weight: 700;
+}
+
+.toolbar-gap {
+  flex: 1;
+}
+
+.canvas-host {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.inspector {
+  flex: 0 0 280px;
+  width: 280px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  overflow-y: auto;
+  border-left: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+}
+
+.panel {
+  margin-bottom: 18px;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.panel h3 {
+  margin: 12px 0 6px;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.field label {
+  min-width: 5.5rem;
+  font-size: 0.8rem;
+}
+
+.field input,
+.field select {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-checkbox {
+  justify-content: flex-start;
+}
+
+.field-unit {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.field-error {
+  flex-basis: 100%;
+  font-size: 0.7rem;
+  color: #c0392b;
+}
+
+.point-row,
+.segment-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.segment-label {
+  min-width: 4.5rem;
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.canvas-svg {
+  display: block;
+}
+
+.board-mat {
+  fill: var(--page-bg);
+  opacity: 0.7;
+}
+
+/* Presses are routed by domain hit-testing (Canvas), so Moveable's own
+   surfaces must not take them: the group drag area would turn a press on empty
+   space inside a multi-selection into a drag, and the box lines and rotation
+   strip would swallow presses on thin objects (a 3 px band at low zoom). Only
+   the round rotation handle stays interactive. */
+.moveable-control-box .moveable-area,
+.moveable-control-box .moveable-line,
+.moveable-control-box .moveable-rotation {
+  pointer-events: none;
+}
+
+.moveable-control-box .moveable-rotation-control {
+  pointer-events: auto;
+}
+
+/* SPEC §7.4 drawing tools' options bar, over the top of the canvas. */
+.tool-options {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--page-bg);
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-radius: 6px;
+}
+
+.tool-options button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.tool-options-fields {
+  display: flex;
+  gap: 8px;
+}
+
+.tool-options-fields .field {
+  margin-bottom: 0;
+}
+
+.tool-options-fields .field label {
+  min-width: 0;
+}
+
+.tool-options-fields .field input {
+  width: 6rem;
+}
+
+/* SPEC §3 materials palette. */
+.materials-panel {
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+}
+
+.materials-hint {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.materials-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.material-swatch-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.material-swatch {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 6px;
+  text-align: left;
+}
+
+.material-swatch[aria-pressed='true'] {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.material-swatch-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  flex: 0 0 auto;
+}
+
+.material-swatch-name {
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-editor-trigger {
+  flex: 0 0 auto;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+.material-editor-popover {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--page-bg);
+  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px color-mix(in srgb, black 25%, transparent);
+  min-width: 14rem;
+}
+
+.material-editor-popover .field select {
+  flex: 1;
+}
+
+.popover-arrow {
+  fill: var(--page-bg);
+}
+
+.tooltip {
+  z-index: 3;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  background: var(--ink);
+  color: var(--page-bg);
+  border-radius: 4px;
+}
+
+/* SPEC §7.6 edit context: the scrim over the full scene, and the breadcrumb. */
+.context-scrim-rect {
+  fill: var(--page-bg);
+  opacity: 0.6;
+}
+
+.breadcrumb {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--page-bg);
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-radius: 6px;
+}
+
+.breadcrumb button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* SPEC §7.5 Repeat panel: an offset field with its ½ step button. */
+.field-with-button {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.field-with-button .field {
+  flex: 1;
+  min-width: 0; /* else the input's intrinsic width pushes the row past the 280 px inspector */
+}
+
+.overrides {
+  list-style: none;
+  padding: 0;
+}
+
+.overrides li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.panel-note {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* SPEC §9 persistence: Project menu + save status bar, the recovery banner,
+   and the New/Open confirmation dialog. */
+.app-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+}
+
+.project-menu {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.status-bar-message {
+  color: #c0392b;
+}
+
+.recovery-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, orange 20%, var(--page-bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  font-size: 0.85rem;
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  background: color-mix(in srgb, black 40%, transparent);
+}
+
+.dialog-content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--page-bg);
+  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px color-mix(in srgb, black 25%, transparent);
+  min-width: 20rem;
+}
