@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-basket-weave",
+  "name": "Basket weave",
+  "displayUnits": "mm",
+  "board": {
+    "widthMm": 300,
+    "heightMm": 450,
+    "backgroundMaterialId": null
+  },
+  "materials": [
+    {
+      "id": "walnut",
+      "name": "Walnut",
+      "color": "#5C3A21"
+    },
+    {
+      "id": "maple",
+      "name": "Maple",
+      "color": "#E8D4A8"
+    }
+  ],
+  "objects": {
+    "weave-h0": {
+      "type": "band",
+      "id": "weave-h0",
+      "materialId": "walnut",
+      "widthMm": 10,
+      "closed": false,
+      "points": [
+        {
+          "id": "weave-h0p0",
+          "x": -30,
+          "y": -15
+        },
+        {
+          "id": "weave-h0p1",
+          "x": 30,
+          "y": -15
+        }
+      ]
+    },
+    "weave-h1": {
+      "type": "band",
+      "id": "weave-h1",
+      "materialId": "walnut",
+      "widthMm": 10,
+      "closed": false,
+      "points": [
+        {
+          "id": "weave-h1p0",
+          "x": -30,
+          "y": 15
+        },
+        {
+          "id": "weave-h1p1",
+          "x": 30,
+          "y": 15
+        }
+      ]
+    },
+    "weave-v0": {
+      "type": "band",
+      "id": "weave-v0",
+      "materialId": "maple",
+      "widthMm": 10,
+      "closed": false,
+      "points": [
+        {
+          "id": "weave-v0p0",
+          "x": -15,
+          "y": -30
+        },
+        {
+          "id": "weave-v0p1",
+          "x": -15,
+          "y": 30
+        }
+      ]
+    },
+    "weave-v1": {
+      "type": "band",
+      "id": "weave-v1",
+      "materialId": "maple",
+      "widthMm": 10,
+      "closed": false,
+      "points": [
+        {
+          "id": "weave-v1p0",
+          "x": 15,
+          "y": -30
+        },
+        {
+          "id": "weave-v1p1",
+          "x": 15,
+          "y": 30
+        }
+      ]
+    },
+    "weave-field": {
+      "type": "repeat",
+      "id": "weave-field",
+      "motifId": "weave-unit",
+      "transform": {
+        "x": 60,
+        "y": 100,
+        "rotationDeg": 0,
+        "mirrorX": false,
+        "mirrorY": false,
+        "scale": 1
+      },
+      "rows": 3,
+      "columns": 3,
+      "stepXMm": 60,
+      "stepYMm": 60,
+      "rowOffsetMm": 0,
+      "columnOffsetMm": 0,
+      "alternateMirrorX": false,
+      "alternateMirrorY": false,
+      "alternateRotationDeg": 90
+    }
+  },
+  "rootChildren": [
+    "weave-field"
+  ],
+  "motifs": {
+    "weave-unit": {
+      "id": "weave-unit",
+      "name": "Weave unit",
+      "children": [
+        "weave-h0",
+        "weave-h1",
+        "weave-v0",
+        "weave-v1"
+      ],
+      "crossings": [
+        {
+          "id": "x-h0v0",
+          "a": {
+            "path": [],
+            "bandId": "weave-h0",
+            "segmentStart": "weave-h0p0"
+          },
+          "b": {
+            "path": [],
+            "bandId": "weave-v0",
+            "segmentStart": "weave-v0p0"
+          },
+          "over": "a",
+          "hint": {
+            "x": -15,
+            "y": -15
+          }
+        },
+        {
+          "id": "x-h0v1",
+          "a": {
+            "path": [],
+            "bandId": "weave-h0",
+            "segmentStart": "weave-h0p0"
+          },
+          "b": {
+            "path": [],
+            "bandId": "weave-v1",
+            "segmentStart": "weave-v1p0"
+          },
+          "over": "b",
+          "hint": {
+            "x": 15,
+            "y": -15
+          }
+        },
+        {
+          "id": "x-h1v0",
+          "a": {
+            "path": [],
+            "bandId": "weave-h1",
+            "segmentStart": "weave-h1p0"
+          },
+          "b": {
+            "path": [],
+            "bandId": "weave-v0",
+            "segmentStart": "weave-v0p0"
+          },
+          "over": "b",
+          "hint": {
+            "x": -15,
+            "y": 15
+          }
+        },
+        {
+          "id": "x-h1v1",
+          "a": {
+            "path": [],
+            "bandId": "weave-h1",
+            "segmentStart": "weave-h1p0"
+          },
+          "b": {
+            "path": [],
+            "bandId": "weave-v1",
+            "segmentStart": "weave-v1p0"
+          },
+          "over": "a",
+          "hint": {
+            "x": 15,
+            "y": 15
+          }
+        }
+      ]
+    }
+  },
+  "crossings": []
+}
