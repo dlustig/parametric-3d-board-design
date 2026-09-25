@@ -18,6 +18,7 @@ import {
   reorder,
   replaceMaterial,
   rotateObjects,
+  setBandClosed,
   setBandWidth,
   setMaterial,
   setPoint,
@@ -68,6 +69,22 @@ describe('add', () => {
     expect(withRegion.objects[withRegion.motifs.M!.children[3]!]!.type).toBe('region')
   })
 
+  it('a closing point on the first point is dropped; too few points or a too-short segment is refused (invariant 3)', () => {
+    const square = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 0.001 }]
+    const region = ok(addRegion(project([]), { ctx: null, materialId: MAT, points: square }))
+    expect(coords(region, region.rootChildren[0]!)).toHaveLength(3)
+    const closed = ok(addBand(project([]), { ctx: null, materialId: MAT, widthMm: 2, points: square, closed: true }))
+    expect(bandOf(closed, closed.rootChildren[0]!).points).toHaveLength(3)
+    // An open band keeps an end that returns to its start.
+    const open = ok(addBand(project([]), { ctx: null, materialId: MAT, widthMm: 2, points: square }))
+    expect(bandOf(open, open.rootChildren[0]!).points).toHaveLength(4)
+
+    const triangle = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 0.001 }]
+    expect(addRegion(project([]), { ctx: null, materialId: MAT, points: triangle }).ok).toBe(false)
+    expect(addBand(project([]), { ctx: null, materialId: MAT, widthMm: 2, points: triangle, closed: true }).ok).toBe(false)
+    expect(addBand(project([]), { ctx: null, materialId: MAT, widthMm: 2, points: [{ x: 0, y: 0 }, { x: 0.001, y: 0 }, { x: 5, y: 0 }] }).ok).toBe(false)
+  })
+
   it('adding into a definition placed by a repeat at the occurrence cap is refused', () => {
     // 50 × 50 cells × 2 bands = exactly 5000 occurrences.
     const atCap = project([repeat('F', 'M', { rows: 50, columns: 50 })], [plus])
@@ -77,6 +94,14 @@ describe('add', () => {
     expect(addBand(atCap, { ctx: 'M', materialId: MAT, widthMm: 3, points })).toEqual(refused(7500))
     expect(addRegion(atCap, { ctx: 'M', materialId: MAT, points })).toEqual(refused(7500))
     expect(addBand(atCap, { ctx: null, materialId: MAT, widthMm: 3, points })).toEqual(refused(5001))
+  })
+})
+
+describe('setBandClosed', () => {
+  it('closes a band, but refuses when its ends already meet (the closing segment would be shorter than MIN_SEGMENT_MM)', () => {
+    const p = project([band('U', [[0, 0], [10, 0], [10, 10]]), band('L', [[0, 0], [10, 0], [10, 10], [0, 0.001]])])
+    expect(bandOf(ok(setBandClosed(p, 'U', true)), 'U').closed).toBe(true)
+    expect(setBandClosed(p, 'L', true)).toEqual({ ok: false, message: 'The band already ends on its first point' })
   })
 })
 

@@ -74,12 +74,17 @@ function interlace2x2(): Project {
   return p
 }
 
+// An open band whose last point sits on its first: closing it would make a
+// zero-length closing segment (SPEC §2.1 invariant 3), so it must refuse.
+const loop = project([band('L', [[0, 0], [30, 0], [30, 30], [0, 0.001]])])
+
 const corpus: Array<[string, Project]> = [
   ['blank', newProject('mm')],
   ['stripes-like', stripes],
   ['3×3 repeat with records', field],
   ['nested motif', nested],
   ['at occurrence cap', atCap],
+  ['band ending on its start', loop],
   // Task 15: the six original acceptance fixtures (SPEC §12).
   ['fixture: stripes', fixtures.stripes],
   ['fixture: checker', fixtures.checker],
@@ -103,6 +108,10 @@ function commandsFor(p: Project): Command[] {
   const out: Command[] = [
     ['addBand', (q) => commands.addBand(q, { ctx: null, materialId: m0, widthMm: 5, points: [{ x: -5, y: -5 }, { x: 90, y: 70 }] })],
     ['addRegion', (q) => commands.addRegion(q, { ctx: null, materialId: m0, points: [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 9, y: 9 }] })],
+    // A closing point repeating the first (a typed segment ending there): dropped; with too few points left, refused.
+    ['addRegion closing point', (q) => commands.addRegion(q, { ctx: null, materialId: m0, points: [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 9, y: 9 }, { x: 0.001, y: 0 }] })],
+    ['addRegion collapsed', (q) => commands.addRegion(q, { ctx: null, materialId: m0, points: [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 0, y: 0.001 }] })],
+    ['addBand closed closing point', (q) => commands.addBand(q, { ctx: null, materialId: m0, widthMm: 2, closed: true, points: [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 9, y: 9 }, { x: 0, y: 0.001 }] })],
     ['translate', (q) => commands.translateObjects(q, root, 3, -2)],
     ['rotate', (q) => commands.rotateObjects(q, root, 30, { x: 10, y: 10 })],
     ['mirror x', (q) => commands.mirrorObjects(q, root, 'x', { x: 40, y: 0 })],

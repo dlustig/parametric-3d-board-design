@@ -4,10 +4,10 @@ import { rematchCrossings } from '@/geometry/resolve'
 import { offsetPolyline } from '@/geometry/offset'
 import { newId } from '@/domain/ids'
 import { stepObjectId } from '@/domain/keys'
-import type { Band, BandRef, ContextId, DesignObject, Id, MotifInstance, Project, Region, RepeatField, Transform } from '@/domain/model'
+import type { Band, BandRef, ContextId, DesignObject, Id, MotifInstance, Project, RepeatField, Transform } from '@/domain/model'
 import { childrenOf, contextOf } from '@/domain/project'
 import type { CommandResult } from './index.ts'
-import { hasTooCloseSegment } from '@/domain/limits'
+import { hasTooCloseSegment, tooClose } from '@/domain/limits'
 import { fail, filterAllRecords, mapObjects, ok, replaceObject, withChildren, withinCap } from './shared.ts'
 
 type XY = { x: number; y: number }
@@ -17,18 +17,33 @@ function addToContext(p: Project, ctx: ContextId, obj: DesignObject): CommandRes
   return withinCap(withChildren(replaceObject(p, obj), ctx, [...childrenOf(p, ctx), obj.id]))
 }
 
-function newPoints(points: XY[]): Band['points'] {
-  return points.map(({ x, y }) => ({ id: newId(), x, y }))
+/**
+ * The points of a new Band/Region with fresh ids (SPEC §2.1 invariant 3): for
+ * a closed shape, a last point within MIN_SEGMENT_MM of the first only
+ * repeats it and is dropped. A refusal message when a segment is still too
+ * short or too few points remain.
+ */
+function newPoints(points: XY[], closes: boolean): Band['points'] | string {
+  const first = points[0]
+  const last = points[points.length - 1]
+  const kept = closes && points.length > 1 && tooClose(first!, last!) ? points.slice(0, -1) : points
+  const min = closes ? 3 : 2
+  if (kept.length < min) return `A ${closes ? 'closed shape' : 'band'} needs at least ${min} points`
+  if (hasTooCloseSegment(kept, closes)) return 'Two points would be too close together'
+  return kept.map(({ x, y }) => ({ id: newId(), x, y }))
 }
 
 export function addBand(p: Project, args: { ctx: ContextId; materialId: Id; widthMm: number; points: XY[]; closed?: boolean }): CommandResult {
-  const band: Band = { type: 'band', id: newId(), materialId: args.materialId, widthMm: args.widthMm, closed: args.closed ?? false, points: newPoints(args.points) }
-  return addToContext(p, args.ctx, band)
+  const closed = args.closed ?? false
+  const points = newPoints(args.points, closed)
+  if (typeof points === 'string') return fail(points)
+  return addToContext(p, args.ctx, { type: 'band', id: newId(), materialId: args.materialId, widthMm: args.widthMm, closed, points })
 }
 
 export function addRegion(p: Project, args: { ctx: ContextId; materialId: Id; points: XY[] }): CommandResult {
-  const region: Region = { type: 'region', id: newId(), materialId: args.materialId, points: newPoints(args.points) }
-  return addToContext(p, args.ctx, region)
+  const points = newPoints(args.points, true)
+  if (typeof points === 'string') return fail(points)
+  return addToContext(p, args.ctx, { type: 'region', id: newId(), materialId: args.materialId, points })
 }
 
 function referencedMotifs(p: Project, objectIds: Iterable<Id>): Set<Id> {
@@ -134,10 +149,11 @@ export function setBandWidth(p: Project, id: Id, widthMm: number): Project {
   return rematchCrossings(p, replaceObject(p, { ...(p.objects[id] as Band), widthMm }))
 }
 
-/** Toggles `closed`; refused going closed below the 3-point minimum (SPEC §2 `Band.points`). */
+/** Toggles `closed`; refused going closed below the 3-point minimum (SPEC §2 `Band.points`) or when the closing segment would be shorter than MIN_SEGMENT_MM (invariant 3). */
 export function setBandClosed(p: Project, id: Id, closed: boolean): CommandResult {
   const band = p.objects[id] as Band
   if (closed && band.points.length < 3) return fail('A closed band needs at least 3 points')
+  if (closed && tooClose(band.points[0]!, band.points[band.points.length - 1]!)) return fail('The band already ends on its first point')
   return ok(rematchCrossings(p, replaceObject(p, { ...band, closed })))
 }
 
