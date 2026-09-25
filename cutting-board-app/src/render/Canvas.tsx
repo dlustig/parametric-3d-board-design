@@ -50,6 +50,7 @@ import {
   enterAt,
   handlesFor,
   objectAt,
+  pointsChanged,
   retargetAt,
   selectableBounds,
   startHandleDrag,
@@ -103,7 +104,7 @@ export function Canvas(): JSX.Element {
   const pressSelectedRef = useRef(false)
   const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null)
   /** The pointer pressing a vertex/midpoint handle, and its gesture (also in `gestureRef` so aborts reach it). */
-  const handlePressRef = useRef<{ id: number; start: XY; maxMove: number; gesture: Gesture } | null>(null)
+  const handlePressRef = useRef<{ id: number; start: XY; maxMove: number; gesture: Gesture; objectId: string } | null>(null)
   const [spaceDown, setSpaceDown] = useState(false)
   const [multiTouch, setMultiTouch] = useState(false)
   const [rotating, setRotating] = useState(false)
@@ -252,6 +253,8 @@ export function Canvas(): JSX.Element {
       e.stop() // a vertex/midpoint or Moveable handle owns this press
       return
     }
+    // An inspector field's pending preview commits now: its blur arrives after this press.
+    useEditor.getState().settlePreview()
     const s = useEditor.getState()
     const id = objectAt(s.project, s.editContext, screenToWorld(svg(), clientOf(e)))
     if (id === null) return // empty space: marquee
@@ -334,6 +337,8 @@ export function Canvas(): JSX.Element {
         return
       }
       if (e.button !== 0 || spaceRef.current || gestureRef.current !== null || moveableRef.current?.isMoveableElement(e.target as Element) === true) return
+      // An inspector field's pending preview commits first (its blur arrives after this press), so the drag starts from it.
+      useEditor.getState().settlePreview()
       const s = useEditor.getState()
       const handles = handlesFor(s.project, s.editContext, s.selection)
       const m = contextMatrix(s)
@@ -341,9 +346,10 @@ export function Canvas(): JSX.Element {
       const radius = e.pointerType === 'touch' ? HIT_RADIUS_TOUCH_PX : HIT_RADIUS_MOUSE_PX
       const k = pickNearest(handles.map((h) => worldToScreen(svgEl, apply(m, h.at))), client, radius)
       if (k === null) return
-      const gesture = startHandleDrag(svgEl, handles[k]!)
+      const handle = handles[k]!
+      const gesture = startHandleDrag(svgEl, handle)
       gestureRef.current = gesture
-      handlePressRef.current = { id: e.pointerId, start: client, maxMove: 0, gesture }
+      handlePressRef.current = { id: e.pointerId, start: client, maxMove: 0, gesture, objectId: handle.objectId }
     }
     const onMove = (e: PointerEvent): void => {
       const press = handlePressRef.current
@@ -358,7 +364,7 @@ export function Canvas(): JSX.Element {
       if (gestureRef.current !== press.gesture) return // aborted meanwhile
       gestureRef.current = null
       const dragged = press.maxMove >= TAP_SLOP_PX
-      endGesture(dragged, e)
+      endGesture(dragged && pointsChanged(useEditor.getState(), press.objectId), e)
       if (!dragged) tapRef.current(clientOf(e), e.shiftKey || useEditor.getState().addToSelection)
     }
     wrapper.addEventListener('pointerdown', onDown, { capture: true })

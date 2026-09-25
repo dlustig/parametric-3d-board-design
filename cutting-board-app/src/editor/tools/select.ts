@@ -9,18 +9,20 @@ import { deletePoint, insertPoint, rotateObjects, setPoint, translateObjects } f
 import { stepKey, stepObjectId } from '@/domain/keys'
 import type { Band, Id, MotifInstance, Project, Region, RepeatField, Step } from '@/domain/model'
 import { childrenOf } from '@/domain/project'
+import type { Mat } from '@/geometry/affine'
 import { apply, invert, isMirrored } from '@/geometry/affine'
 import type { Box } from '@/geometry/bounds'
 import { paintedBounds, unionBoxes } from '@/geometry/bounds'
 import type { Occurrence } from '@/geometry/expand'
 import { expand, segmentsOf } from '@/geometry/expand'
-import type { Mat } from '@/geometry/affine'
-import type { SnapSources } from '@/geometry/snap'
+import type { SnapResult, SnapSources } from '@/geometry/snap'
 import { boundsTargets, dist, snapDelta, snapPoint } from '@/geometry/snap'
+import { gestureSnapTargets, toleranceMm } from '@/editor/snap'
+import { MIN_SEGMENT_MM } from '@/geometry/tolerance'
 import { screenToWorld } from '../camera.ts'
 import type { EditContextLevel } from '../selection.ts'
+import type { EditorState } from '../store.ts'
 import { contextMatrix, useEditor } from '../store.ts'
-import { gestureSnapTargets, toleranceMm } from './draw.ts'
 
 type XY = { x: number; y: number }
 
@@ -200,7 +202,7 @@ export function startTranslate(svg: SVGSVGElement, startClient: XY): Gesture {
       const snapped = snap === null || noSnap ? null : snapDelta(snap.sources, snap.targets, raw, snap.tol)
       const d = snapped?.delta ?? raw
       useEditor.getState().setPreview(translateObjects(project, selection, d.x, d.y), 'cancel')
-      useEditor.setState({ snapGuide: snapped?.guide == null ? null : snapped })
+      showGuide(snapped?.guide == null ? null : snapped)
     },
   }
 }
@@ -208,7 +210,11 @@ export function startTranslate(svg: SVGSVGElement, startClient: XY): Gesture {
 /** A vertex or segment-midpoint handle of the single selected Band/Region (SPEC §7.4); `at` is in the context's space. */
 export type Handle = { kind: 'vertex'; objectId: Id; pointId: Id; at: XY } | { kind: 'midpoint'; objectId: Id; afterPointId: Id; at: XY }
 
-/** Handles for exactly one selected Band or Region of the current context: its vertices, then its segment midpoints (the closing one too). */
+/**
+ * Handles for exactly one selected Band or Region of the current context: its
+ * vertices, then its segment midpoints (the closing one too) — except on
+ * segments too short for `insertPoint` to split (< 2 × MIN_SEGMENT_MM).
+ */
 export function handlesFor(p: Project, editContext: EditContextLevel[], selection: Id[]): Handle[] {
   const id = selection.length === 1 ? selection[0]! : null
   const shape = id === null ? undefined : p.objects[id]
@@ -216,40 +222,43 @@ export function handlesFor(p: Project, editContext: EditContextLevel[], selectio
   if (!childrenOf(p, editContext[editContext.length - 1]?.motifId ?? null).includes(id)) return []
   const pts = shape.points
   const segments = shape.type === 'region' || shape.closed ? pts.length : pts.length - 1
-  return [
-    ...pts.map((q): Handle => ({ kind: 'vertex', objectId: id, pointId: q.id, at: { x: q.x, y: q.y } })),
-    ...pts.slice(0, segments).map((a, k): Handle => {
-      const b = pts[(k + 1) % pts.length]!
-      return { kind: 'midpoint', objectId: id, afterPointId: a.id, at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }
-    }),
-  ]
+  const midpoints: Handle[] = []
+  for (const [k, a] of pts.slice(0, segments).entries()) {
+    const b = pts[(k + 1) % pts.length]!
+    if (dist(a, b) >= 2 * MIN_SEGMENT_MM) midpoints.push({ kind: 'midpoint', objectId: id, afterPointId: a.id, at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } })
+  }
+  return [...pts.map((q): Handle => ({ kind: 'vertex', objectId: id, pointId: q.id, at: { x: q.x, y: q.y } })), ...midpoints]
+}
+
+/** Writes the store's snap guide only when it changes (one render per change, not per frame). */
+function showGuide(g: SnapResult | null): void {
+  const cur = useEditor.getState().snapGuide
+  const same = cur === g || (cur !== null && g !== null && cur.guide === g.guide && cur.line === g.line && cur.point.x === g.point.x && cur.point.y === g.point.y)
+  if (!same) useEditor.setState({ snapGuide: g })
 }
 
 /**
  * SPEC §7.4 vertex drag (a midpoint handle first inserts its point into the
  * preview, then drags it): the pointer maps into the context and snaps to
  * targets frozen now, excluding the object (SPEC §7.7); within snap tolerance
- * of a neighbour the point is deleted instead. Every frame recomputes from the
- * press-time project, so the whole drag commits as one history entry.
+ * of a neighbour the point is deleted instead (unless `deletePoint` refuses,
+ * e.g. a 2-point Band: its message shows and the point is placed as usual).
+ * Every frame recomputes from the press-time project, so the whole drag
+ * commits as one history entry.
  */
 export function startHandleDrag(svg: SVGSVGElement, handle: Handle): Gesture {
   const s = useEditor.getState()
   const id = handle.objectId
   let base = s.project
-  let moving: Id
-  if (handle.kind === 'vertex') {
-    moving = handle.pointId
-  } else {
+  if (handle.kind === 'midpoint') {
     const r = insertPoint(base, id, handle.afterPointId, handle.at)
-    if (!r.ok) return { move: () => {} }
-    base = r.project
-    const pts = (base.objects[id] as Band | Region).points
-    moving = pts[pts.findIndex((q) => q.id === handle.afterPointId) + 1]!.id
-    s.setPreview(base, 'cancel')
+    if (!r.ok) throw new Error(r.message) // handlesFor offers no midpoint insertPoint refuses
+    base = r.project // previewed by the first move: a tap on a midpoint inserts nothing
   }
   const shape = base.objects[id] as Band | Region
-  const k = shape.points.findIndex((q) => q.id === moving)
   const n = shape.points.length
+  const k = handle.kind === 'vertex' ? shape.points.findIndex((q) => q.id === handle.pointId) : shape.points.findIndex((q) => q.id === handle.afterPointId) + 1
+  const moving = shape.points[k]!.id
   const closes = shape.type === 'region' || shape.closed
   const neighbours = [...(closes || k > 0 ? [shape.points[(k - 1 + n) % n]!] : []), ...(closes || k < n - 1 ? [shape.points[(k + 1) % n]!] : [])]
   const toContext = invert(contextMatrix(s))
@@ -259,18 +268,28 @@ export function startHandleDrag(svg: SVGSVGElement, handle: Handle): Gesture {
     move(client, noSnap) {
       const raw = apply(toContext, screenToWorld(svg, client))
       const merge = neighbours.find((q) => dist(q, raw) <= tol)
-      const deleted = merge === undefined ? null : deletePoint(base, id, moving)
-      if (merge !== undefined && deleted?.ok === true) {
-        useEditor.getState().setPreview(deleted.project, 'cancel')
-        useEditor.setState({ snapGuide: { point: { x: merge.x, y: merge.y }, guide: 'point', line: null } })
-        return
+      if (merge !== undefined) {
+        const deleted = deletePoint(base, id, moving)
+        if (deleted.ok) {
+          useEditor.getState().setPreview(deleted.project, 'cancel')
+          showGuide({ point: { x: merge.x, y: merge.y }, guide: 'point', line: null })
+          return
+        }
+        useEditor.setState({ message: deleted.message })
       }
       const snap = targets === null || noSnap ? null : snapPoint(raw, targets, tol)
       const r = setPoint(base, id, moving, snap?.point ?? raw)
       if (r.ok) useEditor.getState().setPreview(r.project, 'cancel')
-      useEditor.setState({ snapGuide: snap?.guide == null ? null : snap })
+      showGuide(snap?.guide == null ? null : snap)
     },
   }
+}
+
+/** Whether the pending preview changed `objectId`'s points (ids and coordinates) — a handle drag back to where it started commits nothing. */
+export function pointsChanged(s: Pick<EditorState, 'project' | 'preview'>, objectId: Id): boolean {
+  const before = (s.project.objects[objectId] as Band | Region).points
+  const after = (s.preview?.next.objects[objectId] as Band | Region | undefined)?.points
+  return after === undefined || after.length !== before.length || after.some((q, i) => q.id !== before[i]!.id || q.x !== before[i]!.x || q.y !== before[i]!.y)
 }
 
 /** SPEC §7.3 rotate: angle from pointer positions about a centre fixed at gesture start. */

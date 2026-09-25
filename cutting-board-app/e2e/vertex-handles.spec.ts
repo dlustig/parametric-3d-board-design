@@ -91,6 +91,37 @@ test.describe('mouse', () => {
     expect(await history(page)).toEqual({ past: 0, future: 0 })
   })
 
+  for (const kind of ['vertex', 'midpoint'] as const) {
+    test(`a pending inspector Width commits before a ${kind} handle drag, which then keeps it`, async ({ page }) => {
+      await setup(page, 'b1')
+      await page.getByLabel('Width', { exact: true }).fill('10') // previewed, not blurred
+      expect(await history(page)).toEqual({ past: 0, future: 0 })
+      const from = await at(page, kind === 'vertex' ? { x: 131.3, y: 40.2 } : { x: 55, y: 40 })
+      await mouseDrag(page, from, { x: from.x, y: from.y + 60 })
+
+      const b = (await getProject(page)).objects['b1'] as Band
+      expect(b.widthMm).toBe(10)
+      expect(b.points).toHaveLength(kind === 'vertex' ? 3 : 4)
+      expect(await history(page)).toEqual({ past: 2, future: 0 }) // the width, then the drag
+      await page.evaluate(() => window.__cbpd!.getState().undo())
+      const undone = (await getProject(page)).objects['b1'] as Band
+      expect(undone.widthMm).toBe(10)
+      expect(undone.points).toEqual((scene.objects['b1'] as Band).points)
+    })
+  }
+
+  test('a vertex dragged back to where it started commits nothing', async ({ page }) => {
+    await setup(page, 'b1')
+    const from = await at(page, { x: 80, y: 40 })
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x + 40, from.y + 30, { steps: 4 })
+    await page.mouse.move(from.x, from.y, { steps: 4 })
+    await page.mouse.up()
+    expect(await getProject(page)).toEqual(scene)
+    expect(await history(page)).toEqual({ past: 0, future: 0 })
+  })
+
   test('dropping a vertex within snap tolerance of its neighbour deletes it', async ({ page }) => {
     await setup(page, 'b1')
     const from = await at(page, { x: 80, y: 40 })

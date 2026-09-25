@@ -200,6 +200,11 @@ describe('points', () => {
     expect(r2.ok).toBe(false)
   })
 
+  it('setPoint merging a 3-point Region vertex onto its neighbour is refused', () => {
+    const r3 = setPoint(project([region('R', [[0, 0], [10, 0], [0, 10]])]), 'R', 'R1', { x: 0.001, y: 0 })
+    expect(r3.ok).toBe(false)
+  })
+
   it('insertPoint adds a point after the given one', () => {
     const p = ok(insertPoint(base(), 'A', 'A0', { x: 5, y: 1 }))
     expect(coords(p, 'A')).toEqual([[0, 0], [5, 1], [10, 0], [20, 0], [30, 0]])
