@@ -6,6 +6,13 @@
 // preventDefault'ed (use-gesture does that itself for pinch). No handler here
 // preventDefaults pointerdown: Moveable and Selecto rely on the compatibility
 // mouse events. Also the toolbar's view commands (zoom about centre, Fit).
+//
+// Wheel and wheel-driven pinch have no native end event: use-gesture emits
+// their `last` state from a 140 ms timeout, re-sending the last wheel event
+// and the unchanged pinch movement. That emission carries no new input, so
+// both handlers ignore it; applying it would pan the last wheel delta twice
+// and snap the camera back to the zoom's result over any pan or setCamera
+// made in the meantime.
 
 import { useGesture } from '@use-gesture/react'
 import { fitBoard, placeAt, screenToWorld, zoomAbout } from './camera.ts'
@@ -36,14 +43,14 @@ export function zoomViewBy(factor: number): void {
 export function useCanvasGestures(wrapper: HTMLDivElement | null, svg: SVGSVGElement | null, spaceDown: boolean): void {
   useGesture(
     {
-      onWheel: ({ event }) => {
-        if (event.ctrlKey || event.metaKey) return // pinch owns modified wheel
+      onWheel: ({ event, last }) => {
+        if (last || event.ctrlKey || event.metaKey) return // pinch owns modified wheel
         event.preventDefault()
         const { camera, setCamera } = useEditor.getState()
         setCamera({ ...camera, x: camera.x + event.deltaX / camera.zoom, y: camera.y + event.deltaY / camera.zoom })
       },
-      onPinch: ({ first, origin, movement, memo }) => {
-        if (svg === null) return memo
+      onPinch: ({ first, last, origin, movement, memo }) => {
+        if (svg === null || last) return memo
         const start = (first ? undefined : (memo as { camera: Camera; anchor: XY } | undefined)) ?? {
           camera: useEditor.getState().camera,
           anchor: screenToWorld(svg, { x: origin[0], y: origin[1] }),
