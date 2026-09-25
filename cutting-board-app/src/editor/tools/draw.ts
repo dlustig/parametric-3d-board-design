@@ -14,6 +14,7 @@ import { addBand, addRegion } from '@/domain/commands'
 import { apply, invert, scaleOf } from '@/geometry/affine'
 import { expand } from '@/geometry/expand'
 import { findIntersections } from '@/geometry/intersections'
+import type { Id } from '@/domain/model'
 import type { SegmentSnap, SnapTargets } from '@/geometry/snap'
 import { collectSnapTargets, dist, segmentMeasure, snapPoint, snapSegmentEnd } from '@/geometry/snap'
 import { DOUBLE_TAP_MS, MIN_SEGMENT_MM, SNAP_TOLERANCE_PX, TAP_SLOP_PX } from '@/geometry/tolerance'
@@ -34,17 +35,22 @@ export function isDrawTool(t: Tool): t is DrawTool {
 /** Snap targets are computed once per project/context/grid, i.e. at gesture start in effect (SPEC §7.7). */
 let targetCache: { key: [EditorState['project'], EditorState['editContext'], number]; targets: SnapTargets } | null = null
 
+/** SPEC §7.7 targets from the committed `project` in the current context, excluding `exclude` (the moving objects); callers compute them once per gesture. */
+export function gestureSnapTargets(s: EditorState, exclude: Id[]): SnapTargets {
+  const occurrences = expand(s.project)
+  return collectSnapTargets(s.project, currentContext(s), contextMatrix(s), exclude, occurrences, findIntersections(occurrences), s.gridMm)
+}
+
 function snapTargets(s: EditorState): SnapTargets {
   const c = targetCache
   if (c !== null && c.key[0] === s.project && c.key[1] === s.editContext && c.key[2] === s.gridMm) return c.targets
-  const occurrences = expand(s.project)
-  const targets = collectSnapTargets(s.project, currentContext(s), contextMatrix(s), [], occurrences, findIntersections(occurrences), s.gridMm)
+  const targets = gestureSnapTargets(s, [])
   targetCache = { key: [s.project, s.editContext, s.gridMm], targets }
   return targets
 }
 
 /** SNAP_TOLERANCE_PX in the current context's mm (SPEC §4.6, §7.6). */
-function toleranceMm(s: EditorState): number {
+export function toleranceMm(s: EditorState): number {
   return SNAP_TOLERANCE_PX / s.camera.zoom / scaleOf(contextMatrix(s))
 }
 

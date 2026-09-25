@@ -61,6 +61,7 @@ export function Canvas(): JSX.Element {
   const editContext = useEditor((s) => s.editContext)
   const drawing = useEditor((s) => s.drawing)
   const showGrid = useEditor((s) => s.showGrid)
+  const snapGuide = useEditor((s) => s.snapGuide)
   const gridMm = useEditor((s) => s.gridMm)
   const ctxMatrix = useEditor(useShallow(contextMatrix))
 
@@ -172,8 +173,8 @@ export function Canvas(): JSX.Element {
   const onDragStart = (e: { clientX: number; clientY: number }): void => {
     gestureRef.current = startTranslate(svg(), clientOf(e))
   }
-  const onMove = (e: { clientX: number; clientY: number }): void => {
-    gestureRef.current?.move(clientOf(e))
+  const onMove = (e: { clientX: number; clientY: number; inputEvent?: unknown }): void => {
+    gestureRef.current?.move(clientOf(e), (e.inputEvent as MouseEvent | TouchEvent | undefined)?.altKey === true)
   }
   const finish = (e: OnDragEnd | OnRotateEnd): void => {
     setRotating(false)
@@ -312,6 +313,7 @@ export function Canvas(): JSX.Element {
         {drawing !== null && <DrawPreview drawing={drawing} matrix={ctxMatrix} zoom={camera.zoom} unit={project.displayUnits} />}
         {tool === 'crossing' && <CrossingMarkers scene={scene} zoom={camera.zoom} />}
         {drawing?.cursor != null && <SnapGuide snap={drawing.cursor} matrix={ctxMatrix} zoom={camera.zoom} />}
+        {snapGuide !== null && <SnapGuide snap={snapGuide} matrix={ctxMatrix} zoom={camera.zoom} />}
       </svg>
       {selecting && (
         <Moveable

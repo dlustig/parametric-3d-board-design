@@ -19,6 +19,7 @@ import {
   seededProject,
   select,
   setCamera,
+  snapOff,
   toClient,
   toWorld,
   Touch,
@@ -189,6 +190,7 @@ test.describe('mouse', () => {
     const zoom = 2
     await setCamera(page, cameraShowing({ x: 200, y: 90 }, { x: 500, y: 380 }, zoom))
     await select(page, ['mb1'])
+    await snapOff(page)
     const before = bandPoints(await getProject(page), 'mb1')
 
     // A point on mb1 at definition (28, 0): world = T·R(30)·S(1.5)·Mx · (28, 0).

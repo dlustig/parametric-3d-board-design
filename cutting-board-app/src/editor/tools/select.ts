@@ -14,9 +14,13 @@ import type { Box } from '@/geometry/bounds'
 import { paintedBounds, unionBoxes } from '@/geometry/bounds'
 import type { Occurrence } from '@/geometry/expand'
 import { expand, segmentsOf } from '@/geometry/expand'
+import type { Mat } from '@/geometry/affine'
+import type { SnapSources } from '@/geometry/snap'
+import { boundsTargets, snapDelta } from '@/geometry/snap'
 import { screenToWorld } from '../camera.ts'
 import type { EditContextLevel } from '../selection.ts'
 import { contextMatrix, useEditor } from '../store.ts'
+import { gestureSnapTargets, toleranceMm } from './draw.ts'
 
 type XY = { x: number; y: number }
 
@@ -159,19 +163,44 @@ export function clickSelect(svg: SVGSVGElement, client: XY, toggle: boolean): vo
 }
 
 export interface Gesture {
-  move(client: XY): void
+  /** `noSnap`: Alt held (SPEC §7.7). */
+  move(client: XY, noSnap: boolean): void
 }
 
-/** SPEC §7.4 drag: Δ from the pointer's client positions through the CTM, mapped into the context. */
+/** SPEC §7.7 sources of the selection, in the context's space: every occurrence vertex/endpoint, and each object's painted-bounds edges and centre. */
+function moveSources(p: Project, editContext: EditContextLevel[], selection: Id[], toContext: Mat): SnapSources {
+  const chosen = new Set(selection)
+  const points: XY[] = []
+  const lines: SnapSources['lines'] = []
+  for (const { id, o } of occurrencesByOwner(p, editContext)) if (chosen.has(id)) for (const v of o.worldPoints) points.push(apply(toContext, v))
+  for (const { id, box } of selectableBounds(p, editContext)) {
+    if (!chosen.has(id)) continue
+    const t = boundsTargets(box, toContext)
+    lines.push(...t.lines)
+    points.push(t.centre)
+  }
+  return { points, lines }
+}
+
+/**
+ * SPEC §7.4 drag: Δ from the pointer's client positions through the CTM,
+ * mapped into the context, then snapped (SPEC §7.7): targets and sources are
+ * frozen at gesture start and the nearest source–target pair adjusts Δ.
+ */
 export function startTranslate(svg: SVGSVGElement, startClient: XY): Gesture {
   const s = useEditor.getState()
-  const { project, selection } = s
+  const { project, selection, editContext } = s
   const toContext = invert(contextMatrix(s))
   const start = apply(toContext, screenToWorld(svg, startClient))
+  const snap = s.snapEnabled ? { sources: moveSources(project, editContext, selection, toContext), targets: gestureSnapTargets(s, selection), tol: toleranceMm(s) } : null
   return {
-    move(client) {
+    move(client, noSnap) {
       const now = apply(toContext, screenToWorld(svg, client))
-      useEditor.getState().setPreview(translateObjects(project, selection, now.x - start.x, now.y - start.y), 'cancel')
+      const raw = { x: now.x - start.x, y: now.y - start.y }
+      const snapped = snap === null || noSnap ? null : snapDelta(snap.sources, snap.targets, raw, snap.tol)
+      const d = snapped?.delta ?? raw
+      useEditor.getState().setPreview(translateObjects(project, selection, d.x, d.y), 'cancel')
+      useEditor.setState({ snapGuide: snapped?.guide == null ? null : snapped })
     },
   }
 }

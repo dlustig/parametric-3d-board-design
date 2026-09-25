@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test'
 import type { Band } from '../src/domain/model.ts'
 import { band, project } from '../src/domain/test-builders.ts'
 import type { XY } from './helpers.ts'
-import { expectClose, getProject, history, mouseDrag, seed, select, toClient, Touch } from './helpers.ts'
+import { expectClose, getProject, history, mouseDrag, seed, select, snapOff, toClient, Touch } from './helpers.ts'
 
 async function selection(page: Page): Promise<string[]> {
   return page.evaluate(() => window.__cbpd!.getState().selection)
@@ -34,6 +34,7 @@ test.describe('mouse', () => {
 
   test('press-and-drag an unselected band selects and moves it in one gesture', async ({ page }) => {
     await seed(page)
+    await snapOff(page)
     const x0 = await firstX(page, 'b1')
     const from = await at(page, { x: 50, y: 40 })
     await mouseDrag(page, from, { x: from.x + 40, y: from.y })
@@ -101,6 +102,7 @@ test.describe('mouse', () => {
   test('Shift-drag on a selected object drags the selection and keeps it', async ({ page }) => {
     await seed(page)
     await select(page, ['b1', 'r1'])
+    await snapOff(page)
     const b0 = await firstX(page, 'b1')
     const r0 = ((await getProject(page)).objects['r1'] as Band).points[0]!.x
     const from = await at(page, { x: 50, y: 40 })
@@ -122,6 +124,7 @@ test.describe('touch', () => {
 
   test('press-and-drag an unselected band with one finger selects and moves it', async ({ page }) => {
     await seed(page)
+    await snapOff(page)
     const x0 = await firstX(page, 'b1')
     const touch = await Touch.attach(page)
     const from = await at(page, { x: 50, y: 40 })

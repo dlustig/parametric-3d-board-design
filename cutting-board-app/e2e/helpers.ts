@@ -51,6 +51,13 @@ export async function select(page: Page, ids: string[]): Promise<void> {
   await nextFrame(page)
 }
 
+/** Turns snapping off with the rail's Snap toggle, for tests asserting raw pointer deltas (SPEC §7.7 would snap them). */
+export async function snapOff(page: Page): Promise<void> {
+  const toggle = page.getByRole('button', { name: 'Snap', exact: true })
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+}
+
 export async function nextFrame(page: Page): Promise<void> {
   await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
 }

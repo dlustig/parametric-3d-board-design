@@ -23,7 +23,7 @@ import type { Mat } from '@/geometry/affine'
 import { IDENTITY, multiply } from '@/geometry/affine'
 import { pathMatrix } from '@/geometry/expand'
 import { rematchCrossings } from '@/geometry/resolve'
-import type { SegmentSnap } from '@/geometry/snap'
+import type { SegmentSnap, SnapResult } from '@/geometry/snap'
 import type { EditContextLevel } from './selection.ts'
 import { pruneCurrentMaterial, pruneEditContext, pruneSelection } from './selection.ts'
 
@@ -70,6 +70,8 @@ export interface EditorState {
   message: string | null // last command failure / notice
   drawing: Drawing
   lastBandWidthMm: number // width for new Bands: the last one set (SPEC §7.4)
+  /** The active snap of a Select gesture (move, vertex drag), in the current context's space; cleared with its preview (SPEC §7.7 guide). */
+  snapGuide: SnapResult | null
   /** Canvas.tsx's gesture-abort hook (stops Moveable, cancels a gesture preview), registered while it's mounted — null otherwise. SPEC §7.4 Esc's "cancel gesture" step calls it. */
   abortGesture: (() => void) | null
 
@@ -125,6 +127,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       message: null,
       drawing: null,
       lastBandWidthMm: 6.35,
+      snapGuide: null,
       abortGesture: null,
 
       run(cmd) {
@@ -145,11 +148,11 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       commit() {
         const { preview, project } = get()
         if (preview === null) return
-        set({ project: rematchCrossings(project, preview.next), preview: null })
+        set({ project: rematchCrossings(project, preview.next), preview: null, snapGuide: null })
       },
 
       cancelPreview() {
-        set({ preview: null })
+        set({ preview: null, snapGuide: null })
       },
 
       settlePreview() {
