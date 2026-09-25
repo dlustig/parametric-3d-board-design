@@ -7,12 +7,14 @@
 // development React, which overstates rendering several times, so plain
 // `pnpm test:e2e` skips this spec unless PERF=1.
 //
-// Two tests, each printing one JSON line per run (take the median of the
+// Three tests, each printing one JSON line per run (take the median of the
 // three runs' values). The targets (drag frame median ≤ 16 ms, p95 ≤ 50 ms)
 // are reported, not asserted — a miss is a finding (SPEC §13); only the
 // measurement's own sanity is checked.
 //   `G9 {…}`       typical: drag the root band (one occurrence moves), drag
 //                  commit, arrow nudge, one Width keystroke on it
+//   `G9-packet {…}` the same at the packet's scale: the field at 8 × 8 cells
+//                  (896 field occurrences, about the ~1,000 the packet targets)
 //   `G9-worst {…}` worst case: drag the repeat field (every occurrence
 //                  moves), one Width keystroke on a lattice-motif band
 //                  (every cell's occurrence changes)
@@ -139,17 +141,23 @@ async function stopProbe(page: Page, count: number): Promise<{ samples: Sample[]
   })
 }
 
-/** Loads the fixture plus the root band, fits the view, and returns the scene's counts. */
-async function seedFixture(page: Page): Promise<{ occurrences: number; listed: number; eligible: number; patches: number; sceneDomElements: number }> {
+/** Loads the fixture (its field at `cells` × `cells`) plus the root band, fits the view, and returns the scene's counts. */
+async function seedFixture(page: Page, cells = 15): Promise<{ occurrences: number; listed: number; eligible: number; patches: number; sceneDomElements: number }> {
   await open(page)
   // A root band across the field, painted last: dragging it moves its crossings with every lattice strand it passes, so each drag frame has crossings to re-find and patches to rebuild.
   const rootBand = band(ROOT_BAND, [[15, 201.3], [384, 201.3]], { widthMm: 6, materialId: 'walnut' })
-  await page.evaluate((b) => {
-    const p = window.__cbpd!.performanceFixture()
-    p.objects[b.id] = b
-    p.rootChildren.push(b.id)
-    window.__cbpd!.replaceProject(p)
-  }, rootBand)
+  await page.evaluate(
+    ({ b, field, n }) => {
+      const p = window.__cbpd!.performanceFixture()
+      const f = p.objects[field]
+      if (f?.type !== 'repeat') throw new Error('no repeat field')
+      p.objects[field] = { ...f, rows: n, columns: n }
+      p.objects[b.id] = b
+      p.rootChildren.push(b.id)
+      window.__cbpd!.replaceProject(p)
+    },
+    { b: rootBand, field: FIELD, n: cells },
+  )
   await page.getByRole('button', { name: 'Fit', exact: true }).click()
   await snapOff(page) // see measureDrag
   await afterPaint(page)
@@ -164,7 +172,7 @@ async function seedFixture(page: Page): Promise<{ occurrences: number; listed: n
       sceneDomElements: document.querySelectorAll('svg.canvas-svg g.scene *').length,
     }
   })
-  expect(counts.occurrences).toBeGreaterThanOrEqual(1000)
+  expect(counts.occurrences).toBe(cells * cells * 14 + 1) // 14 occurrences per cell, plus the root band
   return counts
 }
 
@@ -216,7 +224,7 @@ async function measureDrag(page: Page, grab: XY, moves: number, profilePath?: st
   }
 }
 
-/** Mouse up on the dragged selection: pointerup → mouseup (Moveable's drag end: commit() rematches the preview) → paint. */
+/** Mouse up on the dragged selection: pointerup → mouseup (Moveable's drag end: commit() stores the preview) → paint. */
 async function measureDragCommit(page: Page): Promise<Sample> {
   await startProbe(page, 'pointerup', 'mouseup')
   await page.mouse.up()
@@ -257,9 +265,9 @@ function toPaint(s: Sample): number {
   return round(s.painted - s.start)
 }
 
-test('G9: interlace performance fixture', async ({ page }) => {
-  test.setTimeout(3_600_000)
-  const counts = await seedFixture(page)
+/** The typical case on the fixture at `cells` × `cells`: drag the root band, its commit, an arrow nudge, one Width keystroke. */
+async function typical(page: Page, cells: number): Promise<Record<string, number | string>> {
+  const counts = await seedFixture(page, cells)
 
   await select(page, [ROOT_BAND])
   await afterPaint(page)
@@ -278,7 +286,7 @@ test('G9: interlace performance fixture', async ({ page }) => {
 
   const inspector = await measureWidthKeystroke(page)
 
-  const result = {
+  return {
     machine: machine(),
     ...counts,
     ...dragStats(drag),
@@ -288,7 +296,16 @@ test('G9: interlace performance fixture', async ({ page }) => {
     inspectorDispatchMs: round(inspector.end - inspector.start),
     inspectorToPaintMs: toPaint(inspector),
   }
-  console.log(`G9 ${JSON.stringify(result)}`)
+}
+
+test('G9: interlace performance fixture', async ({ page }) => {
+  test.setTimeout(3_600_000)
+  console.log(`G9 ${JSON.stringify(await typical(page, 15))}`)
+})
+
+test('G9 packet scale: the field at 8 × 8 cells', async ({ page }) => {
+  test.setTimeout(3_600_000)
+  console.log(`G9-packet ${JSON.stringify(await typical(page, 8))}`)
 })
 
 test('G9 worst case: every occurrence changes', async ({ page }) => {
