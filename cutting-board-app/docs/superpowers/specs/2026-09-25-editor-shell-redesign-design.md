@@ -42,14 +42,15 @@ The tokens are defined once in `src/index.css` as custom properties on `:root[da
 | `--line` | `#32363d` | `#dfe2e6` | Borders and dividers |
 | `--line-strong` | `#4a5059` | `#c3c8cf` | Icon-column separator, keycap edges |
 | `--text` | `#e7e9ec` | `#1c1f24` | Primary text and active icons |
-| `--muted` | `#8e96a1` | `#6b7380` | Secondary text, idle icons, units |
+| `--muted` | `#8e96a1` | `#5f6773` | Secondary text, idle icons, units |
 | `--acc` | `#3d9bff` | `#1f6fe5` | Selection, active tool, focus ring, primary button |
 | `--acc-ink` | `#06121f` | `#ffffff` | Text on `--acc` |
 | `--acc-soft` | `rgb(61 155 255 / 16%)` | `rgb(31 111 229 / 11%)` | Active tool and selected-row backgrounds |
-| `--attn` | `#f5b042` | `#b86e00` | Swapped and needs-attention crossing states (§9.6), snap guide |
-| `--ok` | `#46c07a` | `#2fb36a` | Saved dot, "On" in tooltips |
+| `--attn` | `#f5b042` | `#945800` | Swapped and needs-attention crossing states (§9.6), snap guide |
+| `--ok` | `#46c07a` | `#1e8049` | Saved dot, "On" in tooltips |
 | `--danger` | `#ff6b5e` | `#c0392b` | Field errors, unsaved status |
 | `--tip-bg` | `#2e3238` | `#2e3238` | Tooltip surface (dark in both themes) |
+| `--tip-hint` | `#a9b0ba` | `#a9b0ba` | Tooltip hint line |
 | `--shadow` | `0 8px 24px rgb(0 0 0 / 35%)` | `0 8px 24px rgb(20 30 50 / 12%)` | Floating bars, menus, dialogs |
 
 The accent is blue because every starter wood is warm, so a blue selection never merges with a material. `--attn` carries crossing state, so that state never relies on the accent alone.
@@ -138,10 +139,11 @@ The Lucide choices:
 - **App grid:** rows `44px auto 1fr` (top bar, recovery banner, body). Body columns are `52px 1fr`: the icon column, then a horizontal panel `Group` from `react-resizable-panels` (^4.13), laid out as
   `[left Panel] [Separator] [canvas Panel] [Separator] [inspector Panel]`.
 - **Panel settings:**
-  - Both side Panels are `collapsible` with `collapsedSize="0px"`, and the Group uses `groupResizeBehavior="preserve-pixel-size"`, so a pane keeps its width when the window resizes.
+  - Both side Panels are `collapsible` with `collapsedSize="0px"` and `groupResizeBehavior="preserve-pixel-size"` (a Panel prop in v4), so a pane keeps its width when the window resizes.
   - Left: `min 200px`, `max 400px`, `default 240px`.
   - Inspector: `min 248px`, `max 440px`, `default 280px`.
-- **Persistence:** sizes and collapsed state persist through `useDefaultLayout({ id: 'cbpd-shell', onlySaveAfterUserInteractions: true })`.
+- **Persistence:** sizes and collapsed state persist through `useDefaultLayout({ id: 'cbpd-shell', onlySaveAfterUserInteractions: true, storage })`. `storage` wraps `localStorage` so it never throws and treats an unparseable record as absent. Collapse/expand from our own buttons and shortcuts count as user interactions (the plan marks them), so they persist.
+- **Narrow overlays** open at the last desktop width seen this session, or the defaults on a narrow-first load (the library stores desktop proportions only).
 - **The library owns** dragging, clamping, double-click reset, keyboard resize and the separators' ARIA.
 - **We add styling only.** A separator shows a 2 px `--acc` line on hover and while dragging, styled with `[data-separator]`.
 - **Recovery banner** (V1 §9): a `--raised` strip with an `--attn` left border.
@@ -523,7 +525,7 @@ A chord is platform-neutral: `'Mod+G'`, `'Shift+T'`, `'B'`, `'Space'`, `'Alt'`, 
 **Content:**
 
 - The label on the left and keycaps on the right. The keycaps come from a `SHORTCUTS` id, or are passed explicitly for controls that have no entry, such as "Click".
-- An optional hint line in `--muted`.
+- An optional hint line in `--tip-hint`.
 - For toggles, the state after the label: "On" in `--ok`, or "Off".
 - For disabled controls, the reason as the hint line. The trigger wraps the disabled button so the tooltip can still open.
 
@@ -737,4 +739,6 @@ Vertical slices, each shippable:
 | Review 5 | Detach offered for Repeat | Instance only (§9.4) |
 | Review 6 | `?` and `\` chords fail exact-modifier matching | Matching rules stated (§12.1) |
 | Review 7 | Coverage test contradicted Canvas ownership of Space and snap ownership of Alt | Display-only entries excluded (§16) |
+| Plan drafting (contrast) | Light `--muted`/`--attn`/`--ok` and the tooltip hint line fell below 4.5:1 | Light `--muted` `#5f6773`, `--attn` `#945800`, `--ok` `#1e8049`, new `--tip-hint` `#a9b0ba`; all pairs ≥ 4.5:1 (`--line-strong` is decorative) |
+| Plan drafting (library) | `groupResizeBehavior` is a Panel prop; imperative collapse is not saved under `onlySaveAfterUserInteractions`; the default storage throws when blocked | §4 wording corrected; toggles marked as user interactions; non-throwing storage wrapper |
 | Review advisories | Hex rule, test fallout, defaults, resolved `data-theme`, banner row, dialog units, thumbnail records, theme test strength, listbox header, iOS callout, prefs write failure | Addressed in §2.1, §16, §11, §3, §4, §10.2, §6.2, §6.1, §12.3 |
