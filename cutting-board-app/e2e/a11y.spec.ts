@@ -1,6 +1,7 @@
 // SPEC §11 accessibility: every control has a visible label or `aria-label`;
-// Tab / `[` / `]` cycle selection through the current context's objects so
-// the inspector and the crossing list are reachable without a pointer;
+// `[` / `]` cycle selection through the current context's objects (Tab is
+// excluded — it always keeps native focus movement, amended after review)
+// so the inspector and the crossing list are reachable without a pointer;
 // selection is indicated by outline (not colour alone); the layout stays
 // correct at 200% browser zoom. No axe — plain DOM/ARIA checks, matching
 // "keep it simple".
@@ -8,7 +9,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { Band, Project } from '../src/domain/model.ts'
-import { band, MAT2, project } from '../src/domain/test-builders.ts'
+import { band, instance, MAT2, project } from '../src/domain/test-builders.ts'
 import type { XY } from './helpers.ts'
 import { cameraShowing, getProject, history, nextFrame, seed, select, setCamera, toClient } from './helpers.ts'
 
@@ -37,6 +38,17 @@ test.describe('accessibility (G11)', () => {
     return project([band('h1', [[0, 50], [100, 50]]), band('v1', [[50, 0], [50, 100]], { materialId: MAT2 })])
   }
 
+  /** A crossing INSIDE a motif instance, so the pair shares a common ancestor (their occurrence
+   * paths both start with the same `{instanceId: 'i1'}` step) and the Crossing tool's scope
+   * control ("All instances" / "This occurrence") actually renders (`scopeControlShown`,
+   * `src/editor/tools/crossing.ts`) — `crossProject`'s two root Bands never trigger it. */
+  function crossMotifProject(): Project {
+    return project(
+      [instance('i1', 'm1')],
+      [{ id: 'm1', children: [band('h1', [[-50, 0], [50, 0]]), band('v1', [[0, -50], [0, 50]], { materialId: MAT2 })] }],
+    )
+  }
+
   test('every toolbar, tool-options, and project-menu button has an accessible name', async ({ page }) => {
     await seed(page, project([]))
 
@@ -45,10 +57,15 @@ test.describe('accessibility (G11)', () => {
     offenders.push(...(await unlabeledButtons(page, '.project-menu button')))
     offenders.push(...(await unlabeledButtons(page, '.materials-panel button'))) // the palette, always visible in the Inspector
 
-    // Tool options bars only render for the active tool: check each one that has buttons.
+    // The Band tool's options bar (Length/Angle fields, Finish/Undo point/Cancel) renders regardless of project content.
     await page.getByRole('button', { name: 'Band', exact: true }).click()
     offenders.push(...(await unlabeledButtons(page, '.tool-options button')))
+
+    // The Crossing tool's scope control only renders for a pair with a common motif ancestor —
+    // reseed with one so "All instances"/"This occurrence" are actually there to check.
+    await seed(page, crossMotifProject())
     await page.getByRole('button', { name: 'Crossing', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'All instances' })).toBeVisible() // sanity: the scope control really rendered
     offenders.push(...(await unlabeledButtons(page, '.tool-options button')))
 
     expect(offenders, `buttons without an accessible name:\n${offenders.join('\n')}`).toEqual([])
@@ -65,13 +82,19 @@ test.describe('accessibility (G11)', () => {
     await seed(page, crossProject()) // seeded via the hook — the setup, not the flow itself
     await setCamera(page, cameraShowing({ x: 50, y: 50 }, { x: 300, y: 300 }, 3))
 
-    // Focus the canvas (SPEC §11 Tab/[/] cycling owns the selection from here), then `]` selects the first object.
+    // Focus the canvas, then `]` selects the first object (`]`/`[` cycling owns the selection here — SPEC §11, amended).
     await page.locator('.canvas').focus()
     await page.keyboard.press(']')
     expect(await state<string[]>(page, 's.selection')).toEqual(['h1'])
     await expect(page.getByRole('heading', { name: 'Band' })).toBeVisible()
 
-    // Set h1's width from the inspector, entirely by keyboard.
+    // Tab moves focus natively out of the canvas (it never cycles the selection, only `]`/`[` do).
+    await page.keyboard.press('Tab')
+    await expect(page.locator('.canvas')).not.toBeFocused()
+
+    // Reach Width directly rather than hardcoding every palette swatch and Selection-panel
+    // control ahead of it in DOM order — it's an ordinary `<label>`-connected `<input>`,
+    // already reachable by more plain Tabs from wherever the one above landed.
     const width = page.getByLabel('Width', { exact: true })
     await width.focus()
     await width.fill('10')
@@ -119,14 +142,29 @@ test.describe('accessibility (G11)', () => {
     expect(await state<string[]>(page, 's.selection')).toEqual(['v1'])
   })
 
-  test('Tab does not steal focus from a toolbar button', async ({ page }) => {
+  test('] does not cycle the selection when a toolbar button has focus', async ({ page }) => {
+    await seed(page, crossProject())
+    const selectBtn = page.getByRole('button', { name: 'Select', exact: true })
+    await selectBtn.focus()
+    await expect(selectBtn).toBeFocused()
+    await page.keyboard.press(']')
+    expect(await state<string[]>(page, 's.selection')).toEqual([]) // unchanged — cycling only fires from body/canvas
+    await expect(selectBtn).toBeFocused() // and the key did nothing to focus either
+  })
+
+  test('Tab always keeps native focus movement — from a toolbar button, and out of the canvas', async ({ page }) => {
     await seed(page, project([]))
-    const select_ = page.getByRole('button', { name: 'Select', exact: true })
+    const selectBtn = page.getByRole('button', { name: 'Select', exact: true })
     const hand = page.getByRole('button', { name: 'Hand', exact: true })
-    await select_.focus()
-    await expect(select_).toBeFocused()
+    await selectBtn.focus()
+    await expect(selectBtn).toBeFocused()
     await page.keyboard.press('Tab')
-    await expect(hand).toBeFocused() // native Tab order, not selection cycling
+    await expect(hand).toBeFocused() // native Tab order between two buttons, not selection cycling
+
+    await page.locator('.canvas').focus()
+    await expect(page.locator('.canvas')).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.locator('.canvas')).not.toBeFocused() // Tab is never captured for cycling, canvas included
   })
 
   test('a click still selects the expected object at 200% browser zoom', async ({ page }) => {

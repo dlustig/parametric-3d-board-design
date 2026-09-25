@@ -7,12 +7,15 @@
 // field's own handler already reverted it and stopped the event from
 // bubbling here, so this dispatcher takes no further action either way.
 //
-// SPEC §11: `]`/Tab and `[`/Shift+Tab cycle the selection through the
-// current context's objects (`cycleSelection`), the no-pointer path to an
-// object's Inspector panel and crossing list. `[`/`]` always apply (nothing
-// else wants those keys); Tab/Shift+Tab apply only while focus hasn't
-// already landed on a more specific control (`tabOwnedByCanvas`), so normal
-// Tab-through-the-toolbar keyboard navigation is untouched.
+// SPEC §11 (amended): `]`/`[` cycle the selection through the current
+// context's objects (`cycleSelection`), the no-pointer path to an object's
+// Inspector panel and crossing list — but only while focus hasn't already
+// landed on a more specific control (`cyclingOwnsFocus`: the body, nothing
+// focused yet, or the canvas wrapper itself), so a toolbar/inspector
+// control's own keys are never hijacked. Tab is excluded from cycling
+// entirely and always keeps its ordinary, native focus-movement behaviour —
+// including moving focus out of the canvas — so there is still exactly one
+// owner per key and Tab is never "stolen".
 //
 // `Space` stays owned by Canvas.tsx (pan-vs-drag input ownership, SPEC
 // §7.2) — a second, narrowly-scoped listener, not folded in here, so there
@@ -122,30 +125,41 @@ export function repeatSelection(): void {
 }
 
 /**
- * SPEC §11: Tab / `[` / `]` cycle the selection through the current context's
- * objects (its `childrenOf` order), wrapping at either end. A selection of
- * anything other than exactly one of those objects (empty, multi, or an
- * object from a different context) starts the cycle from the first (`]`/Tab)
- * or last (`[`/Shift+Tab) object instead of stepping from it.
+ * SPEC §11: `]`/`[` cycle the selection through the current context's
+ * objects (its `childrenOf` order — paint order), wrapping at either end.
+ *
+ * With exactly one selected object found in this context, the cycle steps
+ * from it. With a MULTI-selection, `]` continues from the object after the
+ * LAST selected one in paint order and `[` from the object before the
+ * FIRST — cycling always extends outward from the current selection's span,
+ * never picks an arbitrary member of it to step from, and always leaves a
+ * single object selected. With nothing selected, or a selection with no
+ * member in this context (a different context, or all ids stale), the cycle
+ * starts fresh: the first object (`]`) or the last (`[`).
+ *
+ * Exported for its own unit test (`keyboard.test.ts`) — it's plain state
+ * logic with no DOM dependency, unlike the rest of this dispatcher.
  */
-function cycleSelection(direction: 1 | -1): void {
+export function cycleSelection(direction: 1 | -1): void {
   const s = useEditor.getState()
   const children = childrenOf(s.project, currentContext(s))
   if (children.length === 0) return
-  const at = s.selection.length === 1 ? children.indexOf(s.selection[0]!) : -1
+  const found = s.selection.map((id) => children.indexOf(id)).filter((i) => i !== -1)
+  const at = found.length === 0 ? -1 : direction === 1 ? Math.max(...found) : Math.min(...found)
   const next = at === -1 ? (direction === 1 ? 0 : children.length - 1) : (at + direction + children.length) % children.length
   s.select([children[next]!])
 }
 
 /**
- * Tab only cycles selection when nothing more specific already owns focus —
- * the body (nothing focused yet) or the canvas wrapper itself — so it keeps
- * its ordinary browser behaviour of moving focus through the toolbar,
- * inspector, and every other control (SPEC §11: Tab must not steal focus
- * from a toolbar button). Field targets (inputs, textareas, selects) are
- * already excluded before this dispatcher gets this far.
+ * `]`/`[` only cycle the selection while nothing more specific already owns
+ * focus — the body (nothing focused yet) or the canvas wrapper itself — so
+ * a toolbar/inspector control's own keys are never hijacked (SPEC §11).
+ * Field targets (inputs, textareas, selects) are already excluded before
+ * this dispatcher gets this far. Tab is deliberately NOT scoped by this: it
+ * never cycles the selection at all, and always keeps its native,
+ * browser-default focus-movement behaviour everywhere, canvas included.
  */
-function tabOwnedByCanvas(target: EventTarget | null): boolean {
+function cyclingOwnsFocus(target: EventTarget | null): boolean {
   return target === document.body || (target instanceof HTMLElement && target.classList.contains('canvas'))
 }
 
@@ -260,14 +274,8 @@ export function installKeyboardDispatcher(): () => void {
       return // an unrecognized modified chord: never falls through to a plain-key binding
     }
 
-    if (!ctrlOrMeta && !e.altKey && (key === ']' || key === '[')) {
+    if (!ctrlOrMeta && !e.altKey && (key === ']' || key === '[') && cyclingOwnsFocus(e.target)) {
       cycleSelection(key === ']' ? 1 : -1)
-      e.preventDefault()
-      return
-    }
-
-    if (!ctrlOrMeta && !e.altKey && key === 'Tab' && tabOwnedByCanvas(e.target)) {
-      cycleSelection(e.shiftKey ? -1 : 1)
       e.preventDefault()
       return
     }
