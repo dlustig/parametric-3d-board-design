@@ -5,6 +5,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { Band } from '../src/domain/model.ts'
+import { translateObjects } from '../src/domain/commands/index.ts'
 import { band, project } from '../src/domain/test-builders.ts'
 import type { XY } from './helpers.ts'
 import { expectClose, getProject, history, mouseDrag, seed, select, snapOff, toClient, Touch } from './helpers.ts'
@@ -122,6 +123,23 @@ test.describe('mouse', () => {
     const stepped = await angle()
     expectClose(stepped, Math.round(free / 15) * 15, 1e-6)
     expect(await history(page)).toEqual({ past: 1, future: 0 })
+  })
+
+  test('a rotate commits a pending inspector preview first and turns the result', async ({ page }) => {
+    await seed(page)
+    await snapOff(page)
+    await select(page, ['b1'])
+    // An inspector edit still pending (its field not yet blurred): b1 moved 20 mm right.
+    const moved = translateObjects(await getProject(page), ['b1'], 20, 0)
+    await page.evaluate((p) => window.__cbpd!.getState().setPreview(p, 'commit'), moved)
+    const rot = (await page.locator('.moveable-rotation-control').boundingBox())!
+    const handle = { x: Math.round(rot.x + rot.width / 2), y: Math.round(rot.y + rot.height / 2) }
+    await mouseDrag(page, handle, { x: handle.x + 60, y: handle.y + 40 })
+
+    expect(await history(page)).toEqual({ past: 2, future: 0 }) // the inspector edit, then the rotate
+    const [a, b] = ((await getProject(page)).objects['b1'] as Band).points
+    expectClose((a!.x + b!.x) / 2, 100, 1e-6) // rotated about the moved band's centre (80 + 20, 40)
+    expectClose((a!.y + b!.y) / 2, 40, 1e-6)
   })
 
   test('Shift-drag on a selected object drags the selection and keeps it', async ({ page }) => {

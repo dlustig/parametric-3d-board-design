@@ -229,7 +229,10 @@ export function Canvas(): JSX.Element {
     clickSelect(svg(), clientOf(e), input?.shiftKey === true || useEditor.getState().addToSelection)
   }
   const onRotateStart = (e: { clientX: number; clientY: number }): void => {
-    const box = unionBoxes(selectableBounds(project, editContext).filter((b) => selection.includes(b.id)).map((b) => b.box))
+    // An inspector field's pending preview commits first (its blur arrives after this press); the centre is then read from that project.
+    useEditor.getState().settlePreview()
+    const s = useEditor.getState()
+    const box = unionBoxes(selectableBounds(s.project, s.editContext).filter((b) => s.selection.includes(b.id)).map((b) => b.box))
     if (box === null) return
     setRotating(true)
     gestureRef.current = startRotate(svg(), clientOf(e), { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 })
