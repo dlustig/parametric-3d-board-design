@@ -19,10 +19,10 @@ Dependencies actually used: react, react-dom, zustand, zundo, zod, @flatten-js/c
 | G3 transform parity | PASS (unit + proof) |
 | G4 edge classes | PASS (unit) |
 | G5 export correctness and parity | PASS in three engines; max pixel difference 1/255 against an 8/255 bound |
-| G6 authorability (A–F from a blank project, UI only) | PASS with friction logged; 20–120 actions per family |
+| G6 authorability (A–F from a blank project, UI only) | PASS with friction logged; 21–127 actions per family |
 | G7 tablet | automated PASS (Chromium touch); manual iPad Safari checklist pending (`2026-09-24-ipad-checklist.md`) |
 | G8 persistence | PASS (unit + browser, three engines) |
-| G9 performance | FINDING: on a 3,151-occurrence fixture (about 9,100 rendered elements, nine times the packet's ~1,000-element target) a drag of one band runs at a 28 ms median / 46 ms p95 frame; moving every occurrence at once runs at 152 / 179 ms. The 16 ms median target is missed; the 50 ms p95 target is met in the typical case. At the packet's stated scale (8×8, 897 occurrences) the drag runs at 20 ms median / 25 ms p95. |
+| G9 performance | FINDING: on a 3,151-occurrence fixture (about 9,100 rendered elements, nine times the packet's ~1,000-element target) a drag of one band runs at a 27 ms median / 36 ms p95 frame; moving every occurrence at once runs at 158 / 200 ms. The 16 ms median target is missed; the 50 ms p95 target is met in the typical case. At the packet's stated scale (8×8, 897 occurrences) the drag runs at 20 ms median / 25 ms p95. |
 | §11 accessibility | PASS (names on every control, keyboard-only flow, 200% zoom via viewport halving) |
 | Product success test | PASS 9/9 steps by scripted walkthrough (`.superpowers` walkthrough report); manual pass by the owner still recommended |
 
@@ -48,6 +48,7 @@ End-to-end contacts of collinear bands (repeat seams) are ignored entirely. Unsu
 - Crossings between two cells of one repeat, between two instances, or between a root band and a motif interior can only be overridden per occurrence (root records); the scope control hides for them. Fixture F keeps all its crossings inside the cell.
 - The accepted compositing residual is a one-pixel anti-aliased blend on the under band's edge where the over band exits it (measured 21–32% under-band colour, a pure blend of the two colours). The clip is enlarged across the over band's edges only.
 - Self-intersecting Regions are allowed but the `occluded` test can mis-measure their overlap (Flatten booleans); rare, documented rather than fixed.
+- Two minors parked at the end of the final review, both with fixes identified: the Selection panel rotates and mirrors about the context-space bounds centre while the rotate handle uses the world bounds centre mapped into the context (they differ only for asymmetric selections inside a rotated motif; one-line fix in `onRotateStart`), and when a corrupt saved document cannot be moved to the recovery key the banner's Discard does not clear it (no data loss; autosave stays off).
 - The final review found and the fix wave corrected three defects that the task reviews had missed: multi-digit fraction numerators (`13/16`) parsed as a mixed number; typed-closed polygons could produce an invalid document; the Selection panel used world coordinates inside an entered motif. A dev/test-only validation assertion in the store now guards the second class.
 - Re-targeting the entered motif by tapping another occurrence only finds occurrences in the enclosing context; sibling painted-bounds snap targets are coarse when entered two or more motif levels deep.
 - Performance: see G9. The remaining per-frame cost is O(occurrences) re-resolution and element diffing; three next steps are recorded in the gates doc (per-intersection resolution memo, patch memo, repeat-cell subtree reuse). Canvas rendering was not evaluated, per the packet's order.
