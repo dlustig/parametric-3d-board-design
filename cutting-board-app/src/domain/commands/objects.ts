@@ -171,22 +171,13 @@ export function setBandClosed(p: Project, id: Id, closed: boolean): CommandResul
  */
 export function offsetCopyBand(p: Project, id: Id, side: 'left' | 'right', widthMm: number): CommandResult {
   const band = p.objects[id] as Band
-  const ctx = contextOf(p, id)
   const distance = ((band.widthMm + widthMm) / 2) * (side === 'right' ? 1 : -1)
   const offsetPoints = offsetPolyline(band.points, distance, band.closed)
 
   if (hasTooCloseSegment(offsetPoints, band.closed)) return fail('The offset copy would collapse a segment')
 
-  const copy: Band = {
-    type: 'band',
-    id: newId(),
-    materialId: band.materialId,
-    widthMm,
-    closed: band.closed,
-    points: offsetPoints.map((pt) => ({ id: newId(), x: pt.x, y: pt.y })),
-  }
-  const withBand: Project = { ...p, objects: { ...p.objects, [copy.id]: copy } }
-  return withinCap(withChildren(withBand, ctx, [...childrenOf(withBand, ctx), copy.id]))
+  const points = offsetPoints.map((pt) => ({ id: newId(), x: pt.x, y: pt.y }))
+  return addToContext(p, contextOf(p, id), { type: 'band', id: newId(), materialId: band.materialId, widthMm, closed: band.closed, points })
 }
 
 /** Patches an instance's or repeat's transform. (The occurrence count cannot change, so this cannot be refused.) */
