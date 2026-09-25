@@ -6,7 +6,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { Band, Region } from '../src/domain/model.ts'
-import { band, project, region } from '../src/domain/test-builders.ts'
+import { band, instance, project, region } from '../src/domain/test-builders.ts'
 import type { XY } from './helpers.ts'
 import { cameraShowing, expectClose, getProject, history, mouseDrag, seed, select, setCamera, toClient, Touch } from './helpers.ts'
 
@@ -153,6 +153,48 @@ test.describe('touch', () => {
     // The vertex goes to the finger: (90 + 6 + 13, 90 + 9) snaps to the grid point (110, 100).
     expectClose(pts[1]!.x, 110, 1e-6)
     expectClose(pts[1]!.y, 100, 1e-6)
+    expect(await history(page)).toEqual({ past: 1, future: 0 })
+  })
+})
+
+test.describe('inside a rotated, scaled edit context', () => {
+  test.skip(({ isMobile }) => isMobile, 'mouse tests run in the desktop projects')
+
+  // Instance i1 of motif m at (150, 100), rotated 30°, scale 1.5; entered, so
+  // handles, snapping and the stored points are all in definition space.
+  const place = { x: 150, y: 100, rotationDeg: 30, scale: 1.5 }
+  const nested = project(
+    [instance('i1', 'm', place)],
+    [{ id: 'm', children: [band('a', [[0, 0], [20, 0]], { widthMm: 2 }), band('b', [[31.3, 10.7], [40, 17.3]], { widthMm: 2 })] }],
+  )
+  const world = (q: XY): XY => {
+    const r = (place.rotationDeg * Math.PI) / 180
+    return { x: place.x + place.scale * (q.x * Math.cos(r) - q.y * Math.sin(r)), y: place.y + place.scale * (q.x * Math.sin(r) + q.y * Math.cos(r)) }
+  }
+  const client = async (page: Page, q: XY): Promise<XY> => at(page, world(q))
+
+  async function enter(page: Page): Promise<void> {
+    await seed(page, nested)
+    await setCamera(page, cameraShowing({ x: 120, y: 80 }, { x: 40, y: 40 }, 3))
+    await page.evaluate(() => window.__cbpd!.getState().enterContext({ motifId: 'm', path: [{ instanceId: 'i1' }] }))
+    await select(page, ['a'])
+  }
+
+  test('a vertex handle drag snaps onto a sibling’s off-grid endpoint in definition space', async ({ page }) => {
+    await enter(page)
+    await mouseDrag(page, await client(page, { x: 20, y: 0 }), await client(page, { x: 31.3, y: 10.7 }))
+    const [p0, p1] = await points(page, 'a')
+    expectXY(p0!, { x: 0, y: 0 })
+    expectXY(p1!, { x: 31.3, y: 10.7 })
+    expect(await history(page)).toEqual({ past: 1, future: 0 })
+  })
+
+  test('a move snaps the selection’s endpoint onto a sibling’s endpoint in definition space', async ({ page }) => {
+    await enter(page)
+    await mouseDrag(page, await client(page, { x: 5, y: 0 }), await client(page, { x: 5 + 11.3, y: 10.7 }))
+    const [p0, p1] = await points(page, 'a')
+    expectXY(p0!, { x: 11.3, y: 10.7 })
+    expectXY(p1!, { x: 31.3, y: 10.7 })
     expect(await history(page)).toEqual({ past: 1, future: 0 })
   })
 })
