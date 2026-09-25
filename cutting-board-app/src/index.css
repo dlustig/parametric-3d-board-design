@@ -348,6 +348,7 @@ body {
 
 .field-with-button .field {
   flex: 1;
+  min-width: 0; /* else the input's intrinsic width pushes the row past the 280 px inspector */
 }
 
 .overrides {

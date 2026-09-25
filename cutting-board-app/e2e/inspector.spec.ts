@@ -7,7 +7,7 @@
 import { expect, test } from '@playwright/test'
 import type { Band, Project } from '../src/domain/model.ts'
 import { band, project } from '../src/domain/test-builders.ts'
-import { getProject, history, seed, select } from './helpers.ts'
+import { getProject, history, seed, seededProject, select } from './helpers.ts'
 
 /** A single Band, in an inch-displaying project so a bare fraction like "3/16" parses as inches. */
 function inchProject(widthMm = 6.35): Project {
@@ -97,5 +97,22 @@ test.describe('inspector numeric fields', () => {
     // then push its own — two entries instead of one.
     await page.getByRole('button', { name: 'Mirror X' }).click()
     expect(await history(page)).toEqual({ past: 1, future: 0 })
+  })
+})
+
+test.describe('inspector layout', () => {
+  test('the Repeat panel fits the inspector: no horizontal scroll, even after ½ step', async ({ page }) => {
+    await seed(page, { ...seededProject(), displayUnits: 'in' })
+    await select(page, ['rp1'])
+    const inspector = page.locator('.inspector')
+    await expect(inspector.getByRole('button', { name: 'Row offset ½ step' })).toBeVisible()
+    const overflow = (): Promise<{ scroll: number; client: number; left: number }> =>
+      inspector.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, left: el.scrollLeft }))
+    const before = await overflow()
+    expect(before.scroll).toBeLessThanOrEqual(before.client)
+    await inspector.getByRole('button', { name: 'Row offset ½ step' }).click()
+    const after = await overflow()
+    expect(after.scroll).toBeLessThanOrEqual(after.client)
+    expect(after.left).toBe(0)
   })
 })
