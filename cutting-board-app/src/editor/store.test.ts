@@ -8,6 +8,7 @@ import { addMaterial, deleteMaterial, deleteObjects, setBoardSize, setDisplayUni
 import type { Project } from '../domain/model.ts'
 import { newProject } from '../domain/project.ts'
 import { band, instance, MAT, MAT2, project } from '../domain/test-builders.ts'
+import { fitBoard } from './camera.ts'
 import { contextMatrix, currentContext, useEditor } from './store.ts'
 
 /** Resets the shared store singleton to a known baseline before each test. */
@@ -220,6 +221,14 @@ describe('replaceProject', () => {
   // Controller ruling (Task 16): replaceProject must repair a dangling
   // currentMaterialId too, the same way undo/redo and deleteMaterial do —
   // an imported/new project may not contain the id the editor had selected.
+  it('fits the camera to the new Board', () => {
+    resetStore(newProject('mm'))
+    useEditor.setState({ viewportPx: { w: 800, h: 600 }, camera: { x: -500, y: -500, zoom: 9 } })
+    const big = { ...newProject('in'), board: { ...newProject('in').board, widthMm: 600, heightMm: 900 } }
+    useEditor.getState().replaceProject(big)
+    expect(useEditor.getState().camera).toEqual(fitBoard(big.board, { w: 800, h: 600 }))
+  })
+
   it('repairs a dangling currentMaterialId to the first material of the replacement project', () => {
     const p0 = project([band('b1', [[0, 0], [10, 0]])])
     resetStore(p0)

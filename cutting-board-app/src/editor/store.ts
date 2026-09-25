@@ -25,6 +25,7 @@ import type { Mat } from '@/geometry/affine'
 import { IDENTITY, multiply } from '@/geometry/affine'
 import { pathMatrix } from '@/geometry/expand'
 import type { SegmentSnap, SnapResult } from '@/geometry/snap'
+import { fitBoard } from './camera.ts'
 import type { EditContextLevel } from './selection.ts'
 import { pruneCurrentMaterial, pruneEditContext, pruneSelection } from './selection.ts'
 
@@ -83,6 +84,7 @@ export interface EditorState {
   settlePreview(): void
   undo(): void
   redo(): void
+  /** Opens `p` (startup load, New, Open): clears history, selection and context, and fits the camera to its Board. */
   replaceProject(p: Project): void
   select(ids: Id[]): void
   setTool(t: Tool): void
@@ -206,7 +208,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       replaceProject(p) {
         get().settlePreview()
-        set({ project: freezeInDev(assertValidInDev(p)), selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId), message: null, gridMm: gridMmFor(p) })
+        set({ project: freezeInDev(assertValidInDev(p)), selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId), message: null, gridMm: gridMmFor(p), camera: fitBoard(p.board, get().viewportPx) })
         useEditor.temporal.getState().clear()
       },
 
