@@ -127,11 +127,6 @@ export function paintIndexOf(p: Project): (key: string) => number {
   return (key) => order.get(key)!
 }
 
-/** Whether the record's refs yield a listed intersection in its context. */
-export function isRecordResolved(p: Project, ctx: ContextId, c: Crossing): boolean {
-  return listedKeys(p, ctx).includes(canonicalKey(c))
-}
-
 /**
  * SPEC §5.5, from the pre-command project to the post-command one, per
  * context (definition records in definition space, root records in world

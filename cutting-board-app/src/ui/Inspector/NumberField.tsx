@@ -43,7 +43,6 @@ function formatValue(value: number, unit: Unit | 'deg' | null): string {
 function satisfiesPolicy(value: number, policy: FieldPolicy): boolean {
   if (!Number.isFinite(value)) return false
   if (policy === 'positive') return value > 0
-  if (policy === 'nonneg') return value >= 0
   if (policy === 'integer1to50') return Number.isInteger(value) && value >= 1 && value <= 50
   return true
 }

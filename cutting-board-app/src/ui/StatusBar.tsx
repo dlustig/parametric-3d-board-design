@@ -12,7 +12,6 @@ import { downloadProject } from './ProjectMenu.tsx'
 
 const STATUS_TEXT: Record<SaveStatus, string> = {
   saved: 'Saved',
-  saving: 'Saving…',
   unsaved: 'Not saved in this browser — download your project',
   'other-tab': 'Project changed in another tab',
 }

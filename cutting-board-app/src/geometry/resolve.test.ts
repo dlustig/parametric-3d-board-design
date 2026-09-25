@@ -3,15 +3,20 @@
 import { describe, expect, it } from 'vitest'
 import type { CommandResult } from '../domain/commands/index.ts'
 import { deletePoint, insertPoint, setBandWidth, setPoint, setRepeatParams, setTransform, toggleCrossing, translateObjects } from '../domain/commands/index.ts'
-import { canonicalize } from '../domain/crossings.ts'
-import type { Crossing, Project, Step } from '../domain/model.ts'
+import { canonicalize, canonicalKey } from '../domain/crossings.ts'
+import type { ContextId, Crossing, Project, Step } from '../domain/model.ts'
 import { importProject } from '../domain/migrate.ts'
 import { band, instance, project, record, ref, repeat } from '../domain/test-builders.ts'
 import { validateProject } from '../domain/validate.ts'
 import { expand } from './expand.ts'
 import type { Intersection } from './intersections.ts'
 import { findIntersections } from './intersections.ts'
-import { isRecordResolved, paintIndexOf, resolveIntersection } from './resolve.ts'
+import { listedKeys, paintIndexOf, resolveIntersection } from './resolve.ts'
+
+/** Whether the record's refs yield a listed intersection in its context. */
+function isRecordResolved(p: Project, ctx: ContextId, c: Crossing): boolean {
+  return listedKeys(p, ctx).includes(canonicalKey(c))
+}
 
 function ok(r: CommandResult): Project {
   if (!r.ok) throw new Error(r.message)

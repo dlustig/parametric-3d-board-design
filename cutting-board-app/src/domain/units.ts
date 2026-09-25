@@ -6,7 +6,7 @@
 
 export type Unit = 'in' | 'mm'
 
-export type FieldPolicy = 'positive' | 'nonneg' | 'any' | 'integer1to50'
+export type FieldPolicy = 'positive' | 'any' | 'integer1to50'
 
 export type ParseResult = { ok: true; mm: number } | { ok: false; error: string }
 export type AngleParseResult = { ok: true; deg: number } | { ok: false; error: string }
