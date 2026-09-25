@@ -45,7 +45,7 @@ test('dark by default, with the dark token set and the IBM Plex Sans face', asyn
   expect(await token(page, '--panel')).toBe('#202328')
   expect(await token(page, '--acc')).toBe('#3d9bff')
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(32, 35, 40)')
-  expect(await page.evaluate(async () => (await document.fonts.ready, document.fonts.check('500 13px "IBM Plex Sans"')))).toBe(true)
+  expect(await page.evaluate(async () => (await document.fonts.ready, document.fonts.check('400 13px "IBM Plex Sans"')))).toBe(true)
 })
 
 test('a stored light preference applies the light token set', async ({ page }) => {

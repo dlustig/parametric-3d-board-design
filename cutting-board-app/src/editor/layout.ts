@@ -1,17 +1,19 @@
 // Shell spec §11: the layout store — UI preferences that outlive a project
 // and never enter undo history. Persisted with zustand `persist` under
-// PREFS_KEY; every storage access is guarded, so a private window, a full
-// quota, or JSON it cannot parse leaves prefs at their defaults for the
-// session and never touches the editor store's saveStatus. Stored values
-// are validated on the way in (`merge`): anything foreign falls back to the
-// literal default, not to whatever the live store already held (Review
-// Focus 1). `createJSONStorage` is not used here because its `JSON.parse`
-// is unguarded and would otherwise throw hydration off the rails entirely
-// on non-JSON text; `guardedStorage` below performs that parse itself.
+// PREFS_KEY; every storage access is guarded, so a private window or a full
+// quota leaves prefs working for the session and never touches the editor
+// store's saveStatus. Stored values are validated on the way in (`merge`):
+// anything foreign falls back to the default (Review Focus 1). Hydration
+// runs synchronously at module load (`guardedStorage`'s calls are plain,
+// synchronous `localStorage` calls, and zustand's persist middleware
+// resolves a synchronous storage's hydration inline before `create()`
+// returns) — so `current` in `merge` is still `configResult`, the literal
+// defaults, on every real boot; corrupt/foreign/throwing storage never
+// reaches a later, already-changed state.
 
 import { create } from 'zustand'
-import type { PersistStorage, StorageValue } from 'zustand/middleware'
-import { persist } from 'zustand/middleware'
+import type { StateStorage } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 
 export type ThemePref = 'dark' | 'light' | 'system'
 export type LeftTab = 'layers' | 'motifs' | 'wood'
@@ -40,28 +42,17 @@ export interface LayoutState {
   setToolsDocked(d: boolean): void
 }
 
-type Prefs = Pick<LayoutState, 'theme' | 'leftTab' | 'toolsDocked'>
-
-const DEFAULTS: Prefs = { theme: 'dark', leftTab: 'layers', toolsDocked: true }
-
-const guardedStorage: PersistStorage<Prefs> = {
+const guardedStorage: StateStorage = {
   getItem: (name) => {
-    let raw: string | null
     try {
-      raw = localStorage.getItem(name)
-    } catch {
-      return null
-    }
-    if (raw === null) return null
-    try {
-      return JSON.parse(raw) as StorageValue<Prefs>
+      return localStorage.getItem(name)
     } catch {
       return null
     }
   },
   setItem: (name, value) => {
     try {
-      localStorage.setItem(name, JSON.stringify(value))
+      localStorage.setItem(name, value)
     } catch {
       // Best-effort: the preference still applies for this session.
     }
@@ -82,7 +73,9 @@ function oneOf<T extends string>(options: readonly T[], value: unknown, fallback
 export const useLayout = create<LayoutState>()(
   persist(
     (set) => ({
-      ...DEFAULTS,
+      theme: 'dark',
+      leftTab: 'layers',
+      toolsDocked: true,
       setTheme: (theme) => set({ theme }),
       setLeftTab: (leftTab) => set({ leftTab }),
       setToolsDocked: (toolsDocked) => set({ toolsDocked }),
@@ -90,16 +83,16 @@ export const useLayout = create<LayoutState>()(
     {
       name: PREFS_KEY,
       version: 1,
-      storage: guardedStorage,
+      storage: createJSONStorage(() => guardedStorage),
       partialize: (s) => ({ theme: s.theme, leftTab: s.leftTab, toolsDocked: s.toolsDocked }),
       merge: (persisted, current) => {
         const read = (key: string): unknown => (typeof persisted === 'object' && persisted !== null ? Reflect.get(persisted, key) : undefined)
         const docked = read('toolsDocked')
         return {
           ...current,
-          theme: oneOf(THEMES, read('theme'), DEFAULTS.theme),
-          leftTab: oneOf(TABS, read('leftTab'), DEFAULTS.leftTab),
-          toolsDocked: typeof docked === 'boolean' ? docked : DEFAULTS.toolsDocked,
+          theme: oneOf(THEMES, read('theme'), current.theme),
+          leftTab: oneOf(TABS, read('leftTab'), current.leftTab),
+          toolsDocked: typeof docked === 'boolean' ? docked : current.toolsDocked,
         }
       },
     },

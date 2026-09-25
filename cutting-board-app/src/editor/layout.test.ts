@@ -2,11 +2,14 @@
 // including Review Focus 1 (corrupt/foreign prefs) and 2 (throwing storage).
 // `localStorage` is stubbed per test; the store's storage reads it lazily.
 //
-// The fallback tests seed the store to NON-default values before rehydrating
-// with corrupt/foreign or throwing storage, then assert the result is the
-// literal defaults (`useLayout.getInitialState()`'s values) — not just
-// "whatever the store already held" — so a merge that quietly keeps the
-// seeded state would fail these tests.
+// The corrupt/foreign/throwing cases model a real boot: `localStorage` is
+// seeded before the module is (re-)imported, since that's the only time
+// `persist` hydrates in this app (`persist.rehydrate()` is never called by
+// the running app — hydration happens once, synchronously, as the module's
+// top-level `create(...)` runs). `vi.resetModules()` plus a dynamic
+// `import('./layout.ts')` gets a fresh store instance for each of those
+// cases so the "current state" merge falls back to is genuinely the
+// module's own defaults, not something a previous test left behind.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LayoutState } from './layout.ts'
@@ -37,13 +40,6 @@ const throwingStorage = {
   },
 }
 
-const DEFAULTS = { theme: 'dark', leftTab: 'layers', toolsDocked: true }
-
-// Differs from DEFAULTS in every field, so a merge that falls back to
-// "whatever is currently in the store" instead of the literal defaults
-// produces a result that visibly fails the `toEqual(DEFAULTS)` assertions.
-const SEEDED = { theme: 'light', leftTab: 'motifs', toolsDocked: false } as const
-
 function prefs(s: LayoutState): { theme: string; leftTab: string; toolsDocked: boolean } {
   return { theme: s.theme, leftTab: s.leftTab, toolsDocked: s.toolsDocked }
 }
@@ -53,6 +49,12 @@ function withStored(raw: string): MemoryStorage {
   s.setItem(PREFS_KEY, raw)
   vi.stubGlobal('localStorage', s)
   return s
+}
+
+/** A fresh module instance, so hydration runs from scratch against whatever `localStorage` is stubbed to right now — the same as a real page load. */
+async function freshLayoutModule(): Promise<typeof import('./layout.ts')> {
+  vi.resetModules()
+  return import('./layout.ts')
 }
 
 beforeEach(() => {
@@ -105,21 +107,22 @@ describe('useLayout persistence', () => {
     ['non-JSON text', 'not json{'],
     ['another version', JSON.stringify({ state: { theme: 'light' }, version: 7 })],
     ['a non-object', '42'],
-  ])('falls back to the defaults for %s', async (_name, raw) => {
+  ])('boots to the defaults for %s, without throwing', async (_name, raw) => {
     vi.spyOn(console, 'error').mockImplementation(() => {}) // zustand reports the unmigratable version
-    useLayout.setState(SEEDED) // prove rehydrate produced the defaults, not the pre-rehydrate state
     withStored(raw)
-    await useLayout.persist.rehydrate()
-    expect(prefs(useLayout.getState())).toEqual(DEFAULTS)
-    expect(prefs(useLayout.getState())).toEqual(prefs(useLayout.getInitialState()))
+    const modulePromise = freshLayoutModule()
+    await expect(modulePromise).resolves.toBeTruthy() // the bad value never throws out of module load
+    const fresh = await modulePromise
+    expect(prefs(fresh.useLayout.getState())).toEqual(prefs(fresh.useLayout.getInitialState()))
   })
 
-  it('keeps working when storage throws: hydration falls back, setters apply for the session', async () => {
-    useLayout.setState(SEEDED) // as above: prove the throw produced the defaults, not the seeded state
+  it('boots to the defaults when storage throws, and setters still apply for the session', async () => {
     vi.stubGlobal('localStorage', throwingStorage)
-    await useLayout.persist.rehydrate()
-    expect(prefs(useLayout.getState())).toEqual(DEFAULTS)
-    expect(() => useLayout.getState().setTheme('light')).not.toThrow()
-    expect(useLayout.getState().theme).toBe('light')
+    const modulePromise = freshLayoutModule()
+    await expect(modulePromise).resolves.toBeTruthy()
+    const fresh = await modulePromise
+    expect(prefs(fresh.useLayout.getState())).toEqual(prefs(fresh.useLayout.getInitialState()))
+    expect(() => fresh.useLayout.getState().setTheme('light')).not.toThrow()
+    expect(fresh.useLayout.getState().theme).toBe('light')
   })
 })
