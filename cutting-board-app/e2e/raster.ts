@@ -99,7 +99,7 @@ export function samplePixel(img: Raster, x: number, y: number): RGB {
   return [img.data[k]!, img.data[k + 1]!, img.data[k + 2]!]
 }
 
-export function hexToRgb(hex: string): RGB {
+function hexToRgb(hex: string): RGB {
   const n = Number.parseInt(hex.slice(1), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }

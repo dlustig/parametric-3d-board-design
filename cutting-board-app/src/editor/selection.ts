@@ -21,7 +21,6 @@ export interface EditContextLevel {
 function walkPath(p: Project, from: ContextId, path: Step[]): ContextId | undefined {
   let ctx = from
   for (const step of path) {
-    if (ctx !== null && !Object.hasOwn(p.motifs, ctx)) return undefined
     const id = stepObjectId(step)
     if (!childrenOf(p, ctx).includes(id)) return undefined
     const obj = p.objects[id]

@@ -273,6 +273,18 @@ describe('G2 occurrence scope', () => {
     expect(overBandAt(p, 150, 150)).toBe('V')
   })
 
+  it('"All instances" keeps the root records of other pairs', () => {
+    const cell00: Step = { repeatId: 'F', row: 0, column: 0 }
+    const other = canonicalize(record('rr', ref('R', 'R0'), ref('H', 'H0', [cell00]), 'b', { x: 110, y: 100 })) // H over R, against paint order
+    const base = field([O, other])
+    const p0: Project = { ...base, objects: { ...base.objects, R: band('R', [[110, 80], [110, 120]]) }, rootChildren: [...base.rootChildren, 'R'] }
+    expect(validateProject(p0)).toBeNull()
+
+    const p = toggleCrossing(p0, at(p0, 100, 100), 'all')
+    expect(p.crossings).toEqual([other]) // O (same pair) removed; the R × H record untouched
+    expect(overBandAt(p, 110, 100)).toBe('H')
+  })
+
   it('"All instances" toggled twice in a plain cell leaves every cell uniform and no root record for the pair', () => {
     let p = field()
     for (const expected of ['V', 'H']) {
