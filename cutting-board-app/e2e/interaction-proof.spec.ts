@@ -58,6 +58,7 @@ test.describe('mouse', () => {
   test('(a) drag N px commits Δ = N/zoom mm through getScreenCTM at zoom 0.5, 1, 7.3 with a panned camera', async ({ page }) => {
     for (const zoom of [0.5, 1, 7.3]) {
       await seed(page)
+      await snapOff(page) // raw Δ: the seed lies on the grid, so a snapped Δ could pass by coincidence
       await setCamera(page, cameraShowing({ x: 80, y: 40 }, { x: 437.3, y: 311.7 }, zoom))
       await select(page, ['b1'])
       const before = bandPoints(await getProject(page), 'b1')
@@ -272,7 +273,8 @@ test.describe('mouse', () => {
     expect(await history(page)).toEqual({ past: 0, future: 0 })
     await page.getByRole('button', { name: 'Select' }).click()
 
-    // And a plain mouse drag of the selection still commits.
+    // And a plain mouse drag of the selection still commits (raw Δ, so Snap off).
+    await snapOff(page)
     const again = round(await toClient(page, { x: 55, y: 40 }))
     await mouseDrag(page, again, { x: again.x + 30, y: again.y })
     expect(await history(page)).toEqual({ past: 1, future: 0 })
