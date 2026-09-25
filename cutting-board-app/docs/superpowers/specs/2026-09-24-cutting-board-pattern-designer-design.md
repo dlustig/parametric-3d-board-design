@@ -255,7 +255,7 @@ One Zustand store with:
 
 - `project` — the document, wrapped by zundo `temporal({ partialize: s => ({ project: s.project }), equality: (a, b) => a.project === b.project, limit: 100 })`. The equality is required: without it camera and selection writes push duplicate entries and clear redo.
 - `preview: { next: Project; onInterrupt: 'commit' | 'cancel' } | null`. Pointer gestures and inspector typing write `next`, always recomputed from `project` with the cumulative gesture arguments (never frame-on-frame). The renderer uses `preview?.next ?? project`.
-- `settlePreview()` runs before **any** command, undo, redo, import, or New Project, so `project` cannot change while a preview exists: inspector previews commit, gesture previews cancel. `commit()` replaces `project` with `rematch(project, next)` and clears the preview. History therefore sees exactly one entry per gesture or field edit, and never a preview frame.
+- `settlePreview()` runs before **any** command, undo, redo, import, or New Project, so `project` cannot change while a preview exists: inspector previews commit, gesture previews cancel. `commit()` replaces `project` with `next` and clears the preview (commands already run `rematchCrossings`; the store never rematches, so no preview frame ever pays for it). History therefore sees exactly one entry per gesture or field edit, and never a preview frame.
 - Ephemeral: `tool`, `selection: Id[]`, `editContext: { motifId, path: Step[] }[]`, `camera`, `snapEnabled`, `addToSelection`, `crossingScope`, `currentMaterialId`, drawing state, save status.
 
 After undo, redo, or import: drop selection ids that no longer exist, pop `editContext` to the deepest level whose motif and path still validate, cancel any drawing. Undo and redo trigger autosave like commits.
@@ -295,7 +295,7 @@ Tool keys: `V` select, `H` hand, `B` band, `R` rectangle region, `P` polygon reg
 - **Rectangle**: drag corner to corner; 4-point Region.
 - **Crossing**: draws markers for every listed intersection (filled = eligible, badge = overridden, hatched = unsupported, ring = unresolved). Tap an eligible marker to toggle per §5.4 using the scope control in the options bar; tap an unsupported marker to read its reason. Hit radius 12 px for mouse, 22 px for touch; nearest centre wins.
 
-Selection commands (toolbar buttons and keys; all operate in the current context): Delete/Backspace; **Duplicate** (`Ctrl/Cmd+D`, in place; arrays are what Repeat is for); copy/paste (`Ctrl/Cmd+C/V`, in place, in-app clipboard including definition-internal records); **Mirror X / Y** about the painted-bounds centre; **Rotate 90° CW/CCW** and **Rotate by °** about the same centre; arrow nudge one grid step (Shift ×10; screen axes, mapped into the context); Bring forward / Send backward / To front / To back; **Offset copy** (Band only: a parallel copy on the chosen side at perpendicular distance `(w + w')/2` with miter-offset joints; width `w'` defaults to `w`); **Create Motif** (`Ctrl/Cmd+G`); **Repeat**; **Detach**.
+Selection commands (toolbar buttons and keys; all operate in the current context): Delete/Backspace; **Duplicate** (`Ctrl/Cmd+D`; the copy is offset by one grid step in +X and +Y so the action is visible; arrays are what Repeat is for); copy/paste (`Ctrl/Cmd+C/V`, in place, in-app clipboard including definition-internal records); **Mirror X / Y** about the painted-bounds centre; **Rotate 90° CW/CCW** and **Rotate by °** about the same centre; arrow nudge one grid step (Shift ×10; screen axes, mapped into the context); Bring forward / Send backward / To front / To back; **Offset copy** (Band only: a parallel copy on the chosen side at perpendicular distance `(w + w')/2` with miter-offset joints; width `w'` defaults to `w`); **Create Motif** (`Ctrl/Cmd+G`); **Repeat**; **Detach**.
 
 **Create Motif**: pivot = centre of the selection's painted bounds. Children are re-based so the pivot is definition `(0,0)`; the new instance has `x, y` = pivot, replacing the selection at the topmost selected child's position in paint order. A pivot marker is drawn on selected instances. **Repeat**: on one instance, replaces it with a 2×2 RepeatField with the same motif and transform and steps equal to the definition's painted-bounds size in definition units (the cell offsets are applied inside the field's transform, so this tiles seamlessly at any scale); on any other selection, performs Create Motif then Repeat.
 
@@ -323,7 +323,7 @@ Entering a definition (double-tap an instance/cell, or **Edit Motif**) pushes `{
 
 ### 7.7 Snapping
 
-Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`ed); the rail toggle persists. Grid spacing is an editor setting (not in the document), defaulting to 3.175 mm for inch projects and 5 mm for mm projects; the grid is drawn when **Show grid** is on. The grid is drawn and snapped in the current context's space (definition axes while editing a motif), like the length and angle labels.
+Enabled by default; Alt held disables temporarily (Alt keyup is `preventDefault`ed); the rail toggle persists. Grid spacing is an editor setting (not in the document), set to 3.175 mm for inch projects and 5 mm for mm projects whenever a project is opened or its display units change (a user edit to the spacing lasts until then); the grid is drawn when **Show grid** is on. The grid is drawn and snapped in the current context's space (definition axes while editing a motif), like the length and angle labels.
 
 - **Targets** (computed once at gesture start from `project`, excluding the moving selection; inside an edit context they include the other occurrences of the entered definition and its siblings, mapped into definition space): grid points; Board edges and centre lines; Band endpoints and vertices; Region vertices; listed intersection points; painted-bounds edges and centres of other objects.
 - **Sources** while moving: the selection's vertices, endpoints, and bounds edges/centres. The nearest source–target pair within tolerance wins; point targets beat line targets beat grid. A guide overlay shows the active snap.
@@ -475,5 +475,8 @@ src/
 | Product 15 | Current material undefined | §3 |
 | Editor 30 | Show `≈` for inexact fractions | Declined: adds a display state for no workflow gain |
 | Final review C1 | The §8 regex let `13/16` backtrack into `1` + `3/16` | Fraction branch requires a separator between whole and fraction (§8) |
+| Final review I4 | Rematch ran in commands and again in `commit()` | Commands are the only rematch owner (§7.1) |
+| Final review I2, walkthrough | Grid default never followed inch units | Grid spacing set from display units on open and on unit change (§7.7) |
+| Walkthrough | Duplicate in place gave no visible result | Copy offset by one grid step (§7.4) |
 | Product 4 (part) | Draggable pivot point | Declined: vertex-snapped move and typed lengths cover alignment |
 | Product 8 (part) | Separate "Move by" field | Declined: bounds X/Y covers it |
