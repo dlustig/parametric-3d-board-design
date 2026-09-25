@@ -5,7 +5,7 @@ Versions: react-moveable 0.56.0, react-selecto 1.26.3 (selecto 1.26.3, gesto 1.1
 
 ## Verdict
 
-All of (a)–(j) pass in `chromium` and `chromium-touch`; the mouse assertions also pass in `firefox`. No assertion needed replacement interaction machinery. WebKit could not be launched on this host (see the last section); that is an environment gap, not a library result.
+All of (a)–(j) pass in `chromium` and `chromium-touch`; the mouse assertions also pass in `firefox`. No assertion needed replacement interaction machinery. WebKit could not be launched on this host when this was first written (see the last section); it has run since, and (a)–(j)'s mouse assertions pass there too.
 
 ## Findings
 
@@ -21,4 +21,4 @@ All of (a)–(j) pass in `chromium` and `chromium-touch`; the mouse assertions a
 
 ## WebKit
 
-`pnpm exec playwright test --project webkit` fails at `browserType.launch` on this host: missing `libgstcodecparsers-1.0.so.0` and `libavif.so.13` (installing them needs root; `sudo` requires a password). The WebKit project stays configured; run it where `playwright install-deps webkit` has been applied, and do the SPEC G7 manual iPad Safari checklist before relying on Safari `gesture*` handling, which no automated project here exercises.
+At Slice 1, `pnpm exec playwright test --project webkit` failed at `browserType.launch` on this host (missing `libgstcodecparsers-1.0.so.0` and `libavif.so.13`). Those libraries have since been installed and the webkit project runs in every full `pnpm exec playwright test` (see the gates document). Desktop WebKit still does not exercise Safari's `gesture*` events: do the SPEC G7 manual iPad Safari checklist before relying on them.

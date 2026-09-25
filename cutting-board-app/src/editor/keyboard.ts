@@ -1,7 +1,7 @@
 // SPEC §7.4 keyboard dispatch: one window `keydown` listener for tool
-// switching, undo/redo, and the selection commands (Delete, Duplicate,
-// Copy/Paste, arrow nudge) and drawing keys (Enter/Backspace/Esc while
-// drawing — moved here from the temporary listener in ToolOptions.tsx).
+// switching, undo/redo, the selection commands (Delete, Duplicate,
+// Copy/Paste, arrow nudge) and the drawing keys (Enter/Backspace/Esc while
+// drawing).
 // Ignores events whose target is an input, textarea, select, or
 // contenteditable: Esc on a field is excepted only in the sense that the
 // field's own handler already reverted it and stopped the event from

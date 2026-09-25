@@ -100,12 +100,10 @@ export function createMotif(p: Project, ctx: ContextId, ids: Id[], name?: string
 
 /**
  * SPEC §7.4 Repeat on one instance: replaced in place (same id, motif and
- * transform) by a 2×2 field whose steps are the definition's painted size,
- * so the default lattice is seamless. SPEC §7.4 says "× scale", but §4.4
- * applies `Cell` after `M(t)`, so steps are already in scaled definition
- * units: multiplying by scale would open gaps (or overlaps) whenever
- * scale ≠ 1. Record steps through the instance become cell (0, 0). Refused
- * over the occurrence cap.
+ * transform) by a 2×2 field whose steps are the definition's painted size in
+ * definition units — §4.4 applies `Cell` inside the field's transform, so the
+ * default lattice is seamless at any scale. Record steps through the
+ * instance become cell (0, 0). Refused over the occurrence cap.
  */
 export function makeRepeat(p: Project, instanceId: Id): CommandResult {
   const inst = p.objects[instanceId] as MotifInstance
@@ -158,7 +156,7 @@ function composeTransforms(parent: Transform, child: Transform): Transform {
  * remapped; a copied record colliding with an existing context record (an
  * override) is dropped. A definition left without instances is deleted.
  * Refused (SPEC §2.1 invariant 3) when a baked segment is shorter than
- * MIN_SEGMENT_MM (a small scale), and over the occurrence cap. Returns the
+ * MIN_SEGMENT_MM (a small scale); the occurrence count cannot change. Returns the
  * copies' ids for the caller to select. No rematch: world geometry is
  * unchanged.
  */
