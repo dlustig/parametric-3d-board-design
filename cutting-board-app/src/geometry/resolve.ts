@@ -4,6 +4,7 @@
 import { canonicalize, canonicalKey, commonPrefix, contextsAlong, pairKey, recordsOf, withRecords } from '@/domain/crossings'
 import { occurrenceKey, refKey } from '@/domain/keys'
 import type { BandRef, ContextId, Crossing, Project } from '@/domain/model'
+import type { Occurrence } from './expand.ts'
 import { expand, expandContext } from './expand.ts'
 import type { Intersection, IntersectionSide } from './intersections.ts'
 import { findIntersections } from './intersections.ts'
@@ -26,9 +27,40 @@ export function intersectionKey(i: Intersection, strip = 0): string {
   return canonicalKey({ a: sideRef(i.a, strip), b: sideRef(i.b, strip) })
 }
 
+/** A context's occurrences (paint order) and its listed intersections, in that context's space. */
+export type ContextListing = { occurrences: Occurrence[]; intersections: Intersection[] }
+
+/**
+ * Listings of the most recently used projects, by reference (projects are
+ * never mutated): a drag frame's command rematches against the committed
+ * project and then draws the same `after` it just listed, so both lookups hit.
+ * Bounded, since history keeps old projects alive.
+ */
+const LISTING_CACHE_SIZE = 4
+const listings = new Map<Project, Map<ContextId, ContextListing>>()
+
+/** SPEC §6.3: classification depends only on the project, never the camera, so it is computed once per project version and context. Callers must not mutate the result. */
+export function contextListing(p: Project, ctx: ContextId): ContextListing {
+  let byContext = listings.get(p)
+  if (byContext === undefined) {
+    byContext = new Map()
+    if (listings.size >= LISTING_CACHE_SIZE) listings.delete(listings.keys().next().value!)
+  } else {
+    listings.delete(p) // re-inserted below as most recent
+  }
+  listings.set(p, byContext)
+  let listing = byContext.get(ctx)
+  if (listing === undefined) {
+    const occurrences = expandContext(p, ctx)
+    listing = { occurrences, intersections: findIntersections(occurrences) }
+    byContext.set(ctx, listing)
+  }
+  return listing
+}
+
 /** Every listed intersection of `ctx`, in that context's space (world space for the root). */
 export function contextIntersections(p: Project, ctx: ContextId): Intersection[] {
-  return findIntersections(expandContext(p, ctx))
+  return contextListing(p, ctx).intersections
 }
 
 /**

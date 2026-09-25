@@ -7,13 +7,12 @@ import { stepKey, stepObjectId } from '@/domain/keys'
 import type { ContextId, Crossing, Project, Step } from '@/domain/model'
 import { apply } from './affine.ts'
 import type { BandOccurrence, Occurrence, RegionOccurrence } from './expand.ts'
-import { expand, pathMatrix } from './expand.ts'
+import { pathMatrix } from './expand.ts'
 import type { XY } from './footprint.ts'
 import { footprint } from './footprint.ts'
 import type { Intersection } from './intersections.ts'
-import { findIntersections } from './intersections.ts'
 import type { Resolved } from './resolve.ts'
-import { contextIntersections, intersectionKey, resolveIntersection } from './resolve.ts'
+import { contextIntersections, contextListing, intersectionKey, resolveIntersection } from './resolve.ts'
 
 export type PatchElement = { kind: 'patch'; over: BandOccurrence; segment: [XY, XY]; clip: XY[] }
 
@@ -99,11 +98,11 @@ function unresolvedMarkers(p: Project, occurrences: Occurrence[]): UnresolvedMar
 
 /** SPEC §6.3. `clipExtendMm` enlarges only the patch clip polygons (SPEC §6.2); classification never uses it. */
 export function buildScene(p: Project, clipExtendMm: number): Scene {
-  const occurrences = expand(p)
+  const { occurrences, intersections } = contextListing(p, null)
   const paintIndex = new Map(occurrences.map((o, index) => [o.key, index]))
   const byKey = (key: string): number => paintIndex.get(key)!
 
-  const resolved = findIntersections(occurrences).map((i) => {
+  const resolved = intersections.map((i) => {
     const { over, source } = resolveIntersection(p, i, byKey)
     return { i, over, source }
   })

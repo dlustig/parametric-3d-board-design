@@ -4,8 +4,7 @@
 
 import type { Id } from '@/domain/model'
 import { scaleOf } from '@/geometry/affine'
-import { expand } from '@/geometry/expand'
-import { findIntersections } from '@/geometry/intersections'
+import { contextListing } from '@/geometry/resolve'
 import type { SnapTargets } from '@/geometry/snap'
 import { collectSnapTargets } from '@/geometry/snap'
 import { SNAP_TOLERANCE_PX } from '@/geometry/tolerance'
@@ -14,8 +13,8 @@ import { contextMatrix, currentContext } from './store.ts'
 
 /** Targets from the committed `project` in the current context, excluding `exclude` (the moving objects); callers compute them once per gesture. */
 export function gestureSnapTargets(s: EditorState, exclude: Id[]): SnapTargets {
-  const occurrences = expand(s.project)
-  return collectSnapTargets(s.project, currentContext(s), contextMatrix(s), exclude, occurrences, findIntersections(occurrences), s.gridMm)
+  const { occurrences, intersections } = contextListing(s.project, null)
+  return collectSnapTargets(s.project, currentContext(s), contextMatrix(s), exclude, occurrences, intersections, s.gridMm)
 }
 
 /** SNAP_TOLERANCE_PX in the current context's mm (SPEC §4.6, §7.6). */
