@@ -1,6 +1,8 @@
 // SPEC §15: the Slice-1 interaction proof. Each assertion (a)–(j) is its own
 // test. Mouse tests run in chromium/firefox/webkit; touch tests (f, g-touch,
-// j) run in chromium-touch through CDP Input.dispatchTouchEvent.
+// j) run in chromium-touch through CDP Input.dispatchTouchEvent. Drags grab
+// b1 at (55, 40), clear of its vertex/midpoint handles (SPEC §7.4), so they
+// exercise Moveable's drag, not a handle's.
 
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
@@ -59,7 +61,7 @@ test.describe('mouse', () => {
       await setCamera(page, cameraShowing({ x: 80, y: 40 }, { x: 437.3, y: 311.7 }, zoom))
       await select(page, ['b1'])
       const before = bandPoints(await getProject(page), 'b1')
-      const start = round(await toClient(page, { x: 80, y: 40 }))
+      const start = round(await toClient(page, { x: 55, y: 40 }))
       const end = { x: start.x + 60, y: start.y - 25 }
       await mouseDrag(page, start, end)
       const after = bandPoints(await getProject(page), 'b1')
@@ -114,7 +116,7 @@ test.describe('mouse', () => {
     expect(await transformed()).toEqual([])
 
     // Mid-drag, after commit, after a rotate, and after zoom.
-    const start = round(await toClient(page, { x: 80, y: 40 }))
+    const start = round(await toClient(page, { x: 55, y: 40 }))
     await page.mouse.move(start.x, start.y)
     await page.mouse.down()
     await page.mouse.move(start.x + 30, start.y + 20, { steps: 5 })
@@ -132,7 +134,7 @@ test.describe('mouse', () => {
     await select(page, ['b1'])
     const original = await getProject(page)
     for (let k = 0; k < 20; k++) {
-      const start = round(await toClient(page, { x: 80, y: 40 }))
+      const start = round(await toClient(page, { x: 55, y: 40 }))
       await mouseDrag(page, start, { x: start.x + 13 + k, y: start.y + 7 - k }, 3)
       expect(await history(page)).toEqual({ past: 1, future: 0 })
       await page.evaluate(() => window.__cbpd!.getState().undo())
@@ -145,7 +147,7 @@ test.describe('mouse', () => {
     await seed(page)
     await select(page, ['b1'])
     const p0 = await getProject(page)
-    const onBand = round(await toClient(page, { x: 80, y: 40 }))
+    const onBand = round(await toClient(page, { x: 55, y: 40 }))
 
     await page.mouse.click(onBand.x, onBand.y) // selected object, no move
     expect(await history(page)).toEqual({ past: 0, future: 0 })
@@ -188,15 +190,15 @@ test.describe('mouse', () => {
     await seed(page, seededProject({ x: 200, y: 90, rotationDeg: 30, mirrorX: true, scale: 1.5 }))
     await page.evaluate(() => window.__cbpd!.getState().enterContext({ motifId: 'm1', path: [{ instanceId: 'i1' }] }))
     const zoom = 2
-    await setCamera(page, cameraShowing({ x: 200, y: 90 }, { x: 500, y: 380 }, zoom))
+    await setCamera(page, cameraShowing({ x: 200, y: 90 }, { x: 400, y: 380 }, zoom)) // grab point clear of the inspector in every engine
     await select(page, ['mb1'])
     await snapOff(page)
     const before = bandPoints(await getProject(page), 'mb1')
 
-    // A point on mb1 at definition (28, 0): world = T·R(30)·S(1.5)·Mx · (28, 0).
+    // A point on mb1 at definition (20, 0), clear of its handles: world = T·R(30)·S(1.5)·Mx · (20, 0).
     const c = Math.cos(Math.PI / 6)
     const s = Math.sin(Math.PI / 6)
-    const onChild = round(await toClient(page, { x: 200 - 1.5 * 28 * c, y: 90 - 1.5 * 28 * s }))
+    const onChild = round(await toClient(page, { x: 200 - 1.5 * 20 * c, y: 90 - 1.5 * 20 * s }))
     const n = { x: 50, y: 20 }
     await mouseDrag(page, onChild, { x: onChild.x + n.x, y: onChild.y + n.y })
 
@@ -250,7 +252,7 @@ test.describe('mouse', () => {
     await setCamera(page, cameraShowing({ x: 80, y: 40 }, { x: 400, y: 300 }, 2))
     const cam3b = await state<{ x: number; y: number; zoom: number }>(page, 's.camera')
     const p0 = await getProject(page)
-    const onBand = round(await toClient(page, { x: 80, y: 40 }))
+    const onBand = round(await toClient(page, { x: 55, y: 40 }))
     await page.keyboard.down('Space')
     await mouseDrag(page, onBand, { x: onBand.x + 40, y: onBand.y + 10 })
     await page.keyboard.up('Space')
@@ -262,7 +264,7 @@ test.describe('mouse', () => {
 
     // Hand tool drag pans too.
     await page.getByRole('button', { name: 'Hand' }).click()
-    const onBandHand = round(await toClient(page, { x: 80, y: 40 }))
+    const onBandHand = round(await toClient(page, { x: 55, y: 40 }))
     await mouseDrag(page, onBandHand, { x: onBandHand.x - 20, y: onBandHand.y + 15 })
     const cam5 = await state<{ x: number; y: number; zoom: number }>(page, 's.camera')
     expectClose(cam5.x, cam4.x + 20 / cam4.zoom, 1e-6)
@@ -271,7 +273,7 @@ test.describe('mouse', () => {
     await page.getByRole('button', { name: 'Select' }).click()
 
     // And a plain mouse drag of the selection still commits.
-    const again = round(await toClient(page, { x: 80, y: 40 }))
+    const again = round(await toClient(page, { x: 55, y: 40 }))
     await mouseDrag(page, again, { x: again.x + 30, y: again.y })
     expect(await history(page)).toEqual({ past: 1, future: 0 })
     expectClose(bandPoints(await getProject(page), 'b1')[0]!.x - 30, 30 / cam5.zoom, 1e-6)
@@ -286,7 +288,7 @@ test.describe('touch', () => {
     await select(page, ['b1'])
     const p0 = await getProject(page)
     const touch = await Touch.attach(page)
-    const on = round(await toClient(page, { x: 80, y: 40 }))
+    const on = round(await toClient(page, { x: 55, y: 40 }))
     await touch.start([on])
     await touch.slide(on, { x: on.x + 60, y: on.y + 30 }, 6)
     expect(await state<unknown>(page, 's.preview')).not.toBeNull() // the drag really was live
@@ -302,7 +304,7 @@ test.describe('touch', () => {
     await select(page, ['b1'])
     const p0 = await getProject(page)
     const touch = await Touch.attach(page)
-    const on = round(await toClient(page, { x: 80, y: 40 }))
+    const on = round(await toClient(page, { x: 55, y: 40 }))
     await touch.start([on])
     const mid = { x: on.x + 40, y: on.y + 20 }
     await touch.slide(on, mid, 4)
@@ -321,7 +323,7 @@ test.describe('touch', () => {
     expect(await state<string[]>(page, 's.selection')).toEqual(['b1'])
 
     // One-finger drag still works afterwards.
-    const again = round(await toClient(page, { x: 80, y: 40 }))
+    const again = round(await toClient(page, { x: 55, y: 40 }))
     await touch.start([again])
     await touch.slide(again, { x: again.x + 30, y: again.y }, 4)
     await touch.end([])

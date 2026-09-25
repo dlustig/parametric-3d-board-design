@@ -9,6 +9,12 @@
 // Selecto, selects the object if needed, and hands the same press to
 // Moveable (`waitToChangeTarget` → `dragStart`, the Selecto+Moveable recipe);
 // a press on nothing starts a marquee, even inside a selected object's bounds.
+//
+// A single selected Band/Region also shows vertex/midpoint handles (SPEC
+// §7.4). Their presses are caught on pointerdown (capture, before Selecto's
+// mousedown/touchstart) by the nearest handle centre within the hit radius,
+// run as a gesture over raw Pointer Events, and stop Selecto so Moveable's
+// drag never starts from a handle.
 
 import type { JSX } from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -19,15 +25,38 @@ import Selecto from 'react-selecto'
 import type { OnDragStart as OnSelectoDragStart, OnSelectEnd } from 'react-selecto'
 import { useShallow } from 'zustand/react/shallow'
 import { unionBoxes } from '@/geometry/bounds'
-import { DOUBLE_TAP_MS } from '@/geometry/tolerance'
+import { apply } from '@/geometry/affine'
+import { DOUBLE_TAP_MS, TAP_SLOP_PX } from '@/geometry/tolerance'
 import { screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
 import { useScene } from '@/editor/scene'
 import { contextMatrix, useEditor } from '@/editor/store'
-import { crossingPointerCancel, crossingPointerDown, crossingPointerMove, crossingPointerUp, resetCrossingInput } from '@/editor/tools/crossing'
+import {
+  crossingPointerCancel,
+  crossingPointerDown,
+  crossingPointerMove,
+  crossingPointerUp,
+  HIT_RADIUS_MOUSE_PX,
+  HIT_RADIUS_TOUCH_PX,
+  pickNearest,
+  resetCrossingInput,
+} from '@/editor/tools/crossing'
 import { drawPointerCancel, drawPointerDown, drawPointerMove, drawPointerUp, isDrawTool, resetDrawInput } from '@/editor/tools/draw'
 import type { Gesture } from '@/editor/tools/select'
-import { clickSelect, contextPrefix, endGesture, enterAt, objectAt, retargetAt, selectableBounds, startRotate, startTranslate, toggleSelection } from '@/editor/tools/select'
+import {
+  clickSelect,
+  contextPrefix,
+  endGesture,
+  enterAt,
+  handlesFor,
+  objectAt,
+  retargetAt,
+  selectableBounds,
+  startHandleDrag,
+  startRotate,
+  startTranslate,
+  toggleSelection,
+} from '@/editor/tools/select'
 import { Proxies } from './Proxies.tsx'
 import { SceneSvg } from './SceneSvg.tsx'
 import { ContextScrim } from './overlays/ContextScrim.tsx'
@@ -37,6 +66,7 @@ import { Grid } from './overlays/Grid.tsx'
 import { PivotMarkers } from './overlays/Pivot.tsx'
 import { SelectionOverlay } from './overlays/Selection.tsx'
 import { SnapGuide } from './overlays/SnapGuide.tsx'
+import { VertexHandles } from './overlays/VertexHandles.tsx'
 
 type XY = { x: number; y: number }
 
@@ -72,6 +102,8 @@ export function Canvas(): JSX.Element {
   /** The current press selected its object itself, so its tap must not toggle it again. */
   const pressSelectedRef = useRef(false)
   const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null)
+  /** The pointer pressing a vertex/midpoint handle, and its gesture (also in `gestureRef` so aborts reach it). */
+  const handlePressRef = useRef<{ id: number; start: XY; maxMove: number; gesture: Gesture } | null>(null)
   const [spaceDown, setSpaceDown] = useState(false)
   const [multiTouch, setMultiTouch] = useState(false)
   const [rotating, setRotating] = useState(false)
@@ -216,8 +248,8 @@ export function Canvas(): JSX.Element {
   const onSelectoDragStart = (e: OnSelectoDragStart): void => {
     const moveable = moveableRef.current!
     const input = e.inputEvent as MouseEvent | TouchEvent
-    if (moveable.isMoveableElement(input.target as Element)) {
-      e.stop() // a Moveable handle owns this press
+    if (handlePressRef.current !== null || moveable.isMoveableElement(input.target as Element)) {
+      e.stop() // a vertex/midpoint or Moveable handle owns this press
       return
     }
     const s = useEditor.getState()
@@ -233,15 +265,20 @@ export function Canvas(): JSX.Element {
     s.select(toggleSelection(s.selection, id, input.shiftKey || s.addToSelection))
     void moveable.waitToChangeTarget().then(() => moveable.dragStart(input, proxy))
   }
+  /** A Select tap that no object press owned: double-tap entry, re-targeting, else tap-select (SPEC §7.4, §7.6). */
+  const tapAt = (client: XY, toggle: boolean): void => {
+    if (isDoubleTap(client) && enterAt(svg(), client)) return
+    if (retargetAt(svg(), client)) return
+    clickSelect(svg(), client, toggle)
+  }
+  const tapRef = useRef(tapAt)
+  tapRef.current = tapAt
   const onSelectEnd = (e: OnSelectEnd): void => {
     const s = useEditor.getState()
     const input = e.inputEvent as MouseEvent | TouchEvent
     const toggle = input.shiftKey || s.addToSelection
     if (e.isClick) {
-      const client = clientOf(e.inputEvent as { clientX: number; clientY: number })
-      if (isDoubleTap(client) && enterAt(svg(), client)) return
-      if (retargetAt(svg(), client)) return
-      clickSelect(svg(), client, toggle)
+      tapAt(clientOf(e.inputEvent as { clientX: number; clientY: number }), toggle)
       return
     }
     const ids = e.selected.map((el) => el.getAttribute('data-object-id')!)
@@ -281,6 +318,62 @@ export function Canvas(): JSX.Element {
     }
   }, [tool, wrapper, svgEl])
 
+  // Vertex/midpoint handle presses (SPEC §7.4): a drag past TAP_SLOP_PX
+  // commits once on release; a tap cancels and acts as a plain Select tap
+  // there; a second pointer or pointercancel cancels.
+  useEffect(() => {
+    if (!selecting || wrapper === null || svgEl === null) return
+    const cancel = (): void => {
+      if (handlePressRef.current === null) return
+      handlePressRef.current = null
+      abortRef.current()
+    }
+    const onDown = (e: PointerEvent): void => {
+      if (handlePressRef.current !== null) {
+        cancel() // a second pointer
+        return
+      }
+      if (e.button !== 0 || spaceRef.current || gestureRef.current !== null || moveableRef.current?.isMoveableElement(e.target as Element) === true) return
+      const s = useEditor.getState()
+      const handles = handlesFor(s.project, s.editContext, s.selection)
+      const m = contextMatrix(s)
+      const client = clientOf(e)
+      const radius = e.pointerType === 'touch' ? HIT_RADIUS_TOUCH_PX : HIT_RADIUS_MOUSE_PX
+      const k = pickNearest(handles.map((h) => worldToScreen(svgEl, apply(m, h.at))), client, radius)
+      if (k === null) return
+      const gesture = startHandleDrag(svgEl, handles[k]!)
+      gestureRef.current = gesture
+      handlePressRef.current = { id: e.pointerId, start: client, maxMove: 0, gesture }
+    }
+    const onMove = (e: PointerEvent): void => {
+      const press = handlePressRef.current
+      if (press === null || press.id !== e.pointerId || gestureRef.current !== press.gesture) return
+      press.maxMove = Math.max(press.maxMove, Math.hypot(e.clientX - press.start.x, e.clientY - press.start.y))
+      if (press.maxMove >= TAP_SLOP_PX) press.gesture.move(clientOf(e), e.altKey)
+    }
+    const onUp = (e: PointerEvent): void => {
+      const press = handlePressRef.current
+      if (press === null || press.id !== e.pointerId) return
+      handlePressRef.current = null
+      if (gestureRef.current !== press.gesture) return // aborted meanwhile
+      gestureRef.current = null
+      const dragged = press.maxMove >= TAP_SLOP_PX
+      endGesture(dragged, e)
+      if (!dragged) tapRef.current(clientOf(e), e.shiftKey || useEditor.getState().addToSelection)
+    }
+    wrapper.addEventListener('pointerdown', onDown, { capture: true })
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', cancel)
+    return () => {
+      wrapper.removeEventListener('pointerdown', onDown, { capture: true })
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', cancel)
+      cancel()
+    }
+  }, [selecting, wrapper, svgEl])
+
   // The Crossing tool owns single-pointer taps the same way (SPEC §7.4).
   useEffect(() => {
     if (tool !== 'crossing' || wrapper === null || svgEl === null) return
@@ -309,6 +402,7 @@ export function Canvas(): JSX.Element {
         {showGrid && <Grid gridMm={gridMm} matrix={ctxMatrix} zoom={camera.zoom} view={{ x: vx, y: vy, w: vw, h: vh }} />}
         <Proxies bounds={bounds} />
         <SelectionOverlay boxes={selectedBoxes} zoom={camera.zoom} />
+        {tool === 'select' && <VertexHandles handles={handlesFor(shown, editContext, selection)} matrix={ctxMatrix} zoom={camera.zoom} />}
         <PivotMarkers project={shown} selection={selection} matrix={ctxMatrix} zoom={camera.zoom} />
         {drawing !== null && <DrawPreview drawing={drawing} matrix={ctxMatrix} zoom={camera.zoom} unit={project.displayUnits} />}
         {tool === 'crossing' && <CrossingMarkers scene={scene} zoom={camera.zoom} />}
