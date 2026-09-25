@@ -3,6 +3,8 @@ import type { Band, DesignObject, MotifInstance, Point, Project, Region, RepeatF
 import { newId } from '../domain/ids.ts'
 import { refKey } from '../domain/keys.ts'
 import { newProject } from '../domain/project.ts'
+import { reorder, setBandWidth, setMaterial, translateObjects } from '../domain/commands/index.ts'
+import { fixtures } from '../fixtures/index.ts'
 import { expand, expandContext } from './expand.ts'
 import type { Intersection } from './intersections.ts'
 import { findIntersections } from './intersections.ts'
@@ -480,5 +482,65 @@ describe('findIntersections — stacked cells (Review Focus 2)', () => {
     expect(elapsed).toBeLessThan(100)
     expect(list.filter((i) => i.a.occ.sourceId === inner.id && i.b.occ.sourceId === inner.id).map((i) => i.cls)).toEqual(['collinear', 'collinear', 'collinear'])
     expect(list.filter((i) => i.cls === 'eligible')).toEqual([])
+  })
+})
+
+describe('findIntersections — reclassifying from a previous list', () => {
+  /** The list for `after` seeded from `before`'s first pass, and a full classification of it. */
+  function both(before: Project, after: Project): { incremental: Intersection[]; full: Intersection[] } {
+    const previous = expand(before)
+    findIntersections(previous)
+    return { incremental: findIntersections(expand(after), previous), full: findIntersections(expand(after)) }
+  }
+
+  // Fixture F with a root band across its lattice, painted last.
+  const across = band([
+    [15, 201.3],
+    [384, 201.3],
+  ])
+  const interlace: Project = { ...fixtures.interlace, objects: { ...fixtures.interlace.objects, [across.id]: across }, rootChildren: [...fixtures.interlace.rootChildren, across.id] }
+  const strand = 'p1' // a lattice-motif band: every cell's occurrence changes
+
+  it.each([
+    ['a moved root band', (p: Project): Project => translateObjects(p, [across.id], 7.3, 2.1)],
+    ['a motif band in every cell', (p: Project): Project => setBandWidth(p, strand, 4)],
+    ['a new paint order', (p: Project): Project => reorder(p, [across.id], 'back')],
+    ['a material only', (p: Project): Project => setMaterial(p, [across.id, strand], 'cherry')],
+  ])('equals a full classification after %s', (_, edit) => {
+    const { incremental, full } = both(interlace, edit(interlace))
+    expect(full.length).toBeGreaterThan(0)
+    expect(incremental).toEqual(full)
+  })
+
+  it('reclassifies an unmoved pair when an element painted between them moves into or out of its footprint', () => {
+    const a = bandAt(50, 50, 0)
+    const b = bandAt(50, 50, 90)
+    const r = region([
+      [52, 52],
+      [60, 52],
+      [60, 60],
+      [52, 60],
+    ])
+    const inside = rootProject([a, r, b])
+    const outside = translateObjects(inside, [r.id], 20, 20)
+
+    const moved = both(inside, outside)
+    expect(classes(moved.incremental)).toEqual(['eligible'])
+    expect(moved.incremental).toEqual(moved.full)
+    const back = both(outside, inside)
+    expect(classes(back.incremental)).toEqual(['occluded'])
+    expect(back.incremental).toEqual(back.full)
+  })
+
+  it('recomputes the crowded result of an unmoved crossing when a moved one comes near it', () => {
+    const a = bandAt(50, 50, 0)
+    const b = bandAt(50, 50, 90)
+    const c = bandAt(80, 50, 90) // crosses a 30 mm away: not crowding (a, b)
+    const far = rootProject([c, a, b])
+    const near = translateObjects(far, [c.id], -26, 0) // 4 mm from b: the footprints overlap
+
+    const moved = both(far, near)
+    expect(classes(moved.incremental)).toEqual(['crowded', 'crowded'])
+    expect(moved.incremental).toEqual(moved.full)
   })
 })

@@ -234,12 +234,43 @@ function boxOf(points: XY[]): Box {
 /** An occurrence's painted polygons and their union box, built on first use. */
 type Painted = { polygons: XY[][]; box: Box }
 
+/** A first-pass contact between occurrences `i` < `j` (paint indices), and whether the `crowded` pass reclassified it. */
+type Entry = { i: number; j: number; found: Found; crowded: boolean }
+
+/** First passes by occurrence list, so a later list differing in a few occurrences can reuse the rest. */
+const firstPasses = new WeakMap<Occurrence[], Entry[]>()
+
+/** Whether two occurrences classify identically: same key and kind, same world points (ids too), width, and closure. Material is not geometry. */
+function sameGeometry(o: Occurrence, q: Occurrence): boolean {
+  if (o.key !== q.key || o.kind !== q.kind || o.worldPoints.length !== q.worldPoints.length) return false
+  if (o.kind === 'band' && q.kind === 'band' && (o.worldWidth !== q.worldWidth || o.closed !== q.closed)) return false
+  return o.worldPoints.every((pt, k) => {
+    const other = q.worldPoints[k]!
+    return pt.id === other.id && pt.x === other.x && pt.y === other.y
+  })
+}
+
+/** A reused contact re-pointed at the current list's occurrence objects (equal geometry; the material may differ). */
+function rebound(found: Found, occI: Occurrence, occJ: Occurrence): Found {
+  const onto = (s: IntersectionSide): IntersectionSide => ({ ...s, occ: (s.occ.key === occI.key ? occI : occJ) as BandOccurrence })
+  return { ...found, intersection: { ...found.intersection, a: onto(found.intersection.a), b: onto(found.intersection.b) } }
+}
+
 /**
  * SPEC §5.2: every listed (non-`ignored`) intersection between segments of
  * different Band occurrences, classified in the spec's precedence order.
  * `occurrences` is in paint order, which the `occluded` test relies on.
+ *
+ * With `previous` (an earlier list this function classified, with the same
+ * occurrence keys in the same order), contacts of pairs whose two
+ * occurrences and every occurrence painted between them have the same
+ * geometry are reused, and so are their `crowded` results when no
+ * recomputed contact shares an occurrence with them; the result equals a
+ * full classification. A drag moves few occurrences, so a frame reclassifies
+ * only the pairs it touches.
  */
-export function findIntersections(occurrences: Occurrence[]): Intersection[] {
+export function findIntersections(occurrences: Occurrence[], previous?: Occurrence[]): Intersection[] {
+  const n = occurrences.length
   const bounds = occurrences.map(conservativeBounds)
   const segments = occurrences.map((o) => (o.kind === 'band' ? segmentsOf(o) : []))
   const painted: Array<Painted | undefined> = []
@@ -252,45 +283,81 @@ export function findIntersections(occurrences: Occurrence[]): Intersection[] {
     }
     return p
   }
-  const found: Found[] = []
-
-  for (let i = 0; i < occurrences.length; i++) {
+  const entries: Entry[] = []
+  const classifyPair = (i: number, j: number): void => {
     const occA = occurrences[i]!
-    if (occA.kind !== 'band') continue
-    for (let j = i + 1; j < occurrences.length; j++) {
-      const occB = occurrences[j]!
-      if (occB.kind !== 'band' || !boxesOverlap(bounds[i]!, bounds[j]!)) continue
-      // Elements painted strictly between i and j; one whose painted box misses the footprint's cannot penetrate it.
-      const occludedBetween = (plain: XY[]): boolean => {
-        const box = boxOf(plain)
-        for (let k = i + 1; k < j; k++) {
-          const element = paintedAt(k)
-          if (!boxesOverlap(element.box, box)) continue
-          if (element.polygons.some((polygon) => polygonsPenetrate(polygon, plain, EPS_OVERLAP_MM))) return true
-        }
-        return false
+    const occB = occurrences[j]!
+    if (occA.kind !== 'band' || occB.kind !== 'band' || !boxesOverlap(bounds[i]!, bounds[j]!)) return
+    // Elements painted strictly between i and j; one whose painted box misses the footprint's cannot penetrate it.
+    const occludedBetween = (plain: XY[]): boolean => {
+      const box = boxOf(plain)
+      for (let k = i + 1; k < j; k++) {
+        const element = paintedAt(k)
+        if (!boxesOverlap(element.box, box)) continue
+        if (element.polygons.some((polygon) => polygonsPenetrate(polygon, plain, EPS_OVERLAP_MM))) return true
       }
-      for (const sA of segments[i]!) {
-        for (const sB of segments[j]!) {
-          const f = classifyContact(occA, sA, occB, sB, occludedBetween)
-          if (f !== null) found.push(f)
-        }
+      return false
+    }
+    for (const sA of segments[i]!) {
+      for (const sB of segments[j]!) {
+        const found = classifyContact(occA, sA, occB, sB, occludedBetween)
+        if (found !== null) entries.push({ i, j, found, crowded: false })
       }
     }
+  }
+
+  const prior = previous === undefined ? undefined : firstPasses.get(previous)
+  const reusable = prior !== undefined && previous!.length === n && previous!.every((o, k) => o.key === occurrences[k]!.key)
+  // Occurrence keys whose contacts changed: the `crowded` results touching them are recomputed.
+  const dirty = new Set<string>()
+  let reused: Set<Entry>
+
+  if (!reusable) {
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) classifyPair(i, j)
+    reused = new Set()
+  } else {
+    const changed = occurrences.map((o, k) => !sameGeometry(o, previous![k]!))
+    const changedBefore = [0] // changedBefore[k]: changed occurrences among the first k
+    for (const c of changed) changedBefore.push(changedBefore[changedBefore.length - 1]! + (c ? 1 : 0))
+    const changedStrictlyBetween = (i: number, j: number): boolean => changedBefore[j]! - changedBefore[i + 1]! > 0
+
+    const redo = new Map<number, [number, number]>() // unchanged pairs whose between range changed
+    const kept: Entry[] = []
+    for (const e of prior!) {
+      if (!changed[e.i] && !changed[e.j] && !changedStrictlyBetween(e.i, e.j)) {
+        kept.push({ ...e, found: rebound(e.found, occurrences[e.i]!, occurrences[e.j]!) })
+        continue
+      }
+      dirty.add(e.found.intersection.a.occ.key).add(e.found.intersection.b.occ.key)
+      if (!changed[e.i] && !changed[e.j]) redo.set(e.i * n + e.j, [e.i, e.j])
+    }
+    for (let c = 0; c < n; c++) {
+      if (!changed[c]) continue
+      for (let o = 0; o < n; o++) if (o !== c && (!changed[o] || o > c)) classifyPair(Math.min(c, o), Math.max(c, o))
+    }
+    for (const [i, j] of redo.values()) classifyPair(i, j)
+    for (const e of entries) dirty.add(e.found.intersection.a.occ.key).add(e.found.intersection.b.occ.key)
+    reused = new Set(kept)
+    entries.push(...kept)
+    // A full pass lists pairs by (i, j), each pair's contacts in segment order; the sort is stable.
+    entries.sort((m, q) => m.i - q.i || m.j - q.j)
   }
 
   // `crowded` pass: compares each still-eligible intersection's plain footprint against every other listed one from the first pass that shares an occurrence with it.
-  const byOccurrence = new Map<string, Found[]>()
-  for (const f of found) {
-    for (const key of new Set([f.intersection.a.occ.key, f.intersection.b.occ.key])) {
+  const byOccurrence = new Map<string, Entry[]>()
+  for (const e of entries) {
+    for (const key of new Set([e.found.intersection.a.occ.key, e.found.intersection.b.occ.key])) {
       const list = byOccurrence.get(key)
-      if (list === undefined) byOccurrence.set(key, [f])
-      else list.push(f)
+      if (list === undefined) byOccurrence.set(key, [e])
+      else list.push(e)
     }
   }
-  return found.map((f) => {
-    const sharing = (key: string): boolean => byOccurrence.get(key)!.some((g) => g !== f && polygonsPenetrate(f.crowdingFootprint, g.crowdingFootprint, EPS_OVERLAP_MM))
-    const crowded = f.intersection.cls === 'eligible' && (sharing(f.intersection.a.occ.key) || sharing(f.intersection.b.occ.key))
-    return crowded ? { ...f.intersection, cls: 'crowded', reason: REASONS.crowded } : f.intersection
-  })
+  for (const e of entries) {
+    const x = e.found.intersection
+    if (reused.has(e) && !dirty.has(x.a.occ.key) && !dirty.has(x.b.occ.key)) continue // its crowded result stands
+    const sharing = (key: string): boolean => byOccurrence.get(key)!.some((g) => g !== e && polygonsPenetrate(e.found.crowdingFootprint, g.found.crowdingFootprint, EPS_OVERLAP_MM))
+    e.crowded = x.cls === 'eligible' && (sharing(x.a.occ.key) || sharing(x.b.occ.key))
+  }
+  firstPasses.set(occurrences, entries)
+  return entries.map((e) => (e.crowded ? { ...e.found.intersection, cls: 'crowded', reason: REASONS.crowded } : e.found.intersection))
 }

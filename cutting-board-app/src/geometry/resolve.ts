@@ -42,6 +42,9 @@ const listings = new Map<Project, Map<ContextId, ContextListing>>()
 /** SPEC §6.3: classification depends only on the project, never the camera, so it is computed once per project version and context. Callers must not mutate the result. */
 export function contextListing(p: Project, ctx: ContextId): ContextListing {
   let byContext = listings.get(p)
+  const cached = byContext?.get(ctx)
+  // The most recent listing of this context (of any project) seeds reclassification of only what changed.
+  const previous = cached !== undefined ? undefined : [...listings.values()].findLast((m) => m.has(ctx))?.get(ctx)?.occurrences
   if (byContext === undefined) {
     byContext = new Map()
     if (listings.size >= LISTING_CACHE_SIZE) listings.delete(listings.keys().next().value!)
@@ -49,12 +52,10 @@ export function contextListing(p: Project, ctx: ContextId): ContextListing {
     listings.delete(p) // re-inserted below as most recent
   }
   listings.set(p, byContext)
-  let listing = byContext.get(ctx)
-  if (listing === undefined) {
-    const occurrences = expandContext(p, ctx)
-    listing = { occurrences, intersections: findIntersections(occurrences) }
-    byContext.set(ctx, listing)
-  }
+  if (cached !== undefined) return cached
+  const occurrences = expandContext(p, ctx)
+  const listing = { occurrences, intersections: findIntersections(occurrences, previous) }
+  byContext.set(ctx, listing)
   return listing
 }
 
