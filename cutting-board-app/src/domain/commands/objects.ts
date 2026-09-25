@@ -7,7 +7,8 @@ import { stepObjectId } from '@/domain/keys'
 import type { Band, BandRef, ContextId, DesignObject, Id, MotifInstance, Project, Region, RepeatField, Transform } from '@/domain/model'
 import { childrenOf, contextOf } from '@/domain/project'
 import type { CommandResult } from './index.ts'
-import { fail, filterAllRecords, mapObjects, ok, replaceObject, tooClose, withChildren, withinCap } from './shared.ts'
+import { hasTooCloseSegment } from '@/domain/limits'
+import { fail, filterAllRecords, mapObjects, ok, replaceObject, withChildren, withinCap } from './shared.ts'
 
 type XY = { x: number; y: number }
 
@@ -158,11 +159,7 @@ export function offsetCopyBand(p: Project, id: Id, side: 'left' | 'right', width
   const distance = ((band.widthMm + widthMm) / 2) * (side === 'right' ? 1 : -1)
   const offsetPoints = offsetPolyline(band.points, distance, band.closed)
 
-  const n = offsetPoints.length
-  for (let k = 0; k < n; k++) {
-    if (!band.closed && k === n - 1) continue // open: no segment from the last point back to the first
-    if (tooClose(offsetPoints[k]!, offsetPoints[(k + 1) % n]!)) return fail('The offset copy would collapse a segment')
-  }
+  if (hasTooCloseSegment(offsetPoints, band.closed)) return fail('The offset copy would collapse a segment')
 
   const copy: Band = {
     type: 'band',

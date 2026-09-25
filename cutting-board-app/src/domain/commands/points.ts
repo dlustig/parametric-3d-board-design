@@ -6,7 +6,8 @@ import { newId } from '@/domain/ids'
 import { refKey } from '@/domain/keys'
 import type { Band, BandRef, Crossing, Id, Point, Project, Region } from '@/domain/model'
 import type { CommandResult } from './index.ts'
-import { fail, mapAllRecords, ok, replaceObject, tooClose, wraps } from './shared.ts'
+import { hasTooCloseSegment, tooClose } from '@/domain/limits'
+import { fail, mapAllRecords, ok, replaceObject, wraps } from './shared.ts'
 
 type XY = { x: number; y: number }
 
@@ -78,12 +79,7 @@ export function deletePoint(p: Project, objectId: Id, pointId: Id): CommandResul
 export function setPoints(p: Project, objectId: Id, points: XY[]): CommandResult {
   const shape = p.objects[objectId] as Band | Region
   const next = shape.points.map((q, k) => ({ id: q.id, x: points[k]!.x, y: points[k]!.y }))
-  const n = next.length
-  const closes = wraps(shape)
-  for (let k = 0; k < n; k++) {
-    if (!closes && k === n - 1) continue // open shape: no segment from the last point back to the first
-    if (tooClose(next[k]!, next[(k + 1) % n]!)) return fail('Two points would be too close together')
-  }
+  if (hasTooCloseSegment(next, wraps(shape))) return fail('Two points would be too close together')
   const after = replaceObject(p, { ...shape, points: next })
   return ok(shape.type === 'band' ? rematchCrossings(p, after) : after)
 }

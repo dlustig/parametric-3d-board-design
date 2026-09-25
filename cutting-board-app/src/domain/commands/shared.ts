@@ -1,7 +1,7 @@
 // Immutable-update helpers shared by the command modules.
 
 import { newId } from '@/domain/ids'
-import { MAX_OCCURRENCES, MIN_SEGMENT_MM } from '@/domain/limits'
+import { MAX_OCCURRENCES } from '@/domain/limits'
 import type { Band, ContextId, Crossing, DesignObject, Id, Project, Region } from '@/domain/model'
 import { countOccurrences } from '@/domain/validate'
 import type { CommandResult } from './index.ts'
@@ -28,11 +28,6 @@ export function okIds(project: Project, newIds: Id[]): IdsResult {
 export function withinCap(after: Project): CommandResult {
   const count = countOccurrences(after)
   return count > MAX_OCCURRENCES ? fail(`This would make ${count} occurrences; the limit is ${MAX_OCCURRENCES}.`) : ok(after)
-}
-
-/** SPEC §2.1 invariant 3: whether two points are closer than MIN_SEGMENT_MM. */
-export function tooClose(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
-  return Math.hypot(a.x - b.x, a.y - b.y) < MIN_SEGMENT_MM
 }
 
 export function replaceObject(p: Project, obj: DesignObject): Project {

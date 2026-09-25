@@ -1,6 +1,6 @@
 import type { BandRef, ContextId, Crossing, DesignObject, Id, Project } from './model.ts'
 import { childrenOf } from './project.ts'
-import { MAX_OCCURRENCES, MIN_SEGMENT_MM } from './limits.ts'
+import { hasTooCloseSegment, MAX_OCCURRENCES, MIN_SEGMENT_MM } from './limits.ts'
 import { refKey } from './keys.ts'
 
 export interface ValidationError {
@@ -226,25 +226,11 @@ function checkPointGeometry(p: Project): ValidationError | null {
       seen.add(point.id)
     }
 
-    // `i < length - 1` and `length - 1 >= 0` (checked above) keep both
-    // indices in bounds, so the lookups below cannot be `undefined`.
-    for (let i = 0; i < obj.points.length - 1; i++) {
-      const err = checkSegmentLength(obj.points[i]!, obj.points[i + 1]!, path)
-      if (err !== null) return err
-    }
-    if (wraps) {
-      const err = checkSegmentLength(obj.points[obj.points.length - 1]!, obj.points[0]!, path)
-      if (err !== null) return err
+    if (hasTooCloseSegment(obj.points, wraps)) {
+      return { path, message: `consecutive points closer than ${MIN_SEGMENT_MM}mm` }
     }
   }
   return null
-}
-
-function checkSegmentLength(from: { x: number; y: number }, to: { x: number; y: number }, path: string): ValidationError | null {
-  const dx = to.x - from.x
-  const dy = to.y - from.y
-  const distance = Math.sqrt(dx * dx + dy * dy)
-  return distance < MIN_SEGMENT_MM ? { path, message: `consecutive points closer than ${MIN_SEGMENT_MM}mm` } : null
 }
 
 // ---------------------------------------------------------------------------

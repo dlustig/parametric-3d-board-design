@@ -13,7 +13,8 @@ import { objectBounds, unionBoxes } from '@/geometry/bounds'
 import type { CommandResult } from './index.ts'
 import { removeObjects } from './objects.ts'
 import type { IdsResult } from './shared.ts'
-import { fail, mapAllRecords, okIds, replaceObject, tooClose, withChildren, withinCap, wraps } from './shared.ts'
+import { hasTooCloseSegment } from '@/domain/limits'
+import { fail, mapAllRecords, okIds, replaceObject, withChildren, withinCap, wraps } from './shared.ts'
 
 type XY = { x: number; y: number }
 
@@ -185,13 +186,8 @@ export function detachInstance(p: Project, instanceId: Id): IdsResult {
     }
     return { ...obj, id: copyId, transform: composeTransforms(inst.transform, obj.transform) }
   })
-  for (const copy of copies) {
-    if (copy.type !== 'band' && copy.type !== 'region') continue
-    const n = copy.points.length
-    const segments = wraps(copy) ? n : n - 1
-    for (let k = 0; k < segments; k++) {
-      if (tooClose(copy.points[k]!, copy.points[(k + 1) % n]!)) return fail('Detaching at this scale would collapse a segment')
-    }
+  if (copies.some((c) => (c.type === 'band' || c.type === 'region') && hasTooCloseSegment(c.points, wraps(c)))) {
+    return fail('Detaching at this scale would collapse a segment')
   }
 
   /** A definition-relative ref re-addressed to the copies: its first object id (and segment, for a copied band) remapped. */
