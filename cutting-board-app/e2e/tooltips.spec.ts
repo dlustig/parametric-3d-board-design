@@ -3,7 +3,8 @@
 // the tooltip without activating the tool and the next press closes it.
 
 import { expect, test } from '@playwright/test'
-import { nextFrame, open, Touch } from './helpers.ts'
+import { project } from '../src/domain/test-builders.ts'
+import { cameraShowing, nextFrame, open, seed, select, setCamera, toClient, Touch } from './helpers.ts'
 
 test('hovering the Band tool shows its label, keycap and hint', async ({ page, isMobile }) => {
   test.skip(isMobile, 'hover is a fine-pointer interaction')
@@ -36,6 +37,41 @@ test('? opens the keyboard shortcuts sheet', async ({ page }) => {
   await expect(sheet.getByRole('heading', { name: 'Tools' })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(sheet).toBeHidden()
+})
+
+test('Escape closes the sheet without clearing the selection', async ({ page }) => {
+  // Radix's DismissableLayer handles Escape on `document` in the capture phase with
+  // preventDefault() but no stopPropagation(); keyboard.ts's global dispatcher listens
+  // on `window` at bubble and never checks defaultPrevented, so without
+  // ShortcutsDialog stopping propagation, closing the sheet also runs the app's
+  // Escape cascade (clearing the selection here).
+  await seed(page) // b1, r1, i1, rp1
+  await select(page, ['b1'])
+  await page.keyboard.press('?')
+  const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
+  await expect(sheet).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  expect(await page.evaluate(() => window.__cbpd!.getState().selection)).toEqual(['b1'])
+})
+
+test('Escape closes the sheet without cancelling an in-progress drawing', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'drawing setup here is mouse-based, matching drawing.spec.ts')
+  await seed(page, project([]))
+  await setCamera(page, cameraShowing({ x: 0, y: 0 }, { x: 60, y: 120 }, 2))
+  await page.getByRole('button', { name: 'Band', exact: true }).click()
+  const a = await toClient(page, { x: 50, y: 50 })
+  const b = await toClient(page, { x: 100, y: 50 })
+  await page.mouse.click(Math.round(a.x), Math.round(a.y))
+  await page.mouse.click(Math.round(b.x), Math.round(b.y))
+  expect(await page.evaluate(() => window.__cbpd!.getState().drawing?.points.length)).toBe(2)
+
+  await page.keyboard.press('?')
+  const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
+  await expect(sheet).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  expect(await page.evaluate(() => window.__cbpd!.getState().drawing?.points.length)).toBe(2) // still drawing, not cancelled
 })
 
 test('a touch long-press shows the tooltip without activating the tool', async ({ page, isMobile }) => {

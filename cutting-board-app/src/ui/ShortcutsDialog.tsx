@@ -19,7 +19,16 @@ export function ShortcutsDialog(): JSX.Element {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog-content shortcuts-dialog" aria-describedby={undefined}>
+        <Dialog.Content
+          className="dialog-content shortcuts-dialog"
+          aria-describedby={undefined}
+          // Radix's DismissableLayer handles Escape on `document` at capture with
+          // preventDefault() but no stopPropagation(); keyboard.ts's global dispatcher
+          // listens on `window` at bubble and never checks defaultPrevented, so without
+          // this the sheet's own Escape-to-close also runs the app's Escape cascade
+          // (clearing the selection, or cancelling an in-progress drawing).
+          onEscapeKeyDown={(e) => e.stopPropagation()}
+        >
           <Dialog.Title className="dialog-title">Keyboard shortcuts</Dialog.Title>
           {GROUPS.map((group) => {
             const rows = entries.filter(([, s]) => s.group === group)
