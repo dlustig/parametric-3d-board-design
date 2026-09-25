@@ -13,11 +13,11 @@ export type AngleParseResult = { ok: true; deg: number } | { ok: false; error: s
 
 const MM_PER_INCH = 25.4
 
-// SPEC §8, verbatim: sign, decimal-or-fraction number, optional trailing
-// unit. At least one of the decimal group or the fraction group must match
-// (checked below — both are independently optional in the regex itself, so
-// it alone accepts the empty string).
-const LENGTH_RE = /^([+-])?\s*(\d+(?:[.,]\d*)?|[.,]\d+)?(?:(?:\s+|-)?(\d+)\s*\/\s*(\d+))?\s*(in|"|”|″|mm)?$/i
+// SPEC §8, verbatim: sign, then either a decimal or a fraction with an
+// optional whole number that must be separated from it by whitespace or a
+// hyphen (so `13/16` is thirteen sixteenths, never 1 3/16), then an optional
+// unit.
+const LENGTH_RE = /^([+-])?\s*(?:(\d+(?:[.,]\d*)?|[.,]\d+)|(?:(\d+)(?:\s+|-))?(\d+)\s*\/\s*(\d+))\s*(in|"|”|″|mm)?$/i
 
 const ANGLE_RE = /^([+-])?\s*(\d+(?:[.,]\d*)?|[.,]\d+)\s*$/
 
@@ -45,22 +45,13 @@ function unitOf(suffix: string | undefined): Unit | undefined {
 export function parseLength(text: string, defaultUnit: Unit): ParseResult {
   const match = LENGTH_RE.exec(text.trim())
   if (match === null) return { ok: false, error: 'Not a valid length' }
-  const [, signStr, decStr, numStr, denStr, unitStr] = match
-  if (decStr === undefined && numStr === undefined) return { ok: false, error: 'Enter a number' }
+  const [, signStr, decStr, wholeStr, numStr, denStr, unitStr] = match
 
-  let num = 0
-  let den = 1
-  if (decStr !== undefined) {
-    const d = decimalToFraction(decStr.replace(',', '.'))
-    num = d.num
-    den = d.den
-  }
-  if (numStr !== undefined && denStr !== undefined) {
-    const fracDen = Number(denStr)
-    if (fracDen === 0) return { ok: false, error: 'Denominator cannot be zero' }
-    num = num * fracDen + Number(numStr) * den
-    den = den * fracDen
-  }
+  if (denStr !== undefined && Number(denStr) === 0) return { ok: false, error: 'Denominator cannot be zero' }
+  const { num, den } =
+    decStr !== undefined
+      ? decimalToFraction(decStr.replace(',', '.'))
+      : { num: Number(wholeStr ?? '0') * Number(denStr) + Number(numStr), den: Number(denStr) }
 
   const sign = signStr === '-' ? -1 : 1
   const unit = unitOf(unitStr) ?? defaultUnit
@@ -112,17 +103,17 @@ const FRACTION_TOLERANCE_IN = 0.0005
 
 /** SPEC §8: `formatLength`. Inches near a 64th print as a reduced mixed fraction; mm trims to two decimals. */
 export function formatLength(mm: number, unit: Unit): string {
-  if (unit === 'mm') return trimmedDecimal(mm, 2) || '0'
+  if (unit === 'mm') return trimmedDecimal(mm, 2)
 
   const inches = mm / MM_PER_INCH
-  const sign = inches < 0 ? '-' : ''
   const absInches = Math.abs(inches)
   const k = Math.round(absInches * SIXTY_FOURTHS)
+  const sign = inches < 0 && k > 0 ? '-' : '' // a value that rounds to 0 never prints "-0"
   if (Math.abs(absInches - k / SIXTY_FOURTHS) <= FRACTION_TOLERANCE_IN) return mixedFraction(k, SIXTY_FOURTHS, sign)
   return `${inches < 0 ? '-' : ''}${absInches.toFixed(3)}`
 }
 
 /** SPEC §8: `formatAngle` — one decimal, trailing zero trimmed. */
 export function formatAngle(deg: number): string {
-  return trimmedDecimal(deg, 1) || '0'
+  return trimmedDecimal(deg, 1)
 }

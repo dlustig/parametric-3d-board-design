@@ -27,7 +27,17 @@ describe('parseLength: accepted forms (defaultUnit "in" unless noted)', () => {
     expect(mm('3/16')).toBeCloseTo(4.7625, 9)
   })
 
+  it('a fraction with no separator is never split into whole + fraction (SPEC §8)', () => {
+    expect(mm('13/16')).toBeCloseTo(20.6375, 9)
+    expect(mm('11/8')).toBeCloseTo(34.925, 9)
+    expect(mm('15/32')).toBeCloseTo(11.90625, 9)
+    expect(mm('12/64')).toBeCloseTo(4.7625, 9)
+    expect(mm('113/16') / 25.4).toBeCloseTo(7.0625, 9)
+  })
+
   it('mixed whole + fraction, space or dash separated', () => {
+    expect(mm('1 13/16')).toBeCloseTo(46.0375, 9)
+    expect(mm('1-13/16')).toBeCloseTo(46.0375, 9)
     expect(mm('1 1/8')).toBeCloseTo(28.575, 9)
     expect(mm('1-1/8')).toBeCloseTo(28.575, 9)
   })
@@ -79,6 +89,12 @@ describe('formatLength', () => {
     expect(formatLength(25.4, 'mm')).toBe('25.4')
     expect(formatLength(25, 'mm')).toBe('25')
     expect(formatLength(3.175, 'mm')).toBe('3.18')
+  })
+
+  it('never prints -0', () => {
+    expect(formatLength(-0.001, 'in')).toBe('0')
+    expect(formatLength(-0.001, 'mm')).toBe('0')
+    expect(formatLength(0, 'mm')).toBe('0')
   })
 })
 
