@@ -171,11 +171,11 @@ function sideKey(s: IntersectionSide): string {
 
 /**
  * Classifies the contact between segment `sA` of `occA` and `sB` of `occB`
- * through every class except `crowded`; `between` is the elements painted
- * strictly between the two. Returns null when the segments do not meet or
+ * through every class except `crowded`; `occludedBetween` tests the plain
+ * footprint against the elements painted strictly between the two. Returns null when the segments do not meet or
  * the contact is `ignored`.
  */
-function classifyContact(occA: BandOccurrence, sA: BandSegment, occB: BandOccurrence, sB: BandSegment, between: Occurrence[]): Found | null {
+function classifyContact(occA: BandOccurrence, sA: BandSegment, occB: BandOccurrence, sB: BandSegment, occludedBetween: (plain: XY[]) => boolean): Found | null {
   const hits = flattenSegment(sA).intersect(flattenSegment(sB))
   if (hits.length === 0) return null
 
@@ -212,19 +212,27 @@ function classifyContact(occA: BandOccurrence, sA: BandSegment, occB: BandOccurr
   const halfDiagonal = Math.max(...clipBound.map((corner) => distance(corner, point)))
   if (nearJoint(occA, point, halfDiagonal) || nearJoint(occB, point, halfDiagonal)) return found(point, 'near-joint', plain, plain)
 
-  for (const element of between) {
-    for (const polygon of paintedPolygons(element)) {
-      if (polygonsPenetrate(polygon, plain, EPS_OVERLAP_MM)) return found(point, 'occluded', plain, plain)
-    }
-  }
+  if (occludedBetween(plain)) return found(point, 'occluded', plain, plain)
 
   return found(point, 'eligible', plain, plain)
 }
 
-function sharesOccurrence(x: Intersection, y: Intersection): boolean {
-  const keys = [x.a.occ.key, x.b.occ.key]
-  return keys.includes(y.a.occ.key) || keys.includes(y.b.occ.key)
+function boxOf(points: XY[]): Box {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const pt of points) {
+    minX = Math.min(minX, pt.x)
+    minY = Math.min(minY, pt.y)
+    maxX = Math.max(maxX, pt.x)
+    maxY = Math.max(maxY, pt.y)
+  }
+  return { minX, minY, maxX, maxY }
 }
+
+/** An occurrence's painted polygons and their union box, built on first use. */
+type Painted = { polygons: XY[][]; box: Box }
 
 /**
  * SPEC §5.2: every listed (non-`ignored`) intersection between segments of
@@ -234,6 +242,16 @@ function sharesOccurrence(x: Intersection, y: Intersection): boolean {
 export function findIntersections(occurrences: Occurrence[]): Intersection[] {
   const bounds = occurrences.map(conservativeBounds)
   const segments = occurrences.map((o) => (o.kind === 'band' ? segmentsOf(o) : []))
+  const painted: Array<Painted | undefined> = []
+  const paintedAt = (k: number): Painted => {
+    let p = painted[k]
+    if (p === undefined) {
+      const polygons = paintedPolygons(occurrences[k]!)
+      p = { polygons, box: boxOf(polygons.flat()) }
+      painted[k] = p
+    }
+    return p
+  }
   const found: Found[] = []
 
   for (let i = 0; i < occurrences.length; i++) {
@@ -242,26 +260,37 @@ export function findIntersections(occurrences: Occurrence[]): Intersection[] {
     for (let j = i + 1; j < occurrences.length; j++) {
       const occB = occurrences[j]!
       if (occB.kind !== 'band' || !boxesOverlap(bounds[i]!, bounds[j]!)) continue
-      const between = occurrences.slice(i + 1, j)
+      // Elements painted strictly between i and j; one whose painted box misses the footprint's cannot penetrate it.
+      const occludedBetween = (plain: XY[]): boolean => {
+        const box = boxOf(plain)
+        for (let k = i + 1; k < j; k++) {
+          const element = paintedAt(k)
+          if (!boxesOverlap(element.box, box)) continue
+          if (element.polygons.some((polygon) => polygonsPenetrate(polygon, plain, EPS_OVERLAP_MM))) return true
+        }
+        return false
+      }
       for (const sA of segments[i]!) {
         for (const sB of segments[j]!) {
-          const f = classifyContact(occA, sA, occB, sB, between)
+          const f = classifyContact(occA, sA, occB, sB, occludedBetween)
           if (f !== null) found.push(f)
         }
       }
     }
   }
 
-  // `crowded` pass: compares each still-eligible intersection's plain footprint against every other listed one from the first pass.
+  // `crowded` pass: compares each still-eligible intersection's plain footprint against every other listed one from the first pass that shares an occurrence with it.
+  const byOccurrence = new Map<string, Found[]>()
+  for (const f of found) {
+    for (const key of new Set([f.intersection.a.occ.key, f.intersection.b.occ.key])) {
+      const list = byOccurrence.get(key)
+      if (list === undefined) byOccurrence.set(key, [f])
+      else list.push(f)
+    }
+  }
   return found.map((f) => {
-    const crowded =
-      f.intersection.cls === 'eligible' &&
-      found.some(
-        (g) =>
-          g !== f &&
-          sharesOccurrence(f.intersection, g.intersection) &&
-          polygonsPenetrate(f.crowdingFootprint, g.crowdingFootprint, EPS_OVERLAP_MM),
-      )
+    const sharing = (key: string): boolean => byOccurrence.get(key)!.some((g) => g !== f && polygonsPenetrate(f.crowdingFootprint, g.crowdingFootprint, EPS_OVERLAP_MM))
+    const crowded = f.intersection.cls === 'eligible' && (sharing(f.intersection.a.occ.key) || sharing(f.intersection.b.occ.key))
     return crowded ? { ...f.intersection, cls: 'crowded', reason: REASONS.crowded } : f.intersection
   })
 }

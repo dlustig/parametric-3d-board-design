@@ -52,11 +52,28 @@ function toFlatten(points: XY[]): Flatten.Polygon {
   return new Flatten.Polygon(wound.map((p): [number, number] => [p.x, p.y]))
 }
 
+function minOf(points: XY[], axis: 'x' | 'y'): number {
+  let m = Infinity
+  for (const pt of points) m = Math.min(m, pt[axis])
+  return m
+}
+
+function maxOf(points: XY[], axis: 'x' | 'y'): number {
+  let m = -Infinity
+  for (const pt of points) m = Math.max(m, pt[axis])
+  return m
+}
+
 /**
  * Whether `p` and `q` overlap by more than `eps`. "Penetrates by more than
  * eps" is defined as intersection area > eps²: zero for polygons that only
  * touch along an edge or at a corner, positive for any real overlap.
  */
 export function polygonsPenetrate(p: XY[], q: XY[], eps: number): boolean {
+  // The intersection lies inside the bounding boxes' overlap, so its area is at most that overlap's area.
+  const overlapW = Math.min(maxOf(p, 'x'), maxOf(q, 'x')) - Math.max(minOf(p, 'x'), minOf(q, 'x'))
+  if (overlapW <= 0) return false
+  const overlapH = Math.min(maxOf(p, 'y'), maxOf(q, 'y')) - Math.max(minOf(p, 'y'), minOf(q, 'y'))
+  if (overlapH <= 0 || overlapW * overlapH <= eps * eps) return false
   return Flatten.BooleanOperations.intersect(toFlatten(p), toFlatten(q)).area() > eps * eps
 }
