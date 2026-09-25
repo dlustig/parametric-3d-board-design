@@ -1,6 +1,6 @@
-// SPEC §7.4: the drawing tools' options bar — the pending segment's Length
-// and Angle (live snapped values; typed values place the point on Enter),
-// Finish, Undo point, Cancel. The drawing keys (Enter/Backspace/Ctrl+Z/Esc)
+// SPEC §7.4: the drawing tools' options bar — the Band tool's Width for new
+// Bands, the pending segment's Length and Angle (live snapped values; typed
+// values place the point on Enter), Finish, Undo point, Cancel. The drawing keys (Enter/Backspace/Ctrl+Z/Esc)
 // are dispatched by `editor/keyboard.ts`, not here. The Crossing tool's bar
 // holds the scope control and the tapped marker's read-out. Alt keyup is
 // preventDefault'ed (SPEC §7.7) — unrelated to that dispatch, so it stays a
@@ -34,6 +34,7 @@ export function ToolOptions(): JSX.Element | null {
   const tool = useEditor((s) => s.tool)
   const drawing = useEditor((s) => s.drawing)
   const unit = useEditor((s) => s.project.displayUnits)
+  const bandWidth = useEditor((s) => s.lastBandWidthMm)
   useAltKeyupGuard()
 
   // Typed values: state for display, refs for the synchronous read on Enter
@@ -64,6 +65,11 @@ export function ToolOptions(): JSX.Element | null {
 
   return (
     <div className="tool-options" role="toolbar" aria-label="Drawing options">
+      {tool === 'band' && (
+        <div className="tool-options-fields">
+          <NumberField label="Width" value={bandWidth} unit={unit} policy="positive" onPreview={() => undefined} onCommit={(v) => useEditor.setState({ lastBandWidthMm: v })} />
+        </div>
+      )}
       {segmenting && (
         <div className="tool-options-fields" onKeyDown={onKeyDown}>
           <NumberField

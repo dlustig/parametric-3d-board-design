@@ -60,6 +60,22 @@ test.describe('mouse', () => {
     expect(await page.evaluate(() => window.__cbpd!.getState().drawing)).toBeNull()
   })
 
+  test('the options bar Width sets the width of the next Band (SPEC §7.4)', async ({ page }) => {
+    await start(page, 'Band')
+    const width = page.getByRole('toolbar', { name: 'Drawing options' }).getByLabel('Width')
+    await width.fill('3.2')
+    await width.press('Enter')
+    expect(await page.evaluate(() => window.__cbpd!.getState().lastBandWidthMm)).toBe(3.2)
+    expect(await history(page)).toEqual({ past: 0, future: 0 }) // an editor setting, not a document edit
+
+    const a = await at(page, { x: 50, y: 50 })
+    const b = await at(page, { x: 100, y: 50 })
+    await page.mouse.click(a.x, a.y)
+    await page.mouse.click(b.x, b.y)
+    await page.getByRole('button', { name: 'Finish' }).click()
+    expect((await onlyBand(page)).widthMm).toBe(3.2)
+  })
+
   test('typed Length 4 and Angle 30 place the next point from the last one', async ({ page }) => {
     await start(page, 'Band')
     const a = await at(page, { x: 50, y: 50 })
