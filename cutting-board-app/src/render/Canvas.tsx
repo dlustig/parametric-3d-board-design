@@ -424,7 +424,7 @@ export function Canvas(): JSX.Element {
       {selecting && (
         <Moveable
           ref={moveableRef}
-          target={selection.map(proxySelector)}
+          target={selection.filter((id) => boundsById.has(id)).map(proxySelector)} // only rendered proxies: a selected id outside the context has none, and Moveable would measure its detached element
           container={wrapper}
           flushSync={flushSync}
           draggable={!spaceDown}
