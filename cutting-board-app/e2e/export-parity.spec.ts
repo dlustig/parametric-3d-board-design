@@ -13,14 +13,13 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { Project } from '../src/domain/model.ts'
 import type { SceneIntersection } from '../src/geometry/scene.ts'
-import type { XY } from './helpers.ts'
 import { open } from './helpers.ts'
 import type { Raster, Side } from './raster.ts'
 import {
   blendDistance,
+  capMarginMm,
   colorEquals,
   edgeDistances,
-  footprintMarginPx,
   hex,
   interiorSamples,
   materialColors,
@@ -29,29 +28,30 @@ import {
   pxPerMmOf,
   rasterizeEditorBoard,
   rasterizeSvg,
+  sampleMarginPx,
+  samplePixel,
   sides,
-  unit,
 } from './raster.ts'
 
 const WIDTH_PX = 800 // fixed pixel size for both rasters, not DPR-dependent
 const INSIDE_TOL = 3 // 3/255, SPEC §13 G5
 const BLEND_TOL = 6 // 6/255, as in crossing-proof
 const MAX_DIFF_TOL = 8 // 8/255, SPEC §13 G5
-// Fixture F's real (non-crafted) geometry puts some eligible crossings close to a place the plain
-// footprint (SPEC §6.1, a strip×strip intersection with no notion of a band's own finite length)
-// doesn't faithfully model the actual paint:
-//  - `accent-a`/`accent-b` (SPEC §12 F's 2-Band accent motif) are short, open (butt-capped) bands, and
-//    some cross a lattice band close to their own far end — the near-joint class only guards interior
-//    joints (SPEC §5.2), not an open band's terminus, so the footprint can reach past where O (or U)
-//    has actually stopped painting; a third colour there is real, not a defect.
-//  - the accent motif's own two bands cross each other right beside where each crosses the lattice, so
-//    a footprint's edge can sit within a px or two of a DIFFERENT eligible intersection's footprint,
-//    where which crossing's colour legitimately shows is ambiguous.
-// Skip a sample in either situation rather than assert on it.
-const SAMPLE_MARGIN_PX = 1.5 // as in crossing-proof: skip an interior-offset sample this close to an edge
-const EDGE_BAND_INSET_PX = 0.5 // within the 1-px band, at each edge's midpoint
-const OTHER_FOOTPRINT_CLEARANCE_MM = 0.5 // skip an edge-band sample this close to a different intersection's footprint
-const SEGMENT_END_CLEARANCE_MM = 2 // skip a sample this close to O's or U's own (possibly open) segment endpoint
+// Fixture F's real (non-crafted) geometry has exactly two quirks these checks must account for
+// (footprint overlap between two DIFFERENT eligible intersections is exactly zero on Fixture F, so no
+// exclusion is needed for that — an earlier round of this gate wrongly suspected it):
+//  - Same-material O/U pairs: `blendDistance` (`raster.ts`) degenerates cleanly to "distance to that
+//    one colour" rather than NaN, so these are simply checked like any other pair, not skipped.
+//  - SPEC §6.1's butt-end case (amended after this gate's review): the plain footprint is the
+//    intersection of two infinite strips, so near a butt end it can reach past where a band's own
+//    (finite) real paint has stopped — the near-joint class (SPEC §5.2) only guards interior joints,
+//    not an open terminus. Fixture F's accent motif (SPEC §12 F) is short and butt-capped, and at
+//    least one crossing has its far end only 0.146 mm inside the lattice band it crosses: close
+//    enough, at this gate's fixed 800 px raster, for a sample point to land past it, where a third
+//    colour is real, not a defect. The two constants below skip a sample there.
+const SAMPLE_MARGIN_PX = 1.0 // skip an interior-offset sample this close to (footprint ∩ O's real extent)'s boundary: a pixel's half-diagonal (≈0.71px) plus slack
+const SEGMENT_END_CLEARANCE_MM = 1 // skip an edge-band pixel this close to O's own segment end
+const MIN_EDGES_WITH_SAMPLES = 1000 // of 425 × 4 = 1700 footprint edges, a sanity floor so the edge-band scan can't go vacuous unnoticed
 
 /** Loads Fixture F through the test hook. */
 async function seedFixtureF(page: Page): Promise<void> {
@@ -94,64 +94,56 @@ async function render(page: Page): Promise<Rendered> {
   }
 }
 
-/** The midpoint of each edge of convex polygon `poly`, offset `insetPx` inward (the farthest point on that edge from either corner). */
-function edgeMidpointsInward(poly: XY[], insetPx: number, k: number): XY[] {
-  const centroid = { x: poly.reduce((s, p) => s + p.x, 0) / poly.length, y: poly.reduce((s, p) => s + p.y, 0) / poly.length }
-  const insetMm = insetPx / k
-  return poly.map((p, i) => {
-    const q = poly[(i + 1) % poly.length]!
-    const mid = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }
-    const u = unit({ a: p, b: q })
-    const n = { x: -u.y, y: u.x }
-    const sign = Math.sign((centroid.x - p.x) * n.x + (centroid.y - p.y) * n.y)
-    return { x: mid.x + sign * n.x * insetMm, y: mid.y + sign * n.y * insetMm }
-  })
-}
-
-/** Whether `p` lies within `marginMm` of being inside any footprint in `footprints` other than `exclude`. */
-function nearAnotherFootprint(footprints: XY[][], exclude: XY[], p: XY): boolean {
-  return footprints.some((f) => f !== exclude && edgeDistances(f, p).every((d) => d >= -OTHER_FOOTPRINT_CLEARANCE_MM))
-}
-
-/** Distance from `p` to the nearer of `seg`'s two endpoints. */
-function distanceToSegmentEnds(seg: { a: XY; b: XY }, p: XY): number {
-  return Math.min(Math.hypot(p.x - seg.a.x, p.y - seg.a.y), Math.hypot(p.x - seg.b.x, p.y - seg.b.y))
-}
-
-/** Each footprint edge's midpoint, `EDGE_BAND_INSET_PX` inside the line: blend distance to the O–U line, in `raster`. */
-function footprintEdgeStats(raster: Raster, k: number, eligible: SceneIntersection[], colorOf: (side: Side) => string): { failures: string[]; maxDistance: number; sampled: number; skipped: number } {
+/**
+ * Every pixel in the 1-px band along a footprint edge (SPEC §13 G5), ≥2 px
+ * from that footprint's other edges (as `crossing-proof.spec.ts` does, to
+ * stay clear of a real corner) and ≥`SEGMENT_END_CLEARANCE_MM` from O's own
+ * segment end (SPEC §6.1's butt-end case): blend distance to the O–U line,
+ * in `raster`. Same-material O/U pairs are still scanned — `blendDistance`
+ * degenerates cleanly to "how close to that one colour" rather than NaN.
+ */
+function footprintEdgeStats(
+  raster: Raster,
+  k: number,
+  eligible: SceneIntersection[],
+  colorOf: (side: Side) => string,
+): { failures: string[]; maxDistance: number; sampled: number; edgesWithSamples: number; edgesTotal: number } {
   const failures: string[] = []
   let maxDistance = 0
   let sampled = 0
-  let skipped = 0
-  const footprints = eligible.map((i) => i.footprint!)
+  let edgesWithSamples = 0
+  let edgesTotal = 0
   for (const i of eligible) {
     const { over, under } = sides(i)
     const cO = colorOf(over)
     const cU = colorOf(under)
-    for (const [e, p] of edgeMidpointsInward(i.footprint!, EDGE_BAND_INSET_PX, k).entries()) {
-      // Skip a sample near another intersection's footprint, or near O's/U's own segment endpoint:
-      // in both cases the footprint's geometry outruns what's actually painted there (see the
-      // constants' comment above), so a third colour is legitimate, not a rendering defect. Also skip
-      // when O and U share a material: the blend line is degenerate (a single point), so there is
-      // nothing this check can distinguish from a defect.
-      if (
-        cO === cU ||
-        nearAnotherFootprint(footprints, i.footprint!, p) ||
-        distanceToSegmentEnds(over.seg, p) < SEGMENT_END_CLEARANCE_MM ||
-        distanceToSegmentEnds(under.seg, p) < SEGMENT_END_CLEARANCE_MM
-      ) {
-        skipped++
-        continue
+    const footprint = i.footprint!
+    const minX = Math.max(0, Math.floor(Math.min(...footprint.map((p) => p.x)) * k) - 2)
+    const maxX = Math.min(raster.width - 1, Math.ceil(Math.max(...footprint.map((p) => p.x)) * k) + 2)
+    const minY = Math.max(0, Math.floor(Math.min(...footprint.map((p) => p.y)) * k) - 2)
+    const maxY = Math.min(raster.height - 1, Math.ceil(Math.max(...footprint.map((p) => p.y)) * k) + 2)
+    const perEdge = footprint.map(() => 0)
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const c = { x: (x + 0.5) / k, y: (y + 0.5) / k }
+        if (capMarginMm(over.seg, c) < SEGMENT_END_CLEARANCE_MM) continue // SPEC §6.1: past O's butt end
+        const d = edgeDistances(footprint, c).map((v) => v * k)
+        for (const [e, de] of d.entries()) {
+          if (de < 0 || de >= 1) continue
+          if (!d.every((v, j) => j === e || v >= 2)) continue
+          const got = samplePixel(raster, x, y)
+          const { distance, t } = blendDistance(got, cO, cU)
+          sampled++
+          perEdge[e]!++
+          maxDistance = Math.max(maxDistance, distance)
+          if (distance > BLEND_TOL) failures.push(`${i.overKey} over ${under.occ.key}, edge ${e}, px (${x}, ${y}): ${hex(got)} is ${distance.toFixed(1)} from ${cO}–${cU} (t=${t.toFixed(2)})`)
+        }
       }
-      const got = pixelAt(raster, k, p)
-      const { distance, t } = blendDistance(got, cO, cU)
-      sampled++
-      maxDistance = Math.max(maxDistance, distance)
-      if (distance > BLEND_TOL) failures.push(`${i.overKey} over ${under.occ.key}, edge ${e} midpoint (${p.x.toFixed(2)}, ${p.y.toFixed(2)}): ${hex(got)} is ${distance.toFixed(1)} from ${cO}–${cU} (t=${t.toFixed(2)})`)
     }
+    edgesTotal += perEdge.length
+    edgesWithSamples += perEdge.filter((n) => n > 0).length
   }
-  return { failures, maxDistance, sampled, skipped }
+  return { failures, maxDistance, sampled, edgesWithSamples, edgesTotal }
 }
 
 test.describe('export parity (Fixture F)', () => {
@@ -193,16 +185,17 @@ test.describe('export parity (Fixture F)', () => {
     let checked = 0
     let skipped = 0
     for (const i of eligible) {
-      const want = colorOf(sides(i).over)
+      const { over } = sides(i)
+      const want = colorOf(over)
       for (const p of interiorSamples(i)) {
         for (const [label, raster, k] of [
           ['editor', editorRaster, kEditor],
           ['export', exportRaster, kExport],
         ] as const) {
-          // Skip a sample pixel within anti-aliasing reach of the footprint's own edge (as in
-          // crossing-proof's sanity check) rather than assert on it: Fixture F's real geometry, at
-          // this gate's fixed 800px raster, occasionally puts an offset sample this close.
-          if (footprintMarginPx(i.footprint!, k, p) < SAMPLE_MARGIN_PX) {
+          // Skip a sample pixel within anti-aliasing reach of (footprint ∩ O's real extent)'s
+          // boundary rather than assert on it: SPEC §6.1's butt-end case (see the constants' comment
+          // above) is the only reason this is ever needed on Fixture F.
+          if (sampleMarginPx(i.footprint!, over.seg, k, p) < SAMPLE_MARGIN_PX) {
             skipped++
             continue
           }
@@ -212,7 +205,7 @@ test.describe('export parity (Fixture F)', () => {
         }
       }
     }
-    console.log(`[${test.info().project.name}] export-parity samples: ${eligible.length} eligible intersections, ${checked} point samples checked, ${skipped} skipped (< ${SAMPLE_MARGIN_PX}px footprint margin)`)
+    console.log(`[${test.info().project.name}] export-parity samples: ${eligible.length} eligible intersections, ${checked} point samples checked, ${skipped} skipped (< ${SAMPLE_MARGIN_PX}px of footprint ∩ O's real extent)`)
     expect(failures.slice(0, 20)).toEqual([])
   })
 
@@ -223,9 +216,14 @@ test.describe('export parity (Fixture F)', () => {
     const editorStats = footprintEdgeStats(editorRaster, kEditor, eligible, colorOf)
     const exportStats = footprintEdgeStats(exportRaster, kExport, eligible, colorOf)
     console.log(
-      `[${test.info().project.name}] footprint edges: editor max ${editorStats.maxDistance.toFixed(1)}/255 over ${editorStats.sampled} px (${editorStats.skipped} skipped); ` +
-        `export max ${exportStats.maxDistance.toFixed(1)}/255 over ${exportStats.sampled} px (${exportStats.skipped} skipped)`,
+      `[${test.info().project.name}] footprint edges: editor max ${editorStats.maxDistance.toFixed(1)}/255 over ${editorStats.sampled} px (${editorStats.edgesWithSamples}/${editorStats.edgesTotal} edges sampled); ` +
+        `export max ${exportStats.maxDistance.toFixed(1)}/255 over ${exportStats.sampled} px (${exportStats.edgesWithSamples}/${exportStats.edgesTotal} edges sampled)`,
     )
+    // Guard against the scan silently going vacuous (an overly tight corner or segment-end
+    // clearance): most footprint edges at this gate's fixed 800px resolution contribute at least
+    // one valid pixel, as `crossing-proof.spec.ts`'s per-edge `n > 10` asserts for its two patches.
+    expect(editorStats.edgesWithSamples, 'footprint edges with ≥1 sampled pixel (editor)').toBeGreaterThan(MIN_EDGES_WITH_SAMPLES)
+    expect(exportStats.edgesWithSamples, 'footprint edges with ≥1 sampled pixel (export)').toBeGreaterThan(MIN_EDGES_WITH_SAMPLES)
     expect([...editorStats.failures, ...exportStats.failures].slice(0, 20)).toEqual([])
   })
 

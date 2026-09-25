@@ -81,6 +81,14 @@ export async function rasterizeEditorBoard(editor: Page, scratch: Page, pxPerMm:
   await nextFrame(editor)
   const tl = await toClient(editor, { x: 0, y: 0 })
   const clip = { x: Math.round(tl.x), y: Math.round(tl.y), width: Math.round(board.widthMm * pxPerMm), height: Math.round(board.heightMm * pxPerMm) }
+  // The clip must land entirely inside the canvas svg's own rect: outside it there is no Board to
+  // capture, only whatever else sits behind (a side panel, the page background) — a silent, wrong
+  // screenshot rather than a loud failure. A viewport too narrow for `pxPerMm`'s requested clip size
+  // (relative to the app's fixed toolbar/inspector chrome) is the usual cause.
+  const svgRect = await editor.evaluate(() => document.querySelector('svg.canvas-svg')!.getBoundingClientRect())
+  if (clip.x < svgRect.left || clip.y < svgRect.top || clip.x + clip.width > svgRect.right || clip.y + clip.height > svgRect.bottom) {
+    throw new Error(`Board clip ${JSON.stringify(clip)} falls outside the canvas svg rect ${JSON.stringify(svgRect)} — widen the viewport`)
+  }
   const png = await editor.screenshot({ clip, animations: 'disabled', caret: 'hide' })
   await scratch.goto('about:blank')
   return decodeInPage(scratch, { url: `data:image/png;base64,${png.toString('base64')}` })
@@ -102,12 +110,13 @@ export function colorEquals(rgb: RGB, hex: string, tol: number): boolean {
   return rgb.every((v, k) => Math.abs(v - c[k]!) <= tol)
 }
 
-/** Euclidean RGB distance from `rgb` to the segment between `hexA` and `hexB`, and the blend parameter (0 = A, 1 = B). */
+/** Euclidean RGB distance from `rgb` to the segment between `hexA` and `hexB`, and the blend parameter (0 = A, 1 = B). `hexA === hexB` degenerates to the distance from `rgb` to that single colour, at `t = 0`. */
 export function blendDistance(rgb: RGB, hexA: string, hexB: string): { distance: number; t: number } {
   const a = hexToRgb(hexA)
   const b = hexToRgb(hexB)
   const d = b.map((v, k) => v - a[k]!)
   const len2 = d.reduce((s, v) => s + v * v, 0)
+  if (len2 === 0) return { distance: Math.hypot(...rgb.map((v, k) => v - a[k]!)), t: 0 }
   const t = Math.min(1, Math.max(0, d.reduce((s, v, k) => s + v * (rgb[k]! - a[k]!), 0) / len2))
   const distance = Math.hypot(...rgb.map((v, k) => v - (a[k]! + t * d[k]!)))
   return { distance, t }
@@ -156,6 +165,32 @@ export function pixelCenterAt(k: number, p: XY): XY {
 /** The sample pixel's minimum distance, in px, to any edge of the convex polygon `poly` (SPEC §6.1 footprint), at `k` px/mm. */
 export function footprintMarginPx(poly: XY[], k: number, p: XY): number {
   return Math.min(...edgeDistances(poly, pixelCenterAt(k, p))) * k
+}
+
+/**
+ * Signed distance, in mm, from `p` to the nearer of segment `seg`'s two
+ * ends, projected along `seg`'s own direction: positive while `p` falls
+ * between the ends, negative past one of them. SPEC §6.1: the plain
+ * footprint is the intersection of two infinite strips, so near a butt end
+ * it can reach past where the segment's own (finite) real paint stops.
+ */
+export function capMarginMm(seg: { a: XY; b: XY }, p: XY): number {
+  const u = unit(seg)
+  const length = Math.hypot(seg.b.x - seg.a.x, seg.b.y - seg.a.y)
+  const t = (p.x - seg.a.x) * u.x + (p.y - seg.a.y) * u.y
+  return Math.min(t, length - t)
+}
+
+/**
+ * The sample pixel's minimum distance, in px, to the boundary of `footprint`
+ * intersected with `overSeg`'s own real (possibly butt-capped) extent: the
+ * footprint's own edges (`footprintMarginPx`), plus `overSeg`'s two end
+ * caps (`capMarginMm`, converted to px) — the footprint's own O-parallel
+ * edges already coincide with `overSeg`'s side edges, so no separate check
+ * is needed for those.
+ */
+export function sampleMarginPx(footprint: XY[], overSeg: { a: XY; b: XY }, k: number, p: XY): number {
+  return Math.min(footprintMarginPx(footprint, k, p), capMarginMm(overSeg, pixelCenterAt(k, p)) * k)
 }
 
 /** The intersection point, and ±25% of the footprint's extent along each band's direction from it. */

@@ -110,7 +110,11 @@ async function render(page: Page, source: Source): Promise<Rendered> {
 
 test.describe('crossing compositing proof', () => {
   test.skip(({ isMobile }) => isMobile, 'pixel proof runs in the desktop chromium/firefox/webkit projects')
-  test.use({ viewport: { width: 1200, height: 1000 } })
+  // Wide enough that the 800×800 Board clip stays inside the canvas area after the app's fixed
+  // toolbar/inspector chrome — `rasterizeEditorBoard` asserts this now (Task 17 review), and 1200 was
+  // too narrow (webkit's canvas there is only 642px), though this file's own sample points never
+  // happened to wander into the misclipped region.
+  test.use({ viewport: { width: 1600, height: 1000 } })
 
   test('scene: classes, over keys and patches', async ({ page }) => {
     await seed(page, crossingProject())
