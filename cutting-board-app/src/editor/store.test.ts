@@ -153,6 +153,23 @@ describe('undo() during a field (commit) preview', () => {
   })
 })
 
+describe('invariant assertion (dev and test builds)', () => {
+  it('throws, leaving project and history unchanged, when a command, a commit or replaceProject hands the store an invalid project', () => {
+    const p0 = project([band('b1', [[0, 0], [10, 0]])])
+    resetStore(p0)
+    const collapsed = (p: Project): Project => ({ ...p, objects: { ...p.objects, b1: band('b1', [[0, 0], [0.001, 0]]) } })
+
+    expect(() => useEditor.getState().run(collapsed)).toThrow(/objects\.b1\.points/)
+    useEditor.getState().setPreview(collapsed(p0), 'commit')
+    expect(() => useEditor.getState().commit()).toThrow(/consecutive points/)
+    useEditor.getState().cancelPreview()
+    expect(() => useEditor.getState().replaceProject(collapsed(p0))).toThrow()
+
+    expect(useEditor.getState().project).toBe(p0)
+    expect(useEditor.temporal.getState().pastStates.length).toBe(0)
+  })
+})
+
 describe('replaceProject', () => {
   it('clears both history stacks and resets selection/editContext', () => {
     const p0 = project(

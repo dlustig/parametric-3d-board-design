@@ -20,6 +20,7 @@ import type { CommandResult } from '@/domain/commands'
 import type { ContextId, Id, Project } from '@/domain/model'
 import { freezeInDev } from '@/domain/freeze'
 import { newProject } from '@/domain/project'
+import { validateProject } from '@/domain/validate'
 import type { Mat } from '@/geometry/affine'
 import { IDENTITY, multiply } from '@/geometry/affine'
 import { pathMatrix } from '@/geometry/expand'
@@ -104,6 +105,20 @@ function gridMmFor(p: Project): number {
   return p.displayUnits === 'in' ? 3.175 : 5
 }
 
+/**
+ * Dev and test builds only: a project the store takes in (a command's result,
+ * a committed preview, an opened file) must satisfy SPEC §2.1, so a command
+ * that breaks an invariant throws where it happens instead of reaching
+ * history and autosave. Production skips the check (it walks the project).
+ */
+function assertValidInDev(p: Project): Project {
+  if (import.meta.env.DEV) {
+    const error = validateProject(p)
+    if (error !== null) throw new Error(`Invalid project at ${error.path}: ${error.message}`)
+  }
+  return p
+}
+
 const INITIAL_PROJECT = newProject('mm')
 
 export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Temporal } = create<EditorState>()(
@@ -134,11 +149,11 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
         get().settlePreview()
         const result = cmd(get().project)
         if (isCommandResult(result)) {
-          if (result.ok) set({ project: freezeInDev(result.project), message: null, currentMaterialId: pruneCurrentMaterial(result.project, get().currentMaterialId) })
+          if (result.ok) set({ project: freezeInDev(assertValidInDev(result.project)), message: null, currentMaterialId: pruneCurrentMaterial(result.project, get().currentMaterialId) })
           else set({ message: result.message })
           return
         }
-        set({ project: freezeInDev(result), message: null, currentMaterialId: pruneCurrentMaterial(result, get().currentMaterialId) })
+        set({ project: freezeInDev(assertValidInDev(result)), message: null, currentMaterialId: pruneCurrentMaterial(result, get().currentMaterialId) })
       },
 
       setPreview(next, onInterrupt) {
@@ -150,7 +165,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       commit() {
         const { preview } = get()
         if (preview === null) return
-        set({ project: freezeInDev(preview.next), preview: null, snapGuide: null })
+        set({ project: freezeInDev(assertValidInDev(preview.next)), preview: null, snapGuide: null })
       },
 
       cancelPreview() {
@@ -178,7 +193,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       replaceProject(p) {
         get().settlePreview()
-        set({ project: freezeInDev(p), selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId), message: null })
+        set({ project: freezeInDev(assertValidInDev(p)), selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId), message: null })
         useEditor.temporal.getState().clear()
       },
 
