@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { IDENTITY, multiply } from '../geometry/affine.ts'
 import { pathMatrix } from '../geometry/expand.ts'
-import { addMaterial, deleteMaterial, deleteObjects } from '../domain/commands/index.ts'
+import { addMaterial, deleteMaterial, deleteObjects, setBoardSize, setDisplayUnits } from '../domain/commands/index.ts'
 import type { Project } from '../domain/model.ts'
 import { newProject } from '../domain/project.ts'
 import { band, instance, MAT, MAT2, project } from '../domain/test-builders.ts'
@@ -150,6 +150,26 @@ describe('undo() during a field (commit) preview', () => {
     // Two entries were pushed (run, then the settled commit); undo() consumed the second one.
     expect(useEditor.temporal.getState().pastStates.length).toBe(1)
     expect(useEditor.temporal.getState().futureStates.length).toBe(1)
+  })
+})
+
+describe('grid spacing follows the display units (SPEC §7.7)', () => {
+  it('is set on replaceProject and when the units change (command, undo, redo); a user edit lasts until then', () => {
+    resetStore(newProject('mm'))
+    useEditor.getState().replaceProject(newProject('in'))
+    expect(useEditor.getState().gridMm).toBe(3.175)
+    useEditor.getState().setGridMm(1)
+    useEditor.getState().run((p) => setBoardSize(p, 400, 400))
+    expect(useEditor.getState().gridMm).toBe(1) // units unchanged: the user's spacing stays
+
+    useEditor.getState().run((p) => setDisplayUnits(p, 'mm'))
+    expect(useEditor.getState().gridMm).toBe(5)
+    useEditor.getState().undo()
+    expect(useEditor.getState().gridMm).toBe(3.175)
+    useEditor.getState().redo()
+    expect(useEditor.getState().gridMm).toBe(5)
+    useEditor.getState().replaceProject(newProject('in'))
+    expect(useEditor.getState().gridMm).toBe(3.175)
   })
 })
 

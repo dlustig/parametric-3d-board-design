@@ -105,6 +105,11 @@ function gridMmFor(p: Project): number {
   return p.displayUnits === 'in' ? 3.175 : 5
 }
 
+/** SPEC §7.7: the grid resets to the default for the display units when they change; a user's spacing lasts until then. */
+function gridAfter(before: Project, after: Project, gridMm: number): number {
+  return after.displayUnits === before.displayUnits ? gridMm : gridMmFor(after)
+}
+
 /**
  * Dev and test builds only: a project the store takes in (a command's result,
  * a committed preview, an opened file) must satisfy SPEC §2.1, so a command
@@ -147,13 +152,19 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       run(cmd) {
         get().settlePreview()
-        const result = cmd(get().project)
-        if (isCommandResult(result)) {
-          if (result.ok) set({ project: freezeInDev(assertValidInDev(result.project)), message: null, currentMaterialId: pruneCurrentMaterial(result.project, get().currentMaterialId) })
-          else set({ message: result.message })
+        const { project, currentMaterialId, gridMm } = get()
+        const result = cmd(project)
+        if (isCommandResult(result) && !result.ok) {
+          set({ message: result.message })
           return
         }
-        set({ project: freezeInDev(assertValidInDev(result)), message: null, currentMaterialId: pruneCurrentMaterial(result, get().currentMaterialId) })
+        const next = isCommandResult(result) ? result.project : result
+        set({
+          project: freezeInDev(assertValidInDev(next)),
+          message: null,
+          currentMaterialId: pruneCurrentMaterial(next, currentMaterialId),
+          gridMm: gridAfter(project, next, gridMm),
+        })
       },
 
       setPreview(next, onInterrupt) {
@@ -181,19 +192,21 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       undo() {
         get().settlePreview()
+        const before = get().project
         useEditor.temporal.getState().undo()
-        repairAfterHistoryChange(set, get)
+        repairAfterHistoryChange(set, get, before)
       },
 
       redo() {
         get().settlePreview()
+        const before = get().project
         useEditor.temporal.getState().redo()
-        repairAfterHistoryChange(set, get)
+        repairAfterHistoryChange(set, get, before)
       },
 
       replaceProject(p) {
         get().settlePreview()
-        set({ project: freezeInDev(assertValidInDev(p)), selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId), message: null })
+        set({ project: freezeInDev(assertValidInDev(p)), selection: [], editContext: [], drawing: null, currentMaterialId: pruneCurrentMaterial(p, get().currentMaterialId), message: null, gridMm: gridMmFor(p) })
         useEditor.temporal.getState().clear()
       },
 
@@ -237,14 +250,15 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
   ),
 )
 
-/** Drops selection ids, edit-context levels, and a dangling `currentMaterialId` invalidated by the undo/redo that just ran (SPEC §7.1); cancels drawing. */
-function repairAfterHistoryChange(set: StoreApi<EditorState>['setState'], get: StoreApi<EditorState>['getState']): void {
-  const { project, selection, editContext, currentMaterialId } = get()
+/** Drops selection ids, edit-context levels, and a dangling `currentMaterialId` invalidated by the undo/redo that just ran from `before` (SPEC §7.1); cancels drawing; resets the grid if the units changed back. */
+function repairAfterHistoryChange(set: StoreApi<EditorState>['setState'], get: StoreApi<EditorState>['getState'], before: Project): void {
+  const { project, selection, editContext, currentMaterialId, gridMm } = get()
   set({
     selection: pruneSelection(project, selection),
     editContext: pruneEditContext(project, editContext),
     currentMaterialId: pruneCurrentMaterial(project, currentMaterialId),
     drawing: null,
+    gridMm: gridAfter(before, project, gridMm),
   })
 }
 
