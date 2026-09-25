@@ -20,7 +20,7 @@ import type { Box } from './bounds.ts'
 import { objectBounds, paintedBounds, unionBoxes } from './bounds.ts'
 import type { Occurrence } from './expand.ts'
 import type { Intersection } from './intersections.ts'
-import { ANGLE_SNAP_CAPTURE_DEG, ANGLE_SNAP_DEG, EPS_GEOMETRY } from './tolerance.ts'
+import { ANGLE_SNAP_CAPTURE_DEG, ANGLE_SNAP_DEG, EPS_GEOMETRY, EPS_RELATIVE } from './tolerance.ts'
 
 type XY = { x: number; y: number }
 
@@ -211,7 +211,7 @@ function rayMeets(start: XY, dir: XY, line: SnapLine): XY | null {
   const ex = line.b.x - line.a.x
   const ey = line.b.y - line.a.y
   const denom = dir.x * ey - dir.y * ex
-  if (Math.abs(denom) < 1e-12) return null
+  if (Math.abs(denom) < EPS_RELATIVE * Math.hypot(ex, ey)) return null // `dir` is a unit vector
   const t = ((line.a.x - start.x) * ey - (line.a.y - start.y) * ex) / denom
   return { x: start.x + t * dir.x, y: start.y + t * dir.y }
 }
@@ -276,7 +276,7 @@ function parallel(l: SnapLine, m: SnapLine): boolean {
   const uy = l.b.y - l.a.y
   const vx = m.b.x - m.a.x
   const vy = m.b.y - m.a.y
-  return Math.abs(ux * vy - uy * vx) <= 1e-9 * Math.hypot(ux, uy) * Math.hypot(vx, vy)
+  return Math.abs(ux * vy - uy * vx) <= EPS_RELATIVE * Math.hypot(ux, uy) * Math.hypot(vx, vy)
 }
 
 /**

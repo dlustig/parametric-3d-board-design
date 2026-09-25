@@ -7,6 +7,9 @@ export { MAX_OCCURRENCES, MIN_SEGMENT_MM } from '../domain/limits.ts'
 /** Point equality and parameter-interior test tolerance, in mm. */
 export const EPS_GEOMETRY = 1e-6
 
+/** Relative tolerance for unit-free comparisons: directions whose normalised cross product is below it are parallel, a miter whose `1 + n₁·n₂` is below it is a reversal, a scale this close to 1 is 1. */
+export const EPS_RELATIVE = 1e-9
+
 /** Below this angle an intersection is classified `near-parallel`, in degrees. */
 export const MIN_CROSSING_ANGLE_DEG = 10
 

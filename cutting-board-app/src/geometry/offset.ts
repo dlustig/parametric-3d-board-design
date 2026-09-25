@@ -6,6 +6,7 @@
 // the right of the polyline's point order, negative to the left.
 
 import type { Point } from '@/domain/model'
+import { EPS_RELATIVE } from './tolerance.ts'
 
 type XY = { x: number; y: number }
 
@@ -52,7 +53,7 @@ export function offsetPolyline(points: Point[], distance: number, closed: boolea
     const denom = 1 + dot
     const sumX = before.x + after.x
     const sumY = before.y + after.y
-    const scale = Math.abs(denom) < 1e-9 ? distance : distance / denom
+    const scale = Math.abs(denom) < EPS_RELATIVE ? distance : distance / denom
     return { id: pt.id, x: pt.x + scale * sumX, y: pt.y + scale * sumY }
   })
 }

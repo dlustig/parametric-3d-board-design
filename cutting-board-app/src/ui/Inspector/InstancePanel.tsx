@@ -11,6 +11,7 @@ import { hasKeyPrefix, stepKey } from '@/domain/keys'
 import type { BandRef, Id, MotifInstance, Project, RepeatField, Step, Transform } from '@/domain/model'
 import { formatLength } from '@/domain/units'
 import { scaleOf } from '@/geometry/affine'
+import { EPS_RELATIVE } from '@/geometry/tolerance'
 import { intersectionKey } from '@/geometry/resolve'
 import type { UnresolvedMarker } from '@/geometry/scene'
 import { useScene } from '@/editor/scene'
@@ -168,7 +169,7 @@ export function InstancePanel({ instance }: { instance: MotifInstance }): JSX.El
       <h2>Instance</h2>
       <MotifNameField obj={instance} />
       <TransformFields obj={instance} />
-      {Math.abs(factor - 1) > 1e-12 &&
+      {Math.abs(factor - 1) > EPS_RELATIVE &&
         worldWidths(project, instance, factor).map(({ width, world }) => (
           <p key={width} className="panel-note">
             World width: {formatLength(width, unit)} → {formatLength(world, unit)} {unit}
