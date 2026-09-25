@@ -5,6 +5,7 @@
 //   run(cmd)             run a command through the store, as the UI does
 //   replaceProject(p)    seed a project (clears history, selection, context)
 //   loadFixture(name)    seed one of src/fixtures/* by key (avoids a JSON import in the Node-side spec)
+//   performanceFixture() Fixture F's performance variant, `interlacePerformance()` (SPEC §13 G9), not seeded
 //   getState()           the whole store, for camera/selection/context setup
 //   getScene()           the committed project's scene at the editor's current clip enlargement
 //   exportSvg()          the standalone SVG export of the committed project
@@ -12,7 +13,7 @@
 
 import type { Project } from '@/domain/model'
 import { exportSvg } from '@/export/svg'
-import { fixtures } from '@/fixtures'
+import { fixtures, interlacePerformance } from '@/fixtures'
 import type { Scene } from '@/geometry/scene'
 import { buildScene } from '@/geometry/scene'
 import { editorClipExtendMm } from './camera.ts'
@@ -31,6 +32,7 @@ export interface TestHook {
   run: EditorState['run']
   replaceProject(p: Project): void
   loadFixture(name: FixtureName): void
+  performanceFixture(): Project
   getState(): EditorState
   getScene(): Scene
   exportSvg(): string
@@ -66,6 +68,7 @@ export function installTestHook(): void {
     run: (cmd) => useEditor.getState().run(cmd),
     replaceProject: (p) => useEditor.getState().replaceProject(p),
     loadFixture: (name) => useEditor.getState().replaceProject(structuredClone(fixtures[name])),
+    performanceFixture: interlacePerformance,
     getState: () => useEditor.getState(),
     getScene: () => {
       const { project, camera } = useEditor.getState()
