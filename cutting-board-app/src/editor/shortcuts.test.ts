@@ -2,19 +2,26 @@
 // Shell spec §12.1, §16: every SHORTCUTS entry that keyboard.ts dispatches
 // produces its effect when its first chord is pressed (Space and Alt are
 // display-only: Canvas and snapping own them), formatChord per platform,
-// and Review Focus 3 — `?` typed in a field never opens the sheet.
+// and Review Focus 3 — `?` typed in a field never opens the sheet. The pane
+// and project chords (Task 3) call the registered `uiActions` and the
+// (mocked) download helpers.
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { translateObjects } from '@/domain/commands'
 import type { Band } from '@/domain/model'
 import { band, MAT, project } from '@/domain/test-builders'
+import { downloadExportSvg, downloadProject } from '@/export/download'
 import { copySelection, installKeyboardDispatcher, pasteClipboard } from './keyboard.ts'
 import { useLayout } from './layout.ts'
 import type { Shortcut, ShortcutId } from './shortcuts.ts'
 import { detectPlatform, DISPLAY_ONLY, formatChord, SHORTCUTS } from './shortcuts.ts'
 import { useEditor } from './store.ts'
 
+vi.mock('@/export/download', () => ({ downloadProject: vi.fn(), downloadExportSvg: vi.fn() }))
+
 const table: Readonly<Record<string, Shortcut>> = SHORTCUTS
+
+const ui = { toggleLeft: vi.fn(), toggleRight: vi.fn(), openLeft: vi.fn(), openProject: vi.fn() }
 
 function reset(selection: string[] = ['a']): void {
   useEditor.setState({
@@ -29,7 +36,8 @@ function reset(selection: string[] = ['a']): void {
     message: null,
   })
   useEditor.temporal.getState().clear()
-  useLayout.setState({ shortcutsOpen: false })
+  useLayout.setState({ shortcutsOpen: false, uiActions: ui })
+  vi.clearAllMocks()
 }
 
 /** Named keys' physical `code` (KeyboardEvent.code), for chords this table doesn't spell out letter-by-letter. */
@@ -158,6 +166,31 @@ const CASES: Record<Exclude<ShortcutId, 'hand' | 'snapOff'>, Case> = {
     },
   },
   shortcuts: { check: () => expect(useLayout.getState().shortcutsOpen).toBe(true) },
+  toggleLeft: {
+    check: () => {
+      expect(ui.toggleLeft).toHaveBeenCalledOnce()
+      expect(ui.toggleRight).not.toHaveBeenCalled()
+    },
+  },
+  toggleRight: {
+    check: () => {
+      expect(ui.toggleRight).toHaveBeenCalledOnce()
+      expect(ui.toggleLeft).not.toHaveBeenCalled()
+    },
+  },
+  openProject: { check: () => expect(ui.openProject).toHaveBeenCalledOnce() },
+  downloadProject: {
+    check: () => {
+      expect(downloadProject).toHaveBeenCalledExactlyOnceWith(s().project)
+      expect(downloadExportSvg).not.toHaveBeenCalled()
+    },
+  },
+  exportSvg: {
+    check: () => {
+      expect(downloadExportSvg).toHaveBeenCalledExactlyOnceWith(s().project)
+      expect(downloadProject).not.toHaveBeenCalled()
+    },
+  },
 }
 
 describe('SHORTCUTS → keyboard.ts dispatch', () => {

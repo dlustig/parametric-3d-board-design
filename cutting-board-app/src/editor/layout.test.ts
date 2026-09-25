@@ -127,3 +127,25 @@ describe('useLayout persistence', () => {
     expect(fresh.useLayout.getState().theme).toBe('light')
   })
 })
+
+describe('pane state (shell §4, Task 3)', () => {
+  it('starts with both panes open, no ui actions, and the Wood tab (Task 5 restores Layers)', () => {
+    const s = useLayout.getInitialState()
+    expect([s.leftOpen, s.rightOpen, s.uiActions, s.leftTab]).toEqual([true, true, null, 'wood'])
+  })
+
+  it('setPaneOpen changes one side only', () => {
+    useLayout.getState().setPaneOpen('left', false)
+    expect([useLayout.getState().leftOpen, useLayout.getState().rightOpen]).toEqual([false, true])
+    useLayout.getState().setPaneOpen('left', true)
+  })
+
+  it('persists only theme, leftTab and toolsDocked — never pane state or ui actions', () => {
+    useLayout.getState().setUiActions({ toggleLeft() {}, toggleRight() {}, openLeft() {}, openProject() {} })
+    useLayout.getState().setPaneOpen('right', false)
+    const persisted = useLayout.persist.getOptions().partialize!(useLayout.getState()) as Record<string, unknown> // getOptions() types the persisted shape as unknown
+    expect(Object.keys(persisted).sort()).toEqual(['leftTab', 'theme', 'toolsDocked'])
+    useLayout.getState().setUiActions(null)
+    useLayout.getState().setPaneOpen('right', true)
+  })
+})

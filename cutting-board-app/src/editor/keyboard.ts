@@ -27,11 +27,18 @@
 // this dispatcher calls, so nothing here duplicates them. `Ctrl/Cmd+G` is
 // Create Motif.
 // `?` opens the keyboard shortcuts sheet (shell spec §10.3).
+//
+// Shell §12.2: Mod+\ and Mod+Shift+\ toggle the sidebar and inspector
+// (matched on `e.code === 'Backslash'`, so the Shift form works where
+// `e.key` is '|'), Mod+O opens a project, Mod+S downloads it and
+// Mod+Shift+E exports the SVG — all preventDefault'ed, and all skipped in
+// fields like every other binding here.
 
 import type { Clipboard } from '@/domain/commands'
 import { copyObjects, createMotif, deleteObjects, duplicateObjects, makeRepeat, pasteObjects, translateObjects } from '@/domain/commands'
 import type { Id } from '@/domain/model'
 import { childrenOf } from '@/domain/project'
+import { downloadExportSvg, downloadProject } from '@/export/download'
 import { apply, invert } from '@/geometry/affine'
 import { useLayout } from './layout.ts'
 import { cancelDrawing, finishDrawing, undoPoint } from './tools/draw.ts'
@@ -278,6 +285,27 @@ export function installKeyboardDispatcher(): () => void {
       }
       if (!e.shiftKey && lower === 'v') {
         pasteClipboard()
+        return
+      }
+      if (e.code === 'Backslash') {
+        if (e.shiftKey) useLayout.getState().uiActions?.toggleRight()
+        else useLayout.getState().uiActions?.toggleLeft()
+        e.preventDefault()
+        return
+      }
+      if (!e.shiftKey && lower === 'o') {
+        useLayout.getState().uiActions?.openProject()
+        e.preventDefault()
+        return
+      }
+      if (!e.shiftKey && lower === 's') {
+        downloadProject(useEditor.getState().project)
+        e.preventDefault()
+        return
+      }
+      if (e.shiftKey && lower === 'e') {
+        downloadExportSvg(useEditor.getState().project)
+        e.preventDefault()
         return
       }
       return // an unrecognized modified chord: never falls through to a plain-key binding

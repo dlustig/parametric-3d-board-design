@@ -18,6 +18,14 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 export type ThemePref = 'dark' | 'light' | 'system'
 export type LeftTab = 'layers' | 'motifs' | 'wood'
 
+/** Shell §4.1: pane and project actions App registers while the shell is mounted; the icon column, top bar, wood chip and keyboard.ts call them. */
+export interface UiActions {
+  toggleLeft(): void
+  toggleRight(): void
+  openLeft(tab: LeftTab): void
+  openProject(): void
+}
+
 export const PREFS_KEY = 'cbpd:prefs'
 
 const THEMES: readonly ThemePref[] = ['dark', 'light', 'system']
@@ -42,6 +50,13 @@ export interface LayoutState {
   setToolsDocked(d: boolean): void
   shortcutsOpen: boolean // not persisted
   setShortcutsOpen(o: boolean): void
+  /** Shell §4: the left pane / inspector is open — mirrored from the panel library on desktop, the overlay state when narrow. Not persisted. */
+  leftOpen: boolean
+  rightOpen: boolean
+  /** Registered by App (null before it mounts). Not persisted. */
+  uiActions: UiActions | null
+  setPaneOpen(side: 'left' | 'right', open: boolean): void
+  setUiActions(a: UiActions | null): void
 }
 
 const guardedStorage: StateStorage = {
@@ -76,13 +91,18 @@ export const useLayout = create<LayoutState>()(
   persist(
     (set) => ({
       theme: 'dark',
-      leftTab: 'layers',
+      leftTab: 'wood', // Task 5 restores 'layers' with the Layers pane
       toolsDocked: true,
       setTheme: (theme) => set({ theme }),
       setLeftTab: (leftTab) => set({ leftTab }),
       setToolsDocked: (toolsDocked) => set({ toolsDocked }),
       shortcutsOpen: false,
       setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+      leftOpen: true,
+      rightOpen: true,
+      uiActions: null,
+      setPaneOpen: (side, open) => set(side === 'left' ? { leftOpen: open } : { rightOpen: open }),
+      setUiActions: (a) => set({ uiActions: a }),
     }),
     {
       name: PREFS_KEY,

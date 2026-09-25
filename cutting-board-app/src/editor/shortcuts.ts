@@ -36,6 +36,11 @@ export const SHORTCUTS = {
   undo: { label: 'Undo', keys: ['Mod+Z'], group: 'Project' },
   redo: { label: 'Redo', keys: ['Mod+Shift+Z', 'Mod+Y'], group: 'Project' },
   shortcuts: { label: 'Keyboard shortcuts', keys: ['?'], group: 'Project' },
+  toggleLeft: { label: 'Toggle sidebar', keys: ['Mod+\\'], group: 'Panels' },
+  toggleRight: { label: 'Toggle inspector', keys: ['Mod+Shift+\\'], group: 'Panels' },
+  openProject: { label: 'Open project…', keys: ['Mod+O'], group: 'Project' },
+  downloadProject: { label: 'Download project', keys: ['Mod+S'], group: 'Project' },
+  exportSvg: { label: 'Export SVG', keys: ['Mod+Shift+E'], group: 'Project' },
 } as const satisfies Record<string, Shortcut>
 
 export type ShortcutId = keyof typeof SHORTCUTS
