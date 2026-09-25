@@ -16,17 +16,17 @@ test('G6 B checker: authored from blank through the UI matches the fixture', asy
   const a = await Author.blank(page, 'B checker')
   await a.fit() // Board: the blank mm project is already 300 × 450 with no background, as the fixture
 
-  // The cell: Maple 20 × 20 at (20, 60) (grid-snapped drag), then a duplicate moved to bounds X 40 and made Walnut.
+  // The cell: Maple 20 × 20 at (20, 60) (grid-snapped drag), then an in-place copy (Copy/Paste) moved to bounds X 40 and made Walnut.
   await a.swatch('Maple')
   await a.tool('Rectangle')
   await a.drag({ x: 20, y: 60 }, { x: 40, y: 80 })
   await a.tool('Select')
   await a.click({ x: 30, y: 70 })
-  await a.duplicate()
+  await a.copyInPlace()
   await a.setField('X', '40', 'Selection')
   await a.swatch('Walnut')
   a.workaround(
-    'B: a second Rectangle dragged flush beside the first lands 0.2 mm off: its free corners (60, 60)/(60, 80) lie on the first region\'s bounds-edge lines, and a line target beats the grid (SPEC §7.7), keeping the raw pointer X along the line. Used Duplicate + bounds X instead.',
+    'B: a second Rectangle dragged flush beside the first lands 0.2 mm off: its free corners (60, 60)/(60, 80) lie on the first region\'s bounds-edge lines, and a line target beats the grid (SPEC §7.7), keeping the raw pointer X along the line. Used Copy/Paste (in place) + bounds X instead.',
   )
 
   // Marquee both, Repeat: pivot (40, 70), steps 40 × 20. Then 6 × 6 with a half-step row offset.

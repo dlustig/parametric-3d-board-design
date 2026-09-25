@@ -23,9 +23,9 @@ function okIds(r: IdsResult): { project: Project; newIds: Id[] } {
 const plus = { id: 'M', children: [band('H', [[-20, 0], [20, 0]]), band('V', [[0, -20], [0, 20]])] }
 
 describe('duplicateObjects', () => {
-  it('gives fresh ids for objects and points, with identical geometry', () => {
+  it('gives fresh ids for objects and points, with the geometry offset by `offset` (one grid step, SPEC §7.4)', () => {
     const src = project([band('A', [[0, 0], [10, 0], [10, 10]]), region('G', [[0, 0], [4, 0], [4, 4]])])
-    const { project: p, newIds } = okIds(duplicateObjects(src, null, ['A', 'G']))
+    const { project: p, newIds } = okIds(duplicateObjects(src, null, ['A', 'G'], { x: 5, y: 5 }))
 
     expect(p.rootChildren).toEqual(['A', 'G', ...newIds])
     expect(newIds).toHaveLength(2)
@@ -35,7 +35,7 @@ describe('duplicateObjects', () => {
     const original = bandOf(src, 'A')
     const copy = bandOf(p, newIds[0]!)
     expect(copy.id).not.toBe(original.id)
-    expect(copy.points.map((pt) => [pt.x, pt.y])).toEqual(original.points.map((pt) => [pt.x, pt.y]))
+    expect(copy.points.map((pt) => [pt.x, pt.y])).toEqual(original.points.map((pt) => [pt.x + 5, pt.y + 5]))
     expect(copy.points.map((pt) => pt.id)).not.toEqual(original.points.map((pt) => pt.id))
     expect(new Set(copy.points.map((pt) => pt.id)).size).toBe(copy.points.length)
     expect(copy).toMatchObject({ materialId: original.materialId, widthMm: original.widthMm, closed: original.closed })
@@ -45,24 +45,24 @@ describe('duplicateObjects', () => {
 
   it('leaves the original objects and definition-internal records untouched', () => {
     const src = project([instance('I', 'M')], [plus])
-    const { project: p, newIds } = okIds(duplicateObjects(src, null, ['I']))
+    const { project: p, newIds } = okIds(duplicateObjects(src, null, ['I'], { x: 3.175, y: 3.175 }))
     expect(p.motifs).toEqual(src.motifs) // the definition itself is not cloned
     const copy = p.objects[newIds[0]!]!
-    expect(copy).toMatchObject({ type: 'motif-instance', motifId: 'M' })
+    expect(copy).toMatchObject({ type: 'motif-instance', motifId: 'M', transform: { x: 3.175, y: 3.175, rotationDeg: 0, scale: 1 } })
     expect(p.objects.I).toEqual(src.objects.I) // the original instance is untouched
     expect(validateProject(p)).toBeNull()
   })
 
   it('duplicates into a motif definition context', () => {
     const src = project([instance('I', 'M')], [plus])
-    const { project: p, newIds } = okIds(duplicateObjects(src, 'M', ['H']))
+    const { project: p, newIds } = okIds(duplicateObjects(src, 'M', ['H'], { x: 5, y: 5 }))
     expect(p.motifs.M!.children).toEqual(['H', 'V', ...newIds])
     expect(validateProject(p)).toBeNull()
   })
 
   it("appends copies in the originals' own paint order, not the (possibly reversed) selection order", () => {
     const src = project([band('A', [[0, 0], [1, 1]]), band('B', [[2, 2], [3, 3]]), band('C', [[4, 4], [5, 5]])])
-    const { project: p, newIds } = okIds(duplicateObjects(src, null, ['C', 'A'])) // selected out of paint order
+    const { project: p, newIds } = okIds(duplicateObjects(src, null, ['C', 'A'], { x: 5, y: 5 })) // selected out of paint order
     expect(newIds).toHaveLength(2)
     const [copyOfA, copyOfC] = newIds
     // A is painted before C, so its copy comes first, regardless of ['C', 'A'] selection order.
@@ -167,7 +167,7 @@ describe('copyObjects / pasteObjects', () => {
 describe('occurrence cap', () => {
   it('duplicateObjects refuses when the result would exceed MAX_OCCURRENCES', () => {
     const atCap = project([repeat('F', 'M', { rows: 50, columns: 50 })], [plus]) // 50 x 50 x 2 = 5000, exactly at cap
-    const result = duplicateObjects(atCap, 'M', ['H']) // M gains a 3rd shape: 50 x 50 x 3 = 7500
+    const result = duplicateObjects(atCap, 'M', ['H'], { x: 5, y: 5 }) // M gains a 3rd shape: 50 x 50 x 3 = 7500
     expect(result).toEqual({ ok: false, message: 'This would make 7500 occurrences; the limit is 5000.' })
   })
 

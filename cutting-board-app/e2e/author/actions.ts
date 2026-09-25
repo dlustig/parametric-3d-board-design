@@ -199,8 +199,10 @@ export class Author {
     await this.button(material)
   }
 
-  async duplicate(): Promise<void> {
-    await this.key('ControlOrMeta+d')
+  /** Copy then Paste: an in-place copy (Duplicate offsets its copy by one grid step, SPEC §7.4). */
+  async copyInPlace(): Promise<void> {
+    await this.key('ControlOrMeta+c')
+    await this.key('ControlOrMeta+v')
   }
 
   async mirror(axis: 'X' | 'Y'): Promise<void> {

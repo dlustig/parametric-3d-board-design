@@ -1,9 +1,9 @@
 // SPEC §13 G6, Fixture F (interlace): a 399 mm Maple board; one lattice
 // strand drawn with typed lengths and angles (a 3.9 mm hook, then 59.8 mm
-// at atan(27/23)); the other two strands of its direction by Duplicate and
-// grid nudges; the opposite three by Duplicate + Mirror X; the 2-Band
+// at atan(27/23)); the other two strands of its direction by Copy/Paste and
+// grid nudges; the opposite three by Copy/Paste + Mirror X; the 2-Band
 // accent drawn from a snapped intersection, made a motif, and placed four
-// ways (identity, Mirror Y, ±90°) with Duplicate / Mirror / Rotate 90°;
+// ways (identity, Mirror Y, ±90°) with Copy/Paste / Mirror / Rotate 90°;
 // marquee + Repeat, 5 × 5, typed steps, alternate mirror X; the lattice's
 // alternating crossings and the accent's crossing toggled in "All
 // instances" scope, and two cells overridden in "This occurrence" scope.
@@ -64,20 +64,20 @@ test('G6 F interlace: authored from blank through the UI matches the fixture', a
   await a.setField('Width', '3.25', 'Band')
 
   // p0 (Maple): a duplicate 15 grid steps left, sent to the back (paint order p0, p1, p2). p2 (Cherry): 15 right.
-  await a.duplicate()
+  await a.copyInPlace()
   await a.nudge('Left', true)
   for (let k = 0; k < 5; k++) await a.nudge('Left')
   await a.swatch('Maple')
   await a.button('To back', 'Selection')
   await a.click(A)
-  await a.duplicate()
+  await a.copyInPlace()
   await a.nudge('Right', true)
   for (let k = 0; k < 5; k++) await a.nudge('Right')
   await a.swatch('Cherry')
 
   // n0, n1, n2: the three duplicated and mirrored about their (symmetric) bounds centre; then recoloured.
   await a.marquee(drawn(-35, -30), drawn(35, 32))
-  await a.duplicate()
+  await a.copyInPlace()
   await a.mirror('X')
   for (const [dx, material] of [[24.75, 'Purpleheart'], [15, 'Maple'], [5.25, 'Walnut']] as const) {
     await a.click(drawn(dx, 17.608)) // a point on n0 / n1 / n2 away from every p strand
@@ -100,7 +100,7 @@ test('G6 F interlace: authored from blank through the UI matches the fixture', a
   for (let k = 0; k < 3; k++) await a.nudge('Up', true)
   for (let k = 0; k < 7; k++) await a.nudge('Up')
   // Accent b (Oak): a duplicate mirrored in Y about itself.
-  await a.duplicate()
+  await a.copyInPlace()
   await a.mirror('Y')
   await a.swatch('Oak')
   // The accent motif: b is selected; add a, Create Motif (pivot = their centre, definition (0, −20.8)).
@@ -108,19 +108,19 @@ test('G6 F interlace: authored from blank through the UI matches the fixture', a
   await a.createMotif()
 
   // The mirrored accent: a duplicate, Mirror Y in place, nudged 64 steps down (to definition (0, 20.8)).
-  await a.duplicate()
+  await a.copyInPlace()
   await a.mirror('Y')
   for (let k = 0; k < 6; k++) await a.nudge('Down', true)
   for (let k = 0; k < 4; k++) await a.nudge('Down')
   // ±90°: the upright pair (centred on the lattice origin) duplicated and rotated; the copy of the
   // mirrored one lands on the wrong diagonal each time and is deleted.
   a.workaround(
-    'F: the ±90° accent instances are rotations about the lattice origin, but Rotate turns about the selection centre; rotated a duplicate of the symmetric identity + mirrored pair and deleted the unwanted copy (twice, 10 actions).',
+    'F: the ±90° accent instances are rotations about the lattice origin, but Rotate turns about the selection centre; rotated an in-place copy of the symmetric identity + mirrored pair and deleted the unwanted copy (twice, 12 actions).',
   )
   for (const [direction, unwanted] of [['CW', drawn(-20.8, 0)], ['CCW', drawn(20.8, 0)]] as const) {
     await a.click(drawn(0, -20.8))
     await a.shiftClick(drawn(0, 20.8))
-    await a.duplicate()
+    await a.copyInPlace()
     await a.rotate90(direction)
     await a.click(unwanted)
     await a.key('Delete')

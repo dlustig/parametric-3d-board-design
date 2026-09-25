@@ -1,6 +1,6 @@
 // SPEC §13 G6, Fixture D (chevron diamond): an Ash background; three nested
 // diamonds (Ash and Padauk Regions made from rotated squares, a closed Wenge
-// Band outline between them); two ±45° chevron Bands, the second a Duplicate
+// Band outline between them); two ±45° chevron Bands, the second an in-place Copy/Paste
 // nudged by the grid. Then one dimension (the wide chevron's width) is
 // edited through the inspector.
 
@@ -73,13 +73,13 @@ test('G6 D chevron diamond: authored from blank through the UI matches the fixtu
   await a.angleEnter('45')
   await a.finish()
 
-  // The narrow chevron: a Duplicate at width 12, nudged by a 30 mm grid 4 right and 3 down (+120, +90).
+  // The narrow chevron: an in-place copy at width 12, nudged by a 30 mm grid 4 right and 3 down (+120, +90).
   // (The grid spacing lives in the Board panel, shown with nothing selected, so it is set first.)
   await a.tool('Select')
   await a.setGrid('30')
   await a.click({ x: 80, y: 170 })
   await a.setField('Width', '20', 'Band')
-  await a.duplicate()
+  await a.copyInPlace()
   await a.setField('Width', '12', 'Band')
   for (let k = 0; k < 4; k++) await a.nudge('Right')
   for (let k = 0; k < 3; k++) await a.nudge('Down')

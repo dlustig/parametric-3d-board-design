@@ -186,7 +186,7 @@ test.describe('selection commands', () => {
     expect(await history(page)).toEqual({ past: 1, future: 0 })
   })
 
-  test('Ctrl/Cmd+D duplicates the selection in place and selects the copies', async ({ page }) => {
+  test('Ctrl/Cmd+D duplicates the selection one grid step along +X and +Y and selects the copies', async ({ page }) => {
     await seed(page, project([band('b1', [[0, 40], [80, 40]])]))
     await select(page, ['b1'])
     await page.keyboard.press('ControlOrMeta+d')
@@ -196,7 +196,8 @@ test.describe('selection commands', () => {
     const newId = p.rootChildren[1]!
     const sel = await selection(page)
     expect(sel).toEqual([newId])
-    expect(bandOf(p, newId).points.map((pt) => [pt.x, pt.y])).toEqual(bandOf(p, 'b1').points.map((pt) => [pt.x, pt.y]))
+    const grid = await page.evaluate(() => window.__cbpd!.getState().gridMm)
+    expect(bandOf(p, newId).points.map((pt) => [pt.x, pt.y])).toEqual(bandOf(p, 'b1').points.map((pt) => [pt.x + grid, pt.y + grid]))
     expect(await history(page)).toEqual({ past: 1, future: 0 })
   })
 

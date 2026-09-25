@@ -1,5 +1,5 @@
 // SPEC §13 G6, Fixture C (basket weave): one Band drawn with typed length
-// and angle, the other three made by Duplicate, Rotate 90° and bounds X/Y;
+// and angle, the other three made by Copy/Paste (in place), Rotate 90° and bounds X/Y;
 // marquee + Repeat (the painted-bounds step tiles seamlessly), 3 × 3 with
 // alternate 90° rotation; two crossings toggled with the Crossing tool in
 // "All instances" scope so the definition alternates. Then the source
@@ -30,16 +30,16 @@ test('G6 C basket weave: authored from blank through the UI matches the fixture'
   await a.setField('Width', '10', 'Band')
 
   // h1: a duplicate at bounds Y 110 (centre y 115).
-  await a.duplicate()
+  await a.copyInPlace()
   await a.setField('Y', '110', 'Selection')
   // v0: a duplicate of h1 rotated 90° CW, moved to bounds (40, 70) (centre x 45, y 70..130), Maple.
-  await a.duplicate()
+  await a.copyInPlace()
   await a.rotate90('CW')
   await a.setField('X', '40', 'Selection')
   await a.setField('Y', '70', 'Selection')
   await a.swatch('Maple')
   // v1: a duplicate of v0 at bounds X 70 (centre x 75).
-  await a.duplicate()
+  await a.copyInPlace()
   await a.setField('X', '70', 'Selection')
 
   // Marquee the four bands, Repeat (pivot (60, 100), steps 60 × 60), 3 × 3, alternate rotation 90°.

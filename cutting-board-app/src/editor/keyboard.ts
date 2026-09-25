@@ -62,7 +62,7 @@ export function duplicateSelection(): void {
   const ctx = currentContext(s)
   let newIds: Id[] = []
   s.run((p) => {
-    const result = duplicateObjects(p, ctx, s.selection)
+    const result = duplicateObjects(p, ctx, s.selection, { x: s.gridMm, y: s.gridMm }) // one grid step in context axes, like the grid (SPEC §7.4)
     if (!result.ok) return result
     newIds = result.newIds
     return result.project

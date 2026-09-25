@@ -130,11 +130,11 @@ function commandsFor(p: Project): Command[] {
     ...root.map((id): Command => [`delete ${id}`, (q) => commands.deleteObjects(q, [id])]),
     ...Object.keys(p.motifs).map((m): Command => [`addBand in ${m}`, (q) => commands.addBand(q, { ctx: m, materialId: m0, widthMm: 2, points: [{ x: -9, y: -9 }, { x: 9, y: 9 }] })]),
     ...p.crossings.map((c): Command => [`removeRecord ${c.id}`, (q) => commands.removeRecord(q, null, c.id)]),
-    ['duplicate root', (q) => commands.duplicateObjects(q, null, root)],
+    ['duplicate root', (q) => commands.duplicateObjects(q, null, root, { x: 5, y: 5 })],
     ['copy/paste root', (q) => commands.pasteObjects(q, null, commands.copyObjects(q, root))],
     ...Object.keys(p.motifs).map((m): Command => [
       `duplicate in ${m}`,
-      (q) => commands.duplicateObjects(q, m, q.motifs[m]!.children),
+      (q) => commands.duplicateObjects(q, m, q.motifs[m]!.children, { x: 5, y: 5 }),
     ]),
     ...Object.keys(p.motifs).map((m): Command => [
       `copy/paste in ${m}`,
