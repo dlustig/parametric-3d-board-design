@@ -130,6 +130,8 @@ test.describe('Esc mid-drag', () => {
 
 test.describe('paste cycle prevention', () => {
   test('pasting a motif instance into its own definition is refused, project unchanged', async ({ page }) => {
+    const errors: string[] = []
+    page.on('pageerror', (e) => errors.push(e.message))
     const seeded = project([instance('i1', 'm1')], [{ id: 'm1', children: [band('mb1', [[-10, 0], [10, 0]])] }])
     await seed(page, seeded)
     await select(page, ['i1'])
@@ -142,6 +144,7 @@ test.describe('paste cycle prevention', () => {
 
     expect(await getProject(page)).toEqual(before)
     expect(await history(page)).toEqual({ past: 0, future: 0 })
+    expect(errors).toEqual([]) // entering with i1 still selected once made Moveable measure i1's removed proxy
   })
 })
 
