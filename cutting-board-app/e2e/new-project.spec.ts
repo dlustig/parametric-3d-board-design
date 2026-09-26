@@ -111,4 +111,21 @@ test.describe('New Project dialog', () => {
     await expect(dialog).toBeHidden()
     expect(await page.evaluate(() => window.__cbpd!.getState().selection)).toEqual(['b1'])
   })
+
+  test('editor shortcuts do nothing behind the open dialog', async ({ page }) => {
+    await seed(page, project([band('b1', [[0, 40], [80, 40]])]))
+    await select(page, ['b1'])
+    const before = await getProject(page)
+    const dialog = await openNewProject(page)
+    await dialog.getByRole('button', { name: 'Checker', exact: true }).focus()
+
+    await page.keyboard.press('Delete')
+    await page.keyboard.press('Backspace')
+    await page.keyboard.press('b')
+
+    expect(await getProject(page)).toEqual(before)
+    expect(await history(page)).toEqual({ past: 0, future: 0 })
+    expect(await page.evaluate(() => window.__cbpd!.getState().tool)).toBe('select')
+    await expect(dialog).toBeVisible()
+  })
 })

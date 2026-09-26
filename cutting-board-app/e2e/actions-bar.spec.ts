@@ -72,6 +72,39 @@ test('Order menu: Escape closes it without clearing the selection', async ({ pag
   expect(await page.evaluate(() => window.__cbpd!.getState().selection)).toEqual(['b1'])
 })
 
+// Radix menus preventDefault their navigation keys but don't stop them, so
+// keyboard.ts's window listener must ignore keys aimed at a menu: arrows would
+// otherwise nudge the selection and typeahead letters switch the tool.
+test('arrow keys move through the Order menu without nudging the selection', async ({ page }) => {
+  await seed(page, twoBands())
+  await select(page, ['b2'])
+  const before = await getProject(page)
+  await bar(page).getByRole('button', { name: 'Order', exact: true }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('menuitem', { name: 'Bring forward', exact: true })).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('menuitem', { name: 'Send backward', exact: true })).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('menuitem', { name: 'Bring to front', exact: true })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  expect(await getProject(page)).toEqual(before)
+  expect(await history(page)).toEqual({ past: 0, future: 0 })
+})
+
+test('a letter typed in an open menu does not switch the tool', async ({ page }) => {
+  await seed(page, twoBands())
+  await select(page, ['b2'])
+  await bar(page).getByRole('button', { name: 'Order', exact: true }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('s') // typeahead: Send backward
+  await expect(page.getByRole('menuitem', { name: 'Send backward', exact: true })).toBeFocused()
+  await page.keyboard.press('b')
+  expect(await page.evaluate(() => window.__cbpd!.getState().tool)).toBe('select')
+  await expect(page.getByRole('menu')).toBeVisible()
+})
+
 test('Edit motif enters an instance; Detach is offered for an instance, never for a repeat', async ({ page }) => {
   await seed(page, seededProject()) // i1: an instance of m1; rp1: a 2×2 repeat of m2
   await select(page, ['rp1'])

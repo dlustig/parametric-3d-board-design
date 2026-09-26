@@ -1,14 +1,16 @@
 // Shell SPEC §6.1: the current context's children as a listbox, topmost
 // first. Click selects; Shift, Mod or Add to selection toggles (V1 §7.4, the
 // canvas's `toggleSelection`); double-clicking an Instance or Repeat enters
-// it as the Inspector's Edit motif does. At the root a Board header labels
-// the list; inside a definition the title row (`LayersTitle`, rendered by
-// LeftPane) holds a back button and the motif name, and a muted line gives
-// the occurrence count.
+// it as the Inspector's Edit motif does. The list is one Tab stop (a roving
+// tabIndex); ArrowUp/ArrowDown, Home and End move focus between rows, and
+// Enter or Space selects the focused row as a click does. At the root a
+// Board header labels the list; inside a definition the title row
+// (`LayersTitle`, rendered by LeftPane) holds a back button and the motif
+// name, and a muted line gives the occurrence count.
 
 import { ArrowLeft } from 'lucide-react'
-import type { JSX, MouseEvent } from 'react'
-import { useEffect, useRef } from 'react'
+import type { JSX, KeyboardEvent, MouseEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DesignObject, Id, Project } from '@/domain/model'
 import { childrenOf } from '@/domain/project'
 import { occurrencePaths } from '@/geometry/scene'
@@ -60,6 +62,7 @@ export function LayersPane(): JSX.Element {
   const selection = useEditor((s) => s.selection)
   const ctx = useEditor(currentContext)
   const listRef = useRef<HTMLDivElement>(null)
+  const [focusedId, setFocusedId] = useState<Id | null>(null)
 
   useEffect(() => {
     listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
@@ -70,6 +73,17 @@ export function LayersPane(): JSX.Element {
     s.select(toggleSelection(s.selection, id, e.shiftKey || e.metaKey || e.ctrlKey || s.addToSelection))
   }
 
+  const moveFocus = (e: KeyboardEvent<HTMLDivElement>): void => {
+    const rows = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="option"]')]
+    const at = rows.findIndex((r) => r === e.target)
+    const to = e.key === 'ArrowDown' ? at + 1 : e.key === 'ArrowUp' ? at - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? rows.length - 1 : null
+    if (to === null) return
+    e.preventDefault()
+    rows[Math.min(Math.max(to, 0), rows.length - 1)]?.focus()
+  }
+
+  const ids = childrenOf(project, ctx).toReversed()
+  const tabStop = ids.find((id) => id === focusedId) ?? ids.find((id) => selection.includes(id)) ?? ids[0]
   const background = project.materials.find((m) => m.id === project.board.backgroundMaterialId)?.name ?? 'None'
   const occurrences = ctx === null ? 0 : occurrencePaths(project, ctx).length
 
@@ -85,37 +99,37 @@ export function LayersPane(): JSX.Element {
       ) : (
         occurrences > 1 && <p className="pane-note">Changes apply to all {occurrences} occurrences</p>
       )}
-      <div ref={listRef} className="layers-list" role="listbox" aria-multiselectable="true" aria-labelledby={ctx === null ? BOARD_ID : TITLE_ID}>
-        {childrenOf(project, ctx)
-          .toReversed()
-          .map((id) => {
-            const obj = project.objects[id]!
-            const row = rowOf(project, obj)
-            return (
-              <button
-                key={id}
-                type="button"
-                role="option"
-                className="layer-row"
-                aria-selected={selection.includes(id)}
-                aria-label={`${row.name}, ${row.detail}`}
-                onClick={(e) => choose(e, id)}
-                onDoubleClick={() => {
-                  if (obj.type === 'motif-instance' || obj.type === 'repeat') enterMotif(obj)
-                }}
-              >
-                <span className="layer-mark" aria-hidden="true">
-                  {row.mark}
-                </span>
-                <span className="layer-name" title={row.name}>
-                  {row.name}
-                </span>
-                <span className="layer-detail" title={row.detail}>
-                  {row.detail}
-                </span>
-              </button>
-            )
-          })}
+      <div ref={listRef} className="layers-list" role="listbox" aria-multiselectable="true" aria-labelledby={ctx === null ? BOARD_ID : TITLE_ID} onKeyDown={moveFocus}>
+        {ids.map((id) => {
+          const obj = project.objects[id]!
+          const row = rowOf(project, obj)
+          return (
+            <button
+              key={id}
+              type="button"
+              role="option"
+              className="layer-row"
+              aria-selected={selection.includes(id)}
+              aria-label={`${row.name}, ${row.detail}`}
+              tabIndex={id === tabStop ? 0 : -1}
+              onFocus={() => setFocusedId(id)}
+              onClick={(e) => choose(e, id)}
+              onDoubleClick={() => {
+                if (obj.type === 'motif-instance' || obj.type === 'repeat') enterMotif(obj)
+              }}
+            >
+              <span className="layer-mark" aria-hidden="true">
+                {row.mark}
+              </span>
+              <span className="layer-name" title={row.name}>
+                {row.name}
+              </span>
+              <span className="layer-detail" title={row.detail}>
+                {row.detail}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )

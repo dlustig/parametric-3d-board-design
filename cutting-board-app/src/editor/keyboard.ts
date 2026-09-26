@@ -2,8 +2,9 @@
 // switching, undo/redo, the selection commands (Delete, Duplicate,
 // Copy/Paste, arrow nudge) and the drawing keys (Enter/Backspace/Esc while
 // drawing).
-// Ignores events whose target is an input, textarea, select, or
-// contenteditable: Esc on a field is excepted only in the sense that the
+// Ignores events whose target is inside a menu, listbox or dialog (Escape
+// excepted, see `isWidgetTarget`), and events whose target is an input,
+// textarea, select, or contenteditable: Esc on a field is excepted only in the sense that the
 // field's own handler already reverted it and stopped the event from
 // bubbling here, so this dispatcher takes no further action either way.
 //
@@ -51,6 +52,18 @@ const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', b: 'band', r: 
 
 function isFieldTarget(t: EventTarget | null): boolean {
   return t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
+}
+
+/**
+ * Keys aimed at a menu, a listbox or a dialog belong to that widget: Radix
+ * menus preventDefault their arrows and typeahead letters without stopping
+ * them, the Layers listbox moves focus with its arrows, and a modal dialog
+ * must not edit the project behind it. Escape is not routed here — every
+ * Radix layer stops its own Escape, and on a Layers row Esc keeps its place
+ * in the cascade.
+ */
+function isWidgetTarget(t: EventTarget | null): boolean {
+  return t instanceof Element && t.closest('[role="menu"], [role="menuitem"], [role="listbox"], [role="option"], [role="dialog"], [role="alertdialog"]') !== null
 }
 
 // --- Selection command actions, shared by this dispatcher and the toolbar/inspector buttons ---
@@ -213,6 +226,7 @@ function handleEscape(): void {
 export function installKeyboardDispatcher(): () => void {
   const onKeyDown = (e: KeyboardEvent): void => {
     if (isFieldTarget(e.target)) return
+    if (e.key !== 'Escape' && isWidgetTarget(e.target)) return
 
     // "do not treat Ctrl+Meta as mod": exactly one of Ctrl/Meta, never both
     // together, never neither. `noModifiers` is its own independent check —

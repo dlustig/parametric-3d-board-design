@@ -227,6 +227,22 @@ describe('SHORTCUTS → keyboard.ts dispatch', () => {
     expect(s().tool).toBe('hand')
   })
 
+  it.each(['menu', 'listbox', 'dialog', 'alertdialog'])('keys aimed inside role=%s never reach the editor, except Escape', (role) => {
+    const widget = document.createElement('div')
+    widget.setAttribute('role', role)
+    const inner = document.createElement('button')
+    widget.append(inner)
+    document.body.append(widget)
+    for (const chord of ['ArrowUp', 'Delete', 'B', 'Mod+D', '?']) press(chord, inner)
+    expect(s().project.rootChildren).toEqual(['a', 'b'])
+    expect(bandAt('a').points[0]).toMatchObject({ x: 0, y: 0 })
+    expect(s().tool).toBe('select')
+    expect(useLayout.getState().shortcutsOpen).toBe(false)
+    press('Escape', inner) // Radix layers stop their own Escape; one that arrives keeps its place in the cascade
+    widget.remove()
+    expect(s().selection).toEqual([])
+  })
+
   it('? typed in a text field does not open the sheet', () => {
     const input = document.createElement('input')
     document.body.append(input)
