@@ -1,8 +1,9 @@
 // SPEC §9, G8 browser part: quota-failure status + recovery, startup
 // corruption recovery, a failed Open leaving project/history untouched,
-// New's and Open's confirmation on a non-blank project (and the direct
-// path — no dialog — on a blank one), the pagehide flush, and multi-tab
-// detection via the `storage` event.
+// Open's confirmation on a non-blank project (and the direct path — no
+// dialog — on a blank one), the pagehide flush, and multi-tab detection via
+// the `storage` event. New Project is covered by new-project.spec.ts (shell
+// spec §10.2: the dialog is New's confirmation).
 
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
@@ -130,35 +131,6 @@ test.describe('Open Project', () => {
 
     expect(chooser.isMultiple()).toBe(false)
     await expect(page.getByRole('dialog')).toBeHidden()
-  })
-})
-
-test.describe('New Project confirmation', () => {
-  test('New on a non-blank project asks to confirm; cancelling leaves the project untouched', async ({ page }) => {
-    const seeded = project([band('b1', [[0, 40], [80, 40]])])
-    await seed(page, seeded)
-    const before = await getProject(page)
-
-    await projectMenuItem(page, 'New project…')
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByText('Start a new project?')).toBeVisible()
-
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
-
-    await expect(page.getByRole('dialog')).toBeHidden()
-    expect(await getProject(page)).toEqual(before)
-  })
-
-  test('New on a blank project replaces it without a confirmation', async ({ page }) => {
-    await seed(page, project([]))
-    const before = await getProject(page)
-
-    await projectMenuItem(page, 'New project…')
-
-    await expect(page.getByRole('dialog')).toBeHidden()
-    const after = await getProject(page)
-    expect(after.id).not.toBe(before.id) // a fresh project, not the same instance
-    expect(after.objects).toEqual({})
   })
 })
 

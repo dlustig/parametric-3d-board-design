@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test'
 import type { Band, Project } from '../src/domain/model.ts'
 import { band, instance, MAT2, project } from '../src/domain/test-builders.ts'
 import type { XY } from './helpers.ts'
-import { cameraShowing, getProject, history, nextFrame, openPane, seed, select, setCamera, toClient } from './helpers.ts'
+import { cameraShowing, getProject, history, nextFrame, openPane, seed, seededProject, select, setCamera, toClient } from './helpers.ts'
 
 test.describe('accessibility (G11)', () => {
   test.skip(({ isMobile }) => isMobile, 'a11y checks run in the desktop chromium project')
@@ -199,5 +199,17 @@ test.describe('accessibility (G11)', () => {
     await nextFrame(page)
     const strokes = await page.locator('.selection-overlay rect').evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke))
     expect(new Set(strokes)).toEqual(new Set(['rgb(255, 255, 255)', 'rgb(61, 155, 255)'])) // #ffffff over --acc (shell spec §9.8)
+  })
+
+  test('at 200% zoom (720 × 450 CSS px of the 1440 × 900 baseline) the shell never scrolls sideways and stays usable', async ({ page }) => {
+    await page.setViewportSize({ width: 720, height: 450 })
+    await seed(page, { ...seededProject(), name: 'A very long project name that keeps going well past the top bar' })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
+    await expect(page.getByRole('button', { name: 'Export SVG', exact: true })).toBeInViewport()
+    expect((await page.locator('.canvas').boundingBox())!.width).toBeGreaterThan(300) // narrow mode: the panes overlay, the canvas keeps the width
+    await setCamera(page, cameraShowing({ x: 80, y: 40 }, { x: 60, y: 60 }, 2))
+    const on = round(await toClient(page, { x: 80, y: 40 }))
+    await page.mouse.click(on.x, on.y)
+    expect(await state<string[]>(page, 's.selection')).toEqual(['b1'])
   })
 })

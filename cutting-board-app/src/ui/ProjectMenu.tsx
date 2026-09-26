@@ -1,8 +1,5 @@
-// Shell §10.1: the project menu, a Radix DropdownMenu on the top bar's
-// project-name button.
+// SPEC §9, shell spec §10.1: the project menu. New project… opens the New Project dialog (its confirmation); Open confirms unless the current project is blank; …
 //
-// - New project… keeps V1 §9's confirm-unless-blank flow until Task 10's
-//   dialog.
 // - Open project… keeps V1 §9's "Open a project?" confirmation and its
 //   failure behaviour: project and history untouched, and the error goes to
 //   the store's `message`, which only TopBar renders. `replaceProject` clears
@@ -24,33 +21,17 @@ import type { ChangeEvent, JSX, ReactElement, RefObject } from 'react'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { setProjectName } from '@/domain/commands'
 import { importProject } from '@/domain/migrate'
-import type { Project } from '@/domain/model'
-import { newProject } from '@/domain/project'
+import { isBlankProject } from '@/domain/project'
 import { useLayout } from '@/editor/layout'
 import type { ShortcutId } from '@/editor/shortcuts'
 import { SHORTCUTS } from '@/editor/shortcuts'
 import { useEditor } from '@/editor/store'
 import { downloadExportSvg, downloadProject } from '@/export/download'
-import { fixtures } from '@/fixtures'
 import { Hint } from './Hint.tsx'
 import { ChordKeys } from './Keycap.tsx'
+import { NewProjectDialog } from './NewProjectDialog.tsx'
 
 const ICON = { size: 16, strokeWidth: 1.6 } as const
-
-/** Dev-only manual-inspection aid (V1 SPEC §12 fixtures), until Task 10's New project dialog ships them; never bundled into production. */
-const SAMPLES: ReadonlyArray<[keyof typeof fixtures, string]> = [
-  ['stripes', 'Stripes'],
-  ['checker', 'Checker'],
-  ['basketWeave', 'Basket weave'],
-  ['chevronDiamond', 'Chevron diamond'],
-  ['isometric', 'Isometric'],
-  ['interlace', 'Interlace'],
-]
-
-/** SPEC §9: the blank starter — no objects (root or definition-owned) — is silently replaceable. */
-export function isBlankProject(project: Project): boolean {
-  return Object.keys(project.objects).length === 0
-}
 
 function MenuItem({ icon, label, shortcut, onSelect }: { icon: ReactElement; label: string; shortcut?: ShortcutId; onSelect(): void }): JSX.Element {
   return (
@@ -66,7 +47,7 @@ function MenuItem({ icon, label, shortcut, onSelect }: { icon: ReactElement; lab
   )
 }
 
-type PendingAction = 'new' | 'open' | null
+type PendingAction = 'open' | null
 
 export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() => void> }): JSX.Element {
   const name = useEditor((s) => s.project.name)
@@ -75,6 +56,7 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
   const fileInputRef = useRef<HTMLInputElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<PendingAction>(null)
+  const [newOpen, setNewOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [text, setText] = useState('')
   // Refs, not state: the menu's close-autofocus handler and the field's blur
@@ -84,16 +66,6 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
 
   /** Shell spec §8: pops the edit context to `depth` levels (0 = the root). The breadcrumb's own crumb clicks. */
   const popTo = (depth: number): void => useEditor.getState().setEditContext(editContext.slice(0, depth))
-
-  const startNew = (): void => {
-    const displayUnits = useEditor.getState().project.displayUnits
-    useEditor.getState().replaceProject(newProject(displayUnits))
-  }
-
-  const onNewClick = (): void => {
-    if (isBlankProject(useEditor.getState().project)) startNew()
-    else setPending('new')
-  }
 
   const onOpenClick = (): void => {
     if (isBlankProject(useEditor.getState().project)) fileInputRef.current?.click()
@@ -105,8 +77,7 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
   })
 
   const onConfirm = (): void => {
-    if (pending === 'new') startNew()
-    else if (pending === 'open') fileInputRef.current?.click()
+    fileInputRef.current?.click()
     setPending(null)
   }
 
@@ -207,7 +178,7 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
               nameInputRef.current?.focus()
             }}
           >
-            <MenuItem icon={<FilePlus {...ICON} />} label="New project…" onSelect={onNewClick} />
+            <MenuItem icon={<FilePlus {...ICON} />} label="New project…" onSelect={() => setNewOpen(true)} />
             <MenuItem icon={<FolderOpen {...ICON} />} label="Open project…" shortcut="openProject" onSelect={onOpenClick} />
             <MenuItem icon={<Download {...ICON} />} label="Download project" shortcut="downloadProject" onSelect={() => downloadProject(useEditor.getState().project)} />
             <DropdownMenu.Separator className="menu-separator" />
@@ -215,26 +186,6 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
             <MenuItem icon={<FileOutput {...ICON} />} label="Export SVG" shortcut="exportSvg" onSelect={() => downloadExportSvg(useEditor.getState().project)} />
             <DropdownMenu.Separator className="menu-separator" />
             <MenuItem icon={<Keyboard {...ICON} />} label="Keyboard shortcuts" shortcut="shortcuts" onSelect={() => useLayout.getState().setShortcutsOpen(true)} />
-            {import.meta.env.DEV && (
-              <>
-                <DropdownMenu.Separator className="menu-separator" />
-                <DropdownMenu.Sub>
-                  <DropdownMenu.SubTrigger className="menu-item">
-                    <span className="menu-item-label">Load sample (dev)</span>
-                    <ChevronRight {...ICON} />
-                  </DropdownMenu.SubTrigger>
-                  <DropdownMenu.Portal>
-                    <DropdownMenu.SubContent className="menu" sideOffset={4} onEscapeKeyDown={(e) => e.stopPropagation()}>
-                      {SAMPLES.map(([key, label]) => (
-                        <DropdownMenu.Item key={key} className="menu-item" onSelect={() => useEditor.getState().replaceProject(structuredClone(fixtures[key]))}>
-                          <span className="menu-item-label">{label}</span>
-                        </DropdownMenu.Item>
-                      ))}
-                    </DropdownMenu.SubContent>
-                  </DropdownMenu.Portal>
-                </DropdownMenu.Sub>
-              </>
-            )}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
@@ -243,11 +194,11 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
           <Dialog.Content className="dialog-content" aria-describedby="project-menu-confirm-description" onEscapeKeyDown={(e) => e.stopPropagation()}>
-            <Dialog.Title>{pending === 'new' ? 'Start a new project?' : 'Open a project?'}</Dialog.Title>
+            <Dialog.Title>Open a project?</Dialog.Title>
             <Dialog.Description id="project-menu-confirm-description">This replaces the current project. Download it first if you want to keep it.</Dialog.Description>
             <div className="button-row">
               <button type="button" onClick={onConfirm}>
-                {pending === 'new' ? 'Start new project' : 'Choose file…'}
+                Choose file…
               </button>
               <Dialog.Close asChild>
                 <button type="button">Cancel</button>
@@ -256,6 +207,7 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+      <NewProjectDialog open={newOpen} onOpenChange={setNewOpen} />
     </div>
   )
 }

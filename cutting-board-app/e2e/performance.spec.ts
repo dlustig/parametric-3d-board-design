@@ -13,6 +13,7 @@
 // measurement's own sanity is checked.
 //   `G9 {…}`       typical: drag the root band (one occurrence moves), drag
 //                  commit, arrow nudge, one Width keystroke on it
+//                  and one Layers-row click → selection painted
 //   `G9-packet {…}` the same at the packet's scale: the field at 8 × 8 cells
 //                  (896 field occurrences, about the ~1,000 the packet targets)
 //   `G9-worst {…}` worst case: drag the repeat field (every occurrence
@@ -160,6 +161,8 @@ async function seedFixture(page: Page, cells = 15): Promise<{ occurrences: numbe
   )
   await page.getByRole('button', { name: 'Fit', exact: true }).click()
   await snapOff(page) // see measureDrag
+  // Shell spec §16: the Layers pane is open for every measurement, so its render cost is inside every frame recorded.
+  await expect(page.locator('[role="listbox"][aria-multiselectable="true"]')).toBeVisible()
   await afterPaint(page)
 
   const counts = await page.evaluate(() => {
@@ -286,6 +289,14 @@ async function typical(page: Page, cells: number): Promise<Record<string, number
 
   const inspector = await measureWidthKeystroke(page)
 
+  // --- Layers pane (shell spec §16, Review Focus 5): a row click on this project selects the band and paints. The root band is painted last, so it is the first row. ---
+  await select(page, [])
+  await afterPaint(page)
+  await startProbe(page, 'pointerdown', 'click')
+  await page.locator('[role="listbox"][aria-multiselectable="true"] [role="option"]').first().click()
+  const [layersClick] = (await stopProbe(page, 1)).samples
+  expect(await page.evaluate(() => window.__cbpd!.getState().selection)).toEqual([ROOT_BAND])
+
   return {
     machine: machine(),
     ...counts,
@@ -295,6 +306,8 @@ async function typical(page: Page, cells: number): Promise<Record<string, number
     nudgeToPaintMs: toPaint(nudge!),
     inspectorDispatchMs: round(inspector.end - inspector.start),
     inspectorToPaintMs: toPaint(inspector),
+    layersClickDispatchMs: round(layersClick!.end - layersClick!.start),
+    layersClickToPaintMs: toPaint(layersClick!),
   }
 }
 

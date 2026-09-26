@@ -55,3 +55,8 @@ export function contextOf(p: Project, objectId: Id): ContextId {
   }
   throw new Error(`Object "${objectId}" is not owned by any context`)
 }
+
+/** SPEC §9: the blank starter — no objects (root or definition-owned). Open replaces it without asking; New Project warns only when it isn't blank (shell spec §10.2). */
+export function isBlankProject(p: Project): boolean {
+  return Object.keys(p.objects).length === 0
+}
