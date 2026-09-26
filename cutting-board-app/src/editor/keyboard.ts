@@ -21,11 +21,12 @@
 // §7.2) — a second, narrowly-scoped listener, not folded in here, so there
 // is still exactly one owner per key.
 //
-// Mirror X/Y, Rotate 90°/by, the order buttons, and Offset copy have no
-// keyboard shortcut in SPEC §7.4 — only a toolbar/inspector button, already
-// wired (SelectionPanel, BandPanel) straight to the same domain commands
-// this dispatcher calls, so nothing here duplicates them. `Ctrl/Cmd+G` is
-// Create Motif.
+// Mirror X/Y, Rotate 90°/by, the Order menu and Offset copy have no
+// keyboard shortcut — only a button (ActionsBar, SelectionPanel,
+// BandPanel) wired straight to the same domain commands. `Mod+G` is Make
+// motif, `Mod+R` Repeat (preventDefault'ed so the browser doesn't reload)
+// and `Shift+T` docks/undocks the tools (shell §12.2). The clipboard lives
+// in the editor store (shell §9.4).
 // `?` opens the keyboard shortcuts sheet (shell spec §10.3).
 //
 // Shell §12.2: Mod+\ and Mod+Shift+\ toggle the sidebar and inspector
@@ -34,7 +35,6 @@
 // Mod+Shift+E exports the SVG — all preventDefault'ed, and all skipped in
 // fields like every other binding here.
 
-import type { Clipboard } from '@/domain/commands'
 import { copyObjects, createMotif, deleteObjects, duplicateObjects, makeRepeat, pasteObjects, translateObjects } from '@/domain/commands'
 import type { Id } from '@/domain/model'
 import { childrenOf } from '@/domain/project'
@@ -52,9 +52,6 @@ const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', b: 'band', r: 
 function isFieldTarget(t: EventTarget | null): boolean {
   return t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
 }
-
-/** The clipboard: a module variable, not the system clipboard (SPEC §7.4). */
-let clipboard: Clipboard | null = null
 
 // --- Selection command actions, shared by this dispatcher and the toolbar/inspector buttons ---
 
@@ -82,14 +79,14 @@ export function duplicateSelection(): void {
 export function copySelection(): void {
   const s = useEditor.getState()
   if (s.selection.length === 0) return
-  clipboard = copyObjects(s.project, s.selection)
+  useEditor.setState({ clipboard: copyObjects(s.project, s.selection) })
 }
 
 export function pasteClipboard(): void {
-  if (clipboard === null) return
   const s = useEditor.getState()
+  const clip = s.clipboard
+  if (clip === null) return
   const ctx = currentContext(s)
-  const clip = clipboard
   let newIds: Id[] = []
   s.run((p) => {
     const result = pasteObjects(p, ctx, clip)
@@ -308,7 +305,19 @@ export function installKeyboardDispatcher(): () => void {
         e.preventDefault()
         return
       }
+      if (!e.shiftKey && lower === 'r') {
+        repeatSelection()
+        e.preventDefault()
+        return
+      }
       return // an unrecognized modified chord: never falls through to a plain-key binding
+    }
+
+    if (!ctrlOrMeta && !e.altKey && e.shiftKey && lower === 't') {
+      const { toolsDocked, setToolsDocked } = useLayout.getState()
+      setToolsDocked(!toolsDocked)
+      e.preventDefault()
+      return
     }
 
     if (!ctrlOrMeta && !e.altKey && (key === ']' || key === '[') && cyclingOwnsFocus(e.target)) {

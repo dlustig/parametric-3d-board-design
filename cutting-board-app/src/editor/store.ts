@@ -16,7 +16,7 @@ import { create } from 'zustand'
 import type { StoreApi, UseBoundStore } from 'zustand'
 import { temporal } from 'zundo'
 import type { TemporalState } from 'zundo'
-import type { CommandResult } from '@/domain/commands'
+import type { Clipboard, CommandResult } from '@/domain/commands'
 import type { ContextId, Id, Project } from '@/domain/model'
 import { freezeInDev } from '@/domain/freeze'
 import { newProject } from '@/domain/project'
@@ -76,6 +76,8 @@ export interface EditorState {
   snapGuide: SnapResult | null
   /** Canvas.tsx's gesture-abort hook (stops Moveable, cancels a gesture preview), registered while it's mounted — null otherwise. SPEC §7.4 Esc's "cancel gesture" step calls it. */
   abortGesture: (() => void) | null
+  /** Shell §9.4: the last Copy (not the system clipboard). Written by copySelection; kept by replaceProject, like V1's module variable. */
+  clipboard: Clipboard | null
 
   run(cmd: (p: Project) => Project | CommandResult): void
   setPreview(next: Project, onInterrupt: 'commit' | 'cancel'): void
@@ -151,6 +153,7 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
       lastBandWidthMm: 6.35,
       snapGuide: null,
       abortGesture: null,
+      clipboard: null,
 
       run(cmd) {
         get().settlePreview()

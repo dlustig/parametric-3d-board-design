@@ -81,6 +81,16 @@ export class Author {
     return this.page.getByRole('region', { name, exact: true })
   }
 
+  private actionsBar(): Locator {
+    return this.page.getByRole('toolbar', { name: 'Selection actions' })
+  }
+
+  /** One actions-bar button (shell §9.4). */
+  private async action(name: string): Promise<void> {
+    await this.actionsBar().getByRole('button', { name, exact: true }).click()
+    await this.tick()
+  }
+
   // --- View ---
 
   async fit(): Promise<void> {
@@ -206,11 +216,11 @@ export class Author {
   }
 
   async mirror(axis: 'X' | 'Y'): Promise<void> {
-    await this.button(`Mirror ${axis}`, 'Selection')
+    await this.action(`Mirror ${axis}`)
   }
 
   async rotate90(direction: 'CW' | 'CCW'): Promise<void> {
-    await this.button(`Rotate 90° ${direction}`, 'Selection')
+    await this.action(`Rotate 90° ${direction}`)
   }
 
   async rotateBy(deg: string): Promise<void> {
@@ -221,9 +231,15 @@ export class Author {
     await this.key('ControlOrMeta+g')
   }
 
-  /** Canvas Repeat: Create Motif then a 2×2 field, or 2×2 of one selected instance (SPEC §7.4). */
+  /** Actions-bar Repeat: Make motif then a 2×2 field, or 2×2 of one selected instance (SPEC §7.4). */
   async repeat(): Promise<void> {
-    await this.page.getByRole('toolbar', { name: 'Canvas actions' }).getByRole('button', { name: 'Repeat', exact: true }).click()
+    await this.action('Repeat')
+  }
+
+  /** The actions bar's Order menu: opening it and choosing the item are two actions (shell §16: G6 counts rise). */
+  async order(item: 'Bring forward' | 'Send backward' | 'Bring to front' | 'Send to back'): Promise<void> {
+    await this.action('Order')
+    await this.page.getByRole('menuitem', { name: item, exact: true }).click()
     await this.tick()
   }
 

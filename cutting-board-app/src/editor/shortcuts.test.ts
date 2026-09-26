@@ -191,6 +191,16 @@ const CASES: Record<Exclude<ShortcutId, 'hand' | 'snapOff'>, Case> = {
       expect(downloadProject).not.toHaveBeenCalled()
     },
   },
+  repeat: {
+    setup: () => s().select(['a', 'b']),
+    check: () => {
+      expect(s().project.rootChildren).toHaveLength(1)
+      expect(s().project.objects[s().project.rootChildren[0]!]!.type).toBe('repeat')
+    },
+  },
+  toggleDock: {
+    check: () => expect(useLayout.getState().toolsDocked).toBe(false),
+  },
 }
 
 describe('SHORTCUTS → keyboard.ts dispatch', () => {

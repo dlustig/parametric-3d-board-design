@@ -57,7 +57,7 @@ test.describe('accessibility (G11)', () => {
     offenders.push(...(await unlabeledButtons(page, '.icon-column button')))
     offenders.push(...(await unlabeledButtons(page, '.left-pane button'))) // the Wood pane, open by default
     offenders.push(...(await unlabeledButtons(page, '.canvas-controls button')))
-    offenders.push(...(await unlabeledButtons(page, '.canvas-actions button')))
+    offenders.push(...(await unlabeledButtons(page, '.actions-bar button')))
 
     // The Band tool's options bar (Length/Angle fields, Finish/Undo point/Cancel) renders regardless of project content.
     await page.getByRole('button', { name: 'Band', exact: true }).click()
@@ -77,6 +77,7 @@ test.describe('accessibility (G11)', () => {
     await seed(page, crossProject())
     await select(page, ['h1'])
     const offenders = await unlabeledButtons(page, '.inspector button')
+    offenders.push(...(await unlabeledButtons(page, '.actions-bar button'))) // the full bar: h1 is selected
     expect(offenders, `buttons without an accessible name:\n${offenders.join('\n')}`).toEqual([])
   })
 

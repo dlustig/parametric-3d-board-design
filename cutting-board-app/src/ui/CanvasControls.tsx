@@ -1,12 +1,13 @@
 // Shell §7.2: the canvas controls — the Snap, Show grid and Add to selection
 // toggles, then Zoom out, the zoom read-out (camera zoom relative to the Fit
 // zoom; clicking it fits), Zoom in and Fit. Bottom-right while the tools are
-// docked (the undocked position arrives in Task 4).
+// docked; a vertical bar at the top-right while they are undocked.
 
 import { Grid3x3, Magnet, Scan, SquarePlus, ZoomIn, ZoomOut } from 'lucide-react'
 import type { JSX } from 'react'
 import { fitBoard } from '@/editor/camera'
 import { fitView, zoomViewBy } from '@/editor/input'
+import { useLayout } from '@/editor/layout'
 import { useEditor } from '@/editor/store'
 import { Hint } from './Hint.tsx'
 
@@ -19,10 +20,11 @@ export function CanvasControls(): JSX.Element {
   const addToSelection = useEditor((s) => s.addToSelection)
   const zoom = useEditor((s) => s.camera.zoom)
   const fitZoom = useEditor((s) => fitBoard(s.project.board, s.viewportPx).zoom)
-  const side = 'top'
+  const docked = useLayout((s) => s.toolsDocked)
+  const side = docked ? 'top' : 'left'
 
   return (
-    <div className="canvas-controls" role="toolbar" aria-label="View">
+    <div className={docked ? 'canvas-controls' : 'canvas-controls canvas-controls-vertical'} role="toolbar" aria-label="View" aria-orientation={docked ? 'horizontal' : 'vertical'}>
       <Hint label="Snap" hint="Hold Alt to drag without snapping" state={snapEnabled ? 'on' : 'off'} side={side}>
         <button type="button" className="icon-button" aria-label="Snap" aria-pressed={snapEnabled} onClick={() => useEditor.setState({ snapEnabled: !snapEnabled })}>
           <Magnet {...ICON} />

@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Project } from '../domain/model.ts'
 import { band, project } from '../domain/test-builders.ts'
-import { cycleSelection } from './keyboard.ts'
+import { copySelection, cycleSelection, pasteClipboard } from './keyboard.ts'
 import { useEditor } from './store.ts'
 
 /** Four root Bands, in paint order a, b, c, d. */
@@ -101,5 +101,31 @@ describe('cycleSelection: an empty context', () => {
     resetStore(project([]), ['stale'])
     cycleSelection(1)
     expect(selection()).toEqual(['stale']) // unchanged
+  })
+})
+
+describe('the clipboard lives in the store (shell §9.4)', () => {
+  it('Copy writes it, replaceProject keeps it, Paste reads it', () => {
+    resetStore(fourObjectProject(), ['a'])
+    useEditor.setState({ clipboard: null })
+    copySelection()
+    expect(useEditor.getState().clipboard?.objects.map((o) => o.type)).toEqual(['band'])
+
+    useEditor.getState().replaceProject(project([]))
+    expect(useEditor.getState().clipboard).not.toBeNull()
+
+    pasteClipboard()
+    const pasted = useEditor.getState().project.rootChildren
+    expect(pasted).toHaveLength(1)
+    expect(useEditor.getState().selection).toEqual(pasted)
+  })
+
+  it('Paste with nothing copied changes nothing', () => {
+    resetStore(fourObjectProject())
+    useEditor.setState({ clipboard: null })
+    const before = useEditor.getState().project
+    pasteClipboard()
+    expect(useEditor.getState().project).toBe(before)
+    expect(useEditor.temporal.getState().pastStates).toHaveLength(0)
   })
 })

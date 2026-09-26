@@ -41,6 +41,8 @@ export const SHORTCUTS = {
   openProject: { label: 'Open project…', keys: ['Mod+O'], group: 'Project' },
   downloadProject: { label: 'Download project', keys: ['Mod+S'], group: 'Project' },
   exportSvg: { label: 'Export SVG', keys: ['Mod+Shift+E'], group: 'Project' },
+  repeat: { label: 'Repeat', keys: ['Mod+R'], hint: 'Repeat the selection as a 2 × 2 grid', group: 'Selection' },
+  toggleDock: { label: 'Dock / undock tools', keys: ['Shift+T'], group: 'Panels' },
 } as const satisfies Record<string, Shortcut>
 
 export type ShortcutId = keyof typeof SHORTCUTS

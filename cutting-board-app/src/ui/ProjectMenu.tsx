@@ -19,7 +19,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { ChevronDown, Download, FileOutput, FilePlus, FolderOpen, Keyboard, PencilLine } from 'lucide-react'
+import { ChevronDown, ChevronRight, Download, FileOutput, FilePlus, FolderOpen, Keyboard, PencilLine } from 'lucide-react'
 import type { ChangeEvent, JSX, ReactElement, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { setProjectName } from '@/domain/commands'
@@ -31,9 +31,20 @@ import type { ShortcutId } from '@/editor/shortcuts'
 import { SHORTCUTS } from '@/editor/shortcuts'
 import { useEditor } from '@/editor/store'
 import { downloadExportSvg, downloadProject } from '@/export/download'
+import { fixtures } from '@/fixtures'
 import { ChordKeys } from './Keycap.tsx'
 
 const ICON = { size: 16, strokeWidth: 1.6 } as const
+
+/** Dev-only manual-inspection aid (V1 SPEC §12 fixtures), until Task 10's New project dialog ships them; never bundled into production. */
+const SAMPLES: ReadonlyArray<[keyof typeof fixtures, string]> = [
+  ['stripes', 'Stripes'],
+  ['checker', 'Checker'],
+  ['basketWeave', 'Basket weave'],
+  ['chevronDiamond', 'Chevron diamond'],
+  ['isometric', 'Isometric'],
+  ['interlace', 'Interlace'],
+]
 
 /** SPEC §9: the blank starter — no objects (root or definition-owned) — is silently replaceable. */
 export function isBlankProject(project: Project): boolean {
@@ -168,6 +179,26 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
             <MenuItem icon={<FileOutput {...ICON} />} label="Export SVG" shortcut="exportSvg" onSelect={() => downloadExportSvg(useEditor.getState().project)} />
             <DropdownMenu.Separator className="menu-separator" />
             <MenuItem icon={<Keyboard {...ICON} />} label="Keyboard shortcuts" shortcut="shortcuts" onSelect={() => useLayout.getState().setShortcutsOpen(true)} />
+            {import.meta.env.DEV && (
+              <>
+                <DropdownMenu.Separator className="menu-separator" />
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger className="menu-item">
+                    <span className="menu-item-label">Load sample (dev)</span>
+                    <ChevronRight {...ICON} />
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.SubContent className="menu" sideOffset={4} onEscapeKeyDown={(e) => e.stopPropagation()}>
+                      {SAMPLES.map(([key, label]) => (
+                        <DropdownMenu.Item key={key} className="menu-item" onSelect={() => useEditor.getState().replaceProject(structuredClone(fixtures[key]))}>
+                          <span className="menu-item-label">{label}</span>
+                        </DropdownMenu.Item>
+                      ))}
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Sub>
+              </>
+            )}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>

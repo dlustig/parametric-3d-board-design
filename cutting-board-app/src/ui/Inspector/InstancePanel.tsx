@@ -83,14 +83,28 @@ export function TransformFields({ obj }: { obj: Placed }): JSX.Element {
   )
 }
 
+/** V1 §7.6: enters `obj`'s definition at its first occurrence and clears the selection. Shared with the actions bar. */
+export function enterMotif(obj: Placed): void {
+  const s = useEditor.getState()
+  s.enterContext({ motifId: obj.motifId, path: [firstStep(obj)] })
+  s.select([])
+}
+
+/** V1 §5.6 Detach: the instance becomes copies of its definition's objects, which are then selected. Shared with the actions bar. */
+export function detachInstanceAndSelect(id: Id): void {
+  let copies: Id[] = []
+  useEditor.getState().run((p) => {
+    const result = detachInstance(p, id)
+    if (!result.ok) return result
+    copies = result.newIds
+    return result.project
+  })
+  if (copies.length > 0) useEditor.getState().select(copies)
+}
+
 export function EditMotifButton({ obj }: { obj: Placed }): JSX.Element {
-  const enter = (): void => {
-    const s = useEditor.getState()
-    s.enterContext({ motifId: obj.motifId, path: [firstStep(obj)] })
-    s.select([])
-  }
   return (
-    <button type="button" onClick={enter}>
+    <button type="button" onClick={() => enterMotif(obj)}>
       Edit Motif
     </button>
   )
@@ -154,16 +168,6 @@ export function InstancePanel({ instance }: { instance: MotifInstance }): JSX.El
   const project = useEditor((s) => s.project)
   const factor = useEditor((s) => scaleOf(contextMatrix(s))) * instance.transform.scale
   const unit = project.displayUnits
-  const detach = (): void => {
-    let copies: Id[] = []
-    useEditor.getState().run((p) => {
-      const result = detachInstance(p, instance.id)
-      if (!result.ok) return result
-      copies = result.newIds
-      return result.project
-    })
-    if (copies.length > 0) useEditor.getState().select(copies)
-  }
   return (
     <section className="panel" aria-label="Instance">
       <h2>Instance</h2>
@@ -177,7 +181,7 @@ export function InstancePanel({ instance }: { instance: MotifInstance }): JSX.El
         ))}
       <div className="button-row">
         <EditMotifButton obj={instance} />
-        <button type="button" onClick={detach}>
+        <button type="button" onClick={() => detachInstanceAndSelect(instance.id)}>
           Detach
         </button>
       </div>

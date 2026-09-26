@@ -1,13 +1,11 @@
 // SPEC §7.5 Selection panel: shown for any non-empty selection (stacked
 // above the Band/Region panel for a single object of that type). Bounds
-// X/Y translate the selection; Rotate by rotates about the bounds centre
-// and resets to 0; Mirror X/Y and the paint-order buttons act in place.
-// Bounds, X/Y and the pivot are in the current context's space, like the
-// commands they drive.
+// X/Y translate the selection; Rotate by rotates about the bounds centre and
+// resets to 0. Bounds, X/Y and the pivot are in the current context's space,
+// like the commands they drive. Its buttons moved to the actions bar (shell §9.4).
 
 import type { JSX } from 'react'
-import { mirrorObjects, reorder, rotateObjects, translateObjects } from '@/domain/commands'
-import { copySelection, createMotifFromSelection, deleteSelection, duplicateSelection, repeatSelection } from '@/editor/keyboard'
+import { rotateObjects, translateObjects } from '@/domain/commands'
 import { useEditor } from '@/editor/store'
 import { selectionBounds } from '@/editor/tools/select'
 import type { PreviewOutcome } from './NumberField.tsx'
@@ -45,55 +43,6 @@ export function SelectionPanel(): JSX.Element | null {
         }}
         onCommit={commit}
       />
-      <div className="button-row">
-        <button type="button" onClick={() => useEditor.getState().run((p) => rotateObjects(p, selection, -90, centre))}>
-          Rotate 90° CCW
-        </button>
-        <button type="button" onClick={() => useEditor.getState().run((p) => rotateObjects(p, selection, 90, centre))}>
-          Rotate 90° CW
-        </button>
-      </div>
-      <div className="button-row">
-        <button type="button" onClick={() => useEditor.getState().run((p) => mirrorObjects(p, selection, 'x', centre))}>
-          Mirror X
-        </button>
-        <button type="button" onClick={() => useEditor.getState().run((p) => mirrorObjects(p, selection, 'y', centre))}>
-          Mirror Y
-        </button>
-      </div>
-      <div className="button-row">
-        <button type="button" onClick={() => useEditor.getState().run((p) => reorder(p, selection, 'forward'))}>
-          Forward
-        </button>
-        <button type="button" onClick={() => useEditor.getState().run((p) => reorder(p, selection, 'backward'))}>
-          Backward
-        </button>
-        <button type="button" onClick={() => useEditor.getState().run((p) => reorder(p, selection, 'front'))}>
-          To front
-        </button>
-        <button type="button" onClick={() => useEditor.getState().run((p) => reorder(p, selection, 'back'))}>
-          To back
-        </button>
-      </div>
-      <div className="button-row">
-        <button type="button" onClick={duplicateSelection}>
-          Duplicate
-        </button>
-        <button type="button" onClick={copySelection}>
-          Copy
-        </button>
-        <button type="button" onClick={deleteSelection}>
-          Delete
-        </button>
-      </div>
-      <div className="button-row">
-        <button type="button" onClick={createMotifFromSelection}>
-          Create Motif
-        </button>
-        <button type="button" onClick={repeatSelection}>
-          Repeat
-        </button>
-      </div>
     </section>
   )
 }

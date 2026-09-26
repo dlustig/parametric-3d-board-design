@@ -53,6 +53,7 @@ test.describe('tablet gate (G7)', () => {
   test('a one-finger drag of a selected object commits one history entry', async ({ page }) => {
     await seed(page)
     await select(page, ['b1'])
+    await setCamera(page, cameraShowing({ x: 55, y: 40 }, { x: 300, y: 150 }, 3)) // clear of the actions bar (shell §9.4)
     const before = await getProject(page)
     const touch = await Touch.attach(page)
     const on = round(await toClient(page, { x: 55, y: 40 })) // clear of b1's vertex/midpoint handles
@@ -68,6 +69,7 @@ test.describe('tablet gate (G7)', () => {
   test('touchcancel mid-drag leaves project and history unchanged', async ({ page }) => {
     await seed(page)
     await select(page, ['b1'])
+    await setCamera(page, cameraShowing({ x: 55, y: 40 }, { x: 300, y: 150 }, 3)) // clear of the actions bar (shell §9.4)
     const before = await getProject(page)
     const touch = await Touch.attach(page)
     const on = round(await toClient(page, { x: 55, y: 40 }))
@@ -156,7 +158,7 @@ test.describe('tablet gate (G7)', () => {
 
   test('every icon button meets the 44×44 px touch target', async ({ page }) => {
     await seed(page)
-    const buttons = page.locator('.icon-column button, .canvas-controls button, .canvas-actions button, .top-bar .icon-button')
+    const buttons = page.locator('.icon-column button, .canvas-controls button, .actions-bar button, .top-bar .icon-button')
     const count = await buttons.count()
     expect(count).toBeGreaterThan(0)
     const undersized: string[] = []

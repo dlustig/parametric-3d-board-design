@@ -1027,9 +1027,8 @@ input[type='number'] {
   font-size: 13px;
 }
 
-/* Canvas controls (§7.2) and the transitional canvas strip (removed in Task 4). */
-.canvas-controls,
-.canvas-actions {
+/* Canvas controls (§7.2). */
+.canvas-controls {
   position: absolute;
   z-index: 2;
   display: flex;
@@ -1040,17 +1039,8 @@ input[type='number'] {
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: var(--shadow);
-}
-
-.canvas-controls {
   right: 14px;
   bottom: 14px;
-}
-
-.canvas-actions {
-  top: 8px;
-  right: 8px;
-  gap: 4px;
 }
 
 .zoom-readout {
@@ -1083,9 +1073,91 @@ input[type='number'] {
 
   .icon-button,
   .wood-chip,
-  .zoom-readout,
-  .canvas-actions .text-button {
+  .zoom-readout {
     min-width: 44px;
     min-height: 44px;
   }
+}
+
+/* ---- Actions bar and tool dock (shell spec §7.1, §7.2, §9.4; Task 4) ---- */
+
+/* Shared by anything centred below the canvas's top edge: the actions bar
+   (this task), Task 6's drawing bar, and Task 8's edit-context pill. */
+.floating-top {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+}
+
+.actions-bar {
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  font-size: 12px;
+}
+
+.actions-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.actions-count {
+  padding: 0 8px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tool-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 24px);
+  padding: 4px;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.tool-bar .icon-button {
+  width: 40px;
+  height: 40px;
+}
+
+.canvas-controls-vertical {
+  top: 14px;
+  bottom: auto;
+  flex-direction: column;
+}
+
+.canvas-controls-vertical .bar-divider {
+  width: 24px;
+  height: 1px;
+  margin: 4px 0;
+}
+
+.icon-column-fill {
+  flex: 1;
+}
+
+.icon-column .undock-button {
+  width: 28px;
+  height: 28px;
 }

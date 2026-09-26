@@ -19,6 +19,7 @@ import { useLayout } from '@/editor/layout'
 import { useEditor } from '@/editor/store'
 import { Canvas } from '@/render/Canvas'
 import { createAutosave, loadAtStartup, openStorage, PROJECT_KEY } from '@/storage/local'
+import { ActionsBar } from './ActionsBar.tsx'
 import { Breadcrumb } from './Breadcrumb.tsx'
 import { CanvasControls } from './CanvasControls.tsx'
 import { IconColumn } from './IconColumn.tsx'
@@ -27,7 +28,7 @@ import { LeftPane } from './LeftPane.tsx'
 import { RecoveryBanner } from './RecoveryBanner.tsx'
 import { ShortcutsDialog } from './ShortcutsDialog.tsx'
 import { useThemeSync } from './theme.ts'
-import { Toolbar } from './Toolbar.tsx'
+import { ToolBar } from './ToolBar.tsx'
 import { ToolOptions } from './ToolOptions.tsx'
 import { TopBar } from './TopBar.tsx'
 
@@ -125,6 +126,7 @@ function App(): JSX.Element {
   const narrow = useSyncExternalStore(subscribeNarrow, () => narrowQuery.matches)
   const leftOpen = useLayout((s) => s.leftOpen)
   const rightOpen = useLayout((s) => s.rightOpen)
+  const toolsDocked = useLayout((s) => s.toolsDocked)
   const leftRef = useRef<PanelImperativeHandle | null>(null)
   const rightRef = useRef<PanelImperativeHandle | null>(null)
   const openProjectRef = useRef<() => void>(() => {})
@@ -218,8 +220,9 @@ function App(): JSX.Element {
             <Panel id="pane-canvas" className="canvas-pane">
               <main className="canvas-host">
                 <Canvas />
-                <Toolbar />
+                <ActionsBar />
                 <CanvasControls />
+                {!toolsDocked && <ToolBar />}
                 <ToolOptions />
                 <Breadcrumb />
               </main>

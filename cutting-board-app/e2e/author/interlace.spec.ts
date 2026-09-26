@@ -68,7 +68,7 @@ test('G6 F interlace: authored from blank through the UI matches the fixture', a
   await a.nudge('Left', true)
   for (let k = 0; k < 5; k++) await a.nudge('Left')
   await a.swatch('Maple')
-  await a.button('To back', 'Selection')
+  await a.order('Send to back')
   await a.click(A)
   await a.copyInPlace()
   await a.nudge('Right', true)
