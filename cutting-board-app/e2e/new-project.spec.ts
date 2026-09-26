@@ -7,7 +7,7 @@
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { band, project } from '../src/domain/test-builders.ts'
-import { expectClose, getProject, history, seed } from './helpers.ts'
+import { expectClose, getProject, history, seed, select } from './helpers.ts'
 
 const WARNING = 'This replaces the current project. Download it first to keep a copy.'
 
@@ -95,5 +95,20 @@ test.describe('New Project dialog', () => {
     await page.getByRole('button', { name: 'Test', exact: true }).click()
     await expect(page.getByRole('menuitem', { name: 'New project…', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: /Load sample/ })).toHaveCount(0)
+  })
+
+  // Controller ruling 3: Escape in the dialog must not also run the app's own
+  // Escape cascade (SPEC's clear-selection step) — `onEscapeKeyDown` stops the
+  // event from reaching keyboard.ts's window-level dispatcher, the same pattern
+  // as every other Radix layer on this branch.
+  test('Escape closes the dialog without touching the selection', async ({ page }) => {
+    await seed(page, project([band('b1', [[0, 40], [80, 40]])]))
+    await select(page, ['b1'])
+    const dialog = await openNewProject(page)
+
+    await page.keyboard.press('Escape')
+
+    await expect(dialog).toBeHidden()
+    expect(await page.evaluate(() => window.__cbpd!.getState().selection)).toEqual(['b1'])
   })
 })
