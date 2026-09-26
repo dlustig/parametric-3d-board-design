@@ -359,7 +359,7 @@ input[type='number'] {
   margin: 0;
 }
 
-/* ---- Shell frame (shell spec §4, §5, §6, §7.2, §8, §10.1; Task 3) ---- */
+/* ---- Shell frame (shell spec §4, §5, §6, §7.2, §8, §10.1) ---- */
 
 .app {
   display: grid;
@@ -636,7 +636,7 @@ input[type='number'] {
   background: var(--line);
 }
 
-/* Menus (§10.1; the Order menu in Task 4 reuses these). */
+/* Menus (§10.1; the Order menu reuses these). */
 .menu {
   z-index: 6;
   min-width: 220px;
@@ -662,7 +662,9 @@ input[type='number'] {
 }
 
 .menu-item[data-highlighted] {
-  background: var(--raised);
+  background: var(--acc-soft);
+  outline: 2px solid var(--acc); /* ≥ 3:1 on --panel and on --acc-soft in both themes; --raised alone was ~1.1:1 */
+  outline-offset: -2px;
 }
 
 .menu-item[data-disabled] {
@@ -927,7 +929,8 @@ input[type='number'] {
   background: var(--raised);
 }
 
-/* Touch (§5, V1 §7.4): 44 px hit areas; the column widens to 56 px. */
+/* Touch (§5, V1 §7.4): 44 px hit areas, also for the menu items, project
+   name and top-bar text buttons; the column widens to 56 px. */
 @media (pointer: coarse) {
   .app-body {
     grid-template-columns: 56px minmax(0, 1fr);
@@ -943,12 +946,19 @@ input[type='number'] {
     min-width: 44px;
     min-height: 44px;
   }
+
+  .menu-item,
+  .project-name,
+  .primary-button,
+  .text-button {
+    height: 44px;
+  }
 }
 
-/* ---- Actions bar and tool dock (shell spec §7.1, §7.2, §9.4; Task 4) ---- */
+/* ---- Actions bar and tool dock (shell spec §7.1, §7.2, §9.4) ---- */
 
 /* Shared by anything centred below the canvas's top edge: the actions bar
-   and Task 6's drawing bar. Task 8's `.canvas-top-stack` places them now. */
+   and the drawing bar. `.canvas-top-stack` places them. */
 .floating-top {
   max-width: calc(100% - 24px);
 }
@@ -1006,7 +1016,7 @@ input[type='number'] {
   height: 28px;
 }
 
-/* ---- Layers and Motifs panes (shell spec §6.1, §6.2; Task 5) ---- */
+/* ---- Layers and Motifs panes (shell spec §6.1, §6.2) ---- */
 
 /* Names truncate with an ellipsis (their full text is the title attribute),
    never widening the pane. */
@@ -1056,6 +1066,12 @@ input[type='number'] {
 .layer-row[aria-selected='true'] {
   background: var(--acc-soft);
   color: var(--acc);
+}
+
+@media (pointer: coarse) {
+  .layer-row {
+    height: 44px;
+  }
 }
 
 .layer-mark {

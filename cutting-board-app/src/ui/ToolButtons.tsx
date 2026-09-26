@@ -1,5 +1,5 @@
 // Shell §5, §7.1: the six tool buttons and the current-wood chip, shared by
-// the icon column (docked) and the floating tool bar (undocked, Task 4).
+// the icon column (docked) and the floating tool bar (undocked).
 
 import { Hand, MousePointer2, Pentagon, Square } from 'lucide-react'
 import type { JSX } from 'react'

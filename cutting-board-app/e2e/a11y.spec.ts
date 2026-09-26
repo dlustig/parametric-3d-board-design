@@ -193,6 +193,28 @@ test.describe('accessibility (G11)', () => {
     expect(await state<string[]>(page, 's.selection')).toEqual(['b1'])
   })
 
+  test('the keyboard-highlighted menu item has a 2 px --acc outline, in both themes', async ({ page }) => {
+    await seed(page)
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await page.locator('.project-name').focus()
+      await page.keyboard.press('Enter')
+      const item = page.getByRole('menuitem').first()
+      await expect(item).toBeFocused()
+      const acc = await page.evaluate(() => {
+        const probe = document.createElement('span')
+        probe.style.color = 'var(--acc)'
+        document.body.append(probe)
+        const c = getComputedStyle(probe).color
+        probe.remove()
+        return c
+      })
+      expect(await item.evaluate((el) => { const cs = getComputedStyle(el); return [cs.outlineStyle, cs.outlineWidth, cs.outlineColor] })).toEqual(['solid', '2px', acc])
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('menu')).toHaveCount(0)
+    }
+  })
+
   test('the selection outline draws both strokes, not colour alone', async ({ page }) => {
     await seed(page)
     await select(page, ['b1'])

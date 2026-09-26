@@ -1,4 +1,4 @@
-// The project/SVG download filename rule, moved here from ProjectMenu (shell Task 3).
+// The project/SVG download filename rule, moved here from ProjectMenu (shell §10.1).
 
 import { describe, expect, it } from 'vitest'
 import { sanitizeFilenamePart } from './download.ts'

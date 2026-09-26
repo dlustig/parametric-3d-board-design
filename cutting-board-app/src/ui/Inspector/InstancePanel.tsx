@@ -32,7 +32,7 @@ export function MotifNameField({ obj }: { obj: Placed }): JSX.Element {
   const name = useEditor((s) => s.project.motifs[obj.motifId]!.name)
   const [text, setText] = useState<string | null>(null) // null while not editing
   const commitName = (): void => {
-    if (text !== null && text !== name) useEditor.getState().run((p) => renameMotif(p, obj.motifId, text))
+    if (text !== null && text.trim() !== '' && text !== name) useEditor.getState().run((p) => renameMotif(p, obj.motifId, text))
     setText(null)
   }
   return (
@@ -92,11 +92,10 @@ export function enterMotif(obj: Placed): void {
   s.select([])
 }
 
-/** Shell spec §9.7/§6.1: pops one level of edit context, clearing the selection first, like Esc with nothing in progress. Shared by EditPill's Done and LayersPane's back button. */
+/** Shell spec §9.7/§6.1: pops one level of edit context, settling any preview and dropping the selection and a drawing in progress (`setEditContext`). Shared by EditPill's Done and LayersPane's back button. */
 export function leaveContext(): void {
   const s = useEditor.getState()
-  s.select([])
-  s.popContext()
+  s.setEditContext(s.editContext.slice(0, -1))
 }
 
 /** V1 §5.6 Detach: the instance becomes copies of its definition's objects, which are then selected. Shared with the actions bar. */

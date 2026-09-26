@@ -20,6 +20,7 @@ export function CanvasControls(): JSX.Element {
   const addToSelection = useEditor((s) => s.addToSelection)
   const zoom = useEditor((s) => s.camera.zoom)
   const fitZoom = useEditor((s) => fitBoard(s.project.board, s.viewportPx).zoom)
+  const pct = Math.round((zoom / fitZoom) * 100)
   const docked = useLayout((s) => s.toolsDocked)
   const side = docked ? 'top' : 'left'
 
@@ -47,8 +48,8 @@ export function CanvasControls(): JSX.Element {
         </button>
       </Hint>
       <Hint label="Zoom" hint="Click to fit the board" side={side}>
-        <button type="button" className="zoom-readout" onClick={fitView}>
-          {Math.round((zoom / fitZoom) * 100)}%
+        <button type="button" className="zoom-readout" aria-label={`Zoom ${pct}%, fit to board`} onClick={fitView}>
+          {pct}%
         </button>
       </Hint>
       <Hint label="Zoom in" side={side}>

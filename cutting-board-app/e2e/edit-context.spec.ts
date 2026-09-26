@@ -7,7 +7,7 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { Project, Step } from '../src/domain/model.ts'
 import { band, instance, project } from '../src/domain/test-builders.ts'
-import { expectClose, nextFrame, seed, seededProject, setCamera } from './helpers.ts'
+import { expectClose, getProject, nextFrame, openPane, seed, seededProject, setCamera, toClient } from './helpers.ts'
 
 /** i1 (motif m1) at the root; m1 holds i2 (motif m2) and a band; m2 holds one band. */
 function nestedProject(): Project {
@@ -53,6 +53,34 @@ test.describe('edit context', () => {
     await pill.getByRole('button', { name: 'Done' }).click()
     expect(await editContext(page)).toEqual([])
     await expect(pill).toHaveCount(0)
+  })
+
+  test('Done and the Layers back button cancel a drawing in progress and leave the project unchanged', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'drawing setup here is mouse-based, matching drawing.spec.ts')
+    await seed(page, seededProject())
+    const before = await getProject(page)
+    const drawTwoPoints = async (): Promise<void> => {
+      await page.getByRole('button', { name: 'Band', exact: true }).click()
+      for (const w of [{ x: 60, y: 300 }, { x: 90, y: 300 }]) {
+        const c = await toClient(page, w)
+        await page.mouse.click(Math.round(c.x), Math.round(c.y))
+      }
+      expect(await page.evaluate(() => window.__cbpd!.getState().drawing?.points.length)).toBe(2)
+    }
+
+    await enter(page, REPEAT_CELL)
+    await drawTwoPoints()
+    await page.getByRole('navigation', { name: 'Edit context' }).getByRole('button', { name: 'Done' }).click()
+    expect(await editContext(page)).toEqual([])
+    expect(await page.evaluate(() => window.__cbpd!.getState().drawing)).toBeNull()
+
+    await enter(page, REPEAT_CELL)
+    await drawTwoPoints()
+    await openPane(page, 'Layers')
+    await page.getByRole('button', { name: 'Back to Test' }).click()
+    expect(await editContext(page)).toEqual([])
+    expect(await page.evaluate(() => window.__cbpd!.getState().drawing)).toBeNull()
+    expect(await getProject(page)).toEqual(before)
   })
 
   test('a motif placed once shows no occurrence count', async ({ page }) => {

@@ -128,7 +128,7 @@ describe('useLayout persistence', () => {
   })
 })
 
-describe('pane state (shell §4, Task 3)', () => {
+describe('pane state (shell §4)', () => {
   it('starts with both panes open, no ui actions, and the Layers tab', () => {
     const s = useLayout.getInitialState()
     expect([s.leftOpen, s.rightOpen, s.uiActions, s.leftTab]).toEqual([true, true, null, 'layers'])

@@ -145,6 +145,26 @@ test.describe('layers and motifs panes', () => {
     expect(await page.evaluate(() => window.__cbpd!.getHistoryLengths().past)).toBe(1)
   })
 
+  test('an empty or blank motif name reverts, as the project Rename does', async ({ page }) => {
+    await seed(page, nested())
+    await openPane(page, 'Motifs')
+    const row = page.getByRole('listitem', { name: 'inner' })
+    await row.getByRole('button', { name: 'Rename motif' }).click()
+    const field = page.getByRole('textbox', { name: 'Motif name' })
+    await field.fill('   ')
+    await field.press('Enter')
+    await expect(field).toHaveCount(0)
+    expect(await page.evaluate(() => window.__cbpd!.getProject().motifs['inner']!.name)).toBe('inner')
+
+    await select(page, ['iO'])
+    const inspectorField = page.getByLabel('Motif name', { exact: true })
+    await inspectorField.fill('')
+    await inspectorField.press('Enter')
+    await expect(inspectorField).toHaveValue('outer')
+    expect(await page.evaluate(() => window.__cbpd!.getProject().motifs['outer']!.name)).toBe('outer')
+    expect(await history(page)).toEqual({ past: 0, future: 0 })
+  })
+
   test('Review Focus 5: an 80-character motif name truncates with its full text as a title, with no horizontal overflow', async ({ page }) => {
     const p = seededProject()
     p.motifs['m1']!.name = LONG

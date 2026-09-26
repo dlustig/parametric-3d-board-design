@@ -112,7 +112,7 @@ function NewProjectForm({ onDone }: { onDone(): void }): JSX.Element {
         />
         <div className="segmented" role="group" aria-label="Units">
           {UNITS.map((u) => (
-            <button key={u} type="button" className="segment" aria-pressed={units === u} onClick={() => setUnits(u)}>
+            <button key={u} type="button" aria-pressed={units === u} onClick={() => setUnits(u)}>
               {u}
             </button>
           ))}

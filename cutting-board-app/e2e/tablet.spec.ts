@@ -10,7 +10,7 @@ import { expect, test } from '@playwright/test'
 import type { Band } from '../src/domain/model.ts'
 import { project } from '../src/domain/test-builders.ts'
 import type { XY } from './helpers.ts'
-import { cameraShowing, getProject, history, nextFrame, seed, select, setCamera, toClient, Touch } from './helpers.ts'
+import { cameraShowing, getProject, history, nextFrame, openPane, seed, select, setCamera, toClient, Touch } from './helpers.ts'
 
 test.describe('tablet gate (G7)', () => {
   test.skip(({ isMobile }) => !isMobile, 'G7 runs in chromium-touch (isMobile + hasTouch)')
@@ -169,6 +169,17 @@ test.describe('tablet gate (G7)', () => {
       if (box === null || box.width < 44 || box.height < 44) undersized.push(`${label} (${box?.width}×${box?.height})`)
     }
     expect(undersized, `icon buttons under 44×44 px: ${undersized.join(', ')}`).toEqual([])
+  })
+
+  test('Layers rows, menu items, the project name and Export SVG are 44 px tall', async ({ page }) => {
+    await seed(page)
+    await openPane(page, 'Layers')
+    const targets = [page.getByRole('option', { name: 'Band, Maple' }), page.locator('.project-name'), page.getByRole('button', { name: 'Export SVG', exact: true })]
+    for (const t of targets) expect((await t.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    await page.locator('.project-name').tap()
+    const items = page.getByRole('menuitem')
+    await expect(items.first()).toBeVisible()
+    for (const box of await Promise.all((await items.all()).map((i) => i.boundingBox()))) expect(box!.height).toBeGreaterThanOrEqual(44)
   })
 
   test('the selection outline draws both strokes: #ffffff over the accent', async ({ page }) => {

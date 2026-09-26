@@ -1,9 +1,9 @@
 // Shell spec §10.3: every SHORTCUTS entry, grouped, with the tooltips' keycaps.
-// Opened by `?` (keyboard.ts) or the project menu (Task 3) through useLayout.
+// Opened by `?` (keyboard.ts) or the project menu through useLayout.
 
 import * as Dialog from '@radix-ui/react-dialog'
 import type { JSX } from 'react'
-import { Fragment } from 'react'
+import { Fragment, useRef } from 'react'
 import { useLayout } from '@/editor/layout'
 import type { Shortcut, ShortcutGroup } from '@/editor/shortcuts'
 import { SHORTCUTS } from '@/editor/shortcuts'
@@ -15,6 +15,7 @@ export function ShortcutsDialog(): JSX.Element {
   const open = useLayout((s) => s.shortcutsOpen)
   const setOpen = useLayout((s) => s.setShortcutsOpen)
   const entries: Array<[string, Shortcut]> = Object.entries(SHORTCUTS)
+  const returnTo = useRef<Element | null>(null)
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
@@ -28,6 +29,17 @@ export function ShortcutsDialog(): JSX.Element {
           // this the sheet's own Escape-to-close also runs the app's Escape cascade
           // (clearing the selection, or cancelling an in-progress drawing).
           onEscapeKeyDown={(e) => e.stopPropagation()}
+          onOpenAutoFocus={() => {
+            returnTo.current = document.activeElement
+          }}
+          // Opened from the project menu, the element focused at open is a menu
+          // item that is gone by now: return focus to the menu's trigger instead
+          // of letting it fall to <body>.
+          onCloseAutoFocus={(e) => {
+            if (returnTo.current?.isConnected === true) return
+            e.preventDefault()
+            document.querySelector<HTMLElement>('.project-menu [aria-haspopup="menu"]')?.focus()
+          }}
         >
           <Dialog.Title className="dialog-title">Keyboard shortcuts</Dialog.Title>
           {GROUPS.map((group) => {

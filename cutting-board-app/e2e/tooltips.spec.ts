@@ -39,6 +39,22 @@ test('? opens the keyboard shortcuts sheet', async ({ page }) => {
   await expect(sheet).toBeHidden()
 })
 
+test('closing the sheet opened from the project menu returns focus to the project name', async ({ page }) => {
+  await seed(page)
+  await page.locator('.project-name').click()
+  await page.getByRole('menuitem', { name: 'Keyboard shortcuts' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
+  await expect(sheet).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await expect(page.locator('.project-name')).toBeFocused()
+})
+
+test('the zoom read-out is named for what it does, whatever the zoom', async ({ page }) => {
+  await open(page)
+  await expect(page.getByRole('button', { name: /^Zoom \d+%, fit to board$/ })).toBeVisible()
+})
+
 test('Escape closes the sheet without clearing the selection', async ({ page }) => {
   // Radix's DismissableLayer handles Escape on `document` in the capture phase with
   // preventDefault() but no stopPropagation(); keyboard.ts's global dispatcher listens

@@ -1,7 +1,7 @@
 // Browser downloads: generated text, the project file and the SVG export.
-// The project/SVG helpers moved here from ProjectMenu (shell Task 3), so the
-// top bar, the project menu and the keyboard dispatcher share them. DOM
-// code; only the filename rule is unit-tested.
+// The project/SVG helpers moved here from ProjectMenu so the top bar, the
+// project menu and the keyboard dispatcher share them. DOM code; only the
+// filename rule is unit-tested.
 
 import type { Project } from '@/domain/model'
 import { exportSvg } from './svg.ts'

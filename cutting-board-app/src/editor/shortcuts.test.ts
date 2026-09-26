@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 // Shell spec §12.1, §16: every SHORTCUTS entry that keyboard.ts dispatches
-// produces its effect when its first chord is pressed (Space and Alt are
+// produces its effect when any of its chords is pressed (Space and Alt are
 // display-only: Canvas and snapping own them), formatChord per platform,
 // and Review Focus 3 — `?` typed in a field never opens the sheet. The pane
-// and project chords (Task 3) call the registered `uiActions` and the
-// (mocked) download helpers.
+// and project chords call the registered `uiActions` and the (mocked)
+// download helpers.
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { translateObjects } from '@/domain/commands'
@@ -67,7 +67,7 @@ function deriveCode(rawKey: string): string {
 /**
  * Presses a platform-neutral chord as a real keydown on `target` (it
  * bubbles to window). Derives a full `KeyboardEventInit`, including `code`,
- * so a `\` chord matches Task 3's `e.code === 'Backslash'` dispatch rule
+ * so a `\` chord matches keyboard.ts's `e.code === 'Backslash'` dispatch rule
  * (shell spec §12.1) — with Shift held, `key` is `|`, as it is on a real US
  * keyboard, since `code` alone doesn't determine `key`.
  */
@@ -95,7 +95,15 @@ const drawing = (): void => useEditor.setState({ tool: 'band', drawing: { tool: 
 
 interface Case {
   setup?: () => void
-  check: () => void
+  check: (chord: string) => void
+}
+
+/** Where each arrow moves band a's first point (0, 0): one 5 mm grid step. */
+const NUDGED: Readonly<Record<string, { x: number; y: number }>> = {
+  ArrowUp: { x: 0, y: -5 },
+  ArrowDown: { x: 0, y: 5 },
+  ArrowLeft: { x: -5, y: 0 },
+  ArrowRight: { x: 5, y: 0 },
 }
 
 const CASES: Record<Exclude<ShortcutId, 'hand' | 'snapOff'>, Case> = {
@@ -140,7 +148,7 @@ const CASES: Record<Exclude<ShortcutId, 'hand' | 'snapOff'>, Case> = {
       expect(s().project.objects[s().selection[0]!]!.type).toBe('motif-instance')
     },
   },
-  nudge: { check: () => expect(bandAt('a').points[0]!.y).toBe(-5) },
+  nudge: { check: (chord) => expect(bandAt('a').points[0]).toMatchObject(NUDGED[chord]!) },
   selectNext: { check: () => expect(s().selection).toEqual(['b']) },
   selectPrevious: { setup: () => s().select(['b']), check: () => expect(s().selection).toEqual(['a']) },
   escape: { check: () => expect(s().selection).toEqual([]) },
@@ -216,10 +224,12 @@ describe('SHORTCUTS → keyboard.ts dispatch', () => {
     expect(Object.keys(CASES).sort()).toEqual(Object.keys(SHORTCUTS).filter((id) => !displayOnly.includes(id)).sort())
   })
 
-  it.each(Object.entries(CASES))('%s: its first chord has its effect', (id, c) => {
+  const chords = Object.entries(CASES).flatMap(([id, c]) => table[id]!.keys.map((chord) => [id, chord, c] as const))
+
+  it.each(chords)('%s: %s has its effect', (_id, chord, c) => {
     c.setup?.()
-    press(table[id]!.keys[0]!)
-    c.check()
+    press(chord)
+    c.check(chord)
   })
 
   it("hand's H selects the Hand tool (its Space alternative is Canvas-owned)", () => {

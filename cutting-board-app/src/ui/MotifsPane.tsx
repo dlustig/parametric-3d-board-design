@@ -42,7 +42,7 @@ function MotifRow({ project, motifId }: { project: Project; motifId: Id }): JSX.
   const n = paths.length
 
   const commit = (): void => {
-    if (text !== null && text !== name) useEditor.getState().run((p) => renameMotif(p, motifId, text))
+    if (text !== null && text.trim() !== '' && text !== name) useEditor.getState().run((p) => renameMotif(p, motifId, text))
     setText(null)
   }
   const edit = (): void => useEditor.getState().setEditContext(contextLevelsForPath(project, paths[0]!))
