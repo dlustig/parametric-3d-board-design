@@ -16,7 +16,7 @@ Authority, in order:
 
 ```
 pnpm install
-pnpm dev            # http://localhost:5173, development build (fixture loader + window.__cbpd test hook)
+pnpm dev            # http://localhost:5173, development build (window.__cbpd test hook)
 pnpm dev --host     # same, reachable on the LAN (tablet testing)
 pnpm build          # typecheck src, then production build to dist/
 pnpm preview        # serve dist/
@@ -53,6 +53,13 @@ Node 22.12+ and pnpm only. Never `npm` in this repo. Playwright browsers: `pnpm 
 | Crossing identity, precedence, rematch | `src/domain/crossings.ts`, `src/geometry/resolve.ts` (spec §5) |
 | Classification and compositing | `src/geometry/intersections.ts`, `src/geometry/footprint.ts`, `src/geometry/scene.ts` (spec §5.2, §6) |
 | Editor state and history | `src/editor/store.ts` (spec §7.1) |
+| Shell layout, panes, narrow mode | `src/ui/App.tsx`, `src/editor/layout.ts` (persisted prefs: theme, left tab, tool dock), shell spec `docs/superpowers/specs/2026-09-25-editor-shell-redesign-design.md` |
+| Top bar, project menu, New Project | `src/ui/TopBar.tsx`, `src/ui/ProjectMenu.tsx` (with the edit-context breadcrumb), `src/ui/NewProjectDialog.tsx` |
+| Left column and panes | `src/ui/IconColumn.tsx`, `src/ui/ToolButtons.tsx`, `src/ui/LeftPane.tsx`, `src/ui/LayersPane.tsx`, `src/ui/MotifsPane.tsx`, `src/ui/WoodPane.tsx` |
+| Floating canvas bars | `src/ui/ActionsBar.tsx`, `src/ui/DrawingBar.tsx`, `src/ui/ToolBar.tsx` (undocked tools), `src/ui/CanvasControls.tsx`, `src/ui/EditPill.tsx` |
+| Inspector panels | `src/ui/Inspector/` (`Section.tsx`, `Switch.tsx`, `PointRow.tsx` points table, `CrossingsPanel.tsx`) |
+| Shortcut table and tooltips | `src/editor/shortcuts.ts` (display only; dispatch stays in `src/editor/keyboard.ts`), `src/ui/Hint.tsx`, `src/ui/Keycap.tsx`, `src/ui/ShortcutsDialog.tsx` |
+| Design tokens | `src/index.css` (shell spec §2.1), `src/ui/theme.ts`, the pre-paint script in `index.html` |
 | Input ownership (Moveable, Selecto, use-gesture) | `src/render/Canvas.tsx`, `src/editor/input.ts`, `docs/decisions/2026-09-24-slice1-interaction.md` |
 | Units grammar | `src/domain/units.ts` (spec §8) |
 | Fixtures A–F | `src/fixtures/` |

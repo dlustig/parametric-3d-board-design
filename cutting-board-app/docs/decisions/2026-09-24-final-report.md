@@ -64,12 +64,47 @@ End-to-end contacts of collinear bands (repeat seams) are ignored entirely. Unsu
 6. Default repeat step is the definition's painted size in definition units (the cell offsets are inside the field transform).
 7. Duplicate offsets by one grid step so the action is visible; Tab keeps native focus movement and `[`/`]` cycle selection.
 
+## Editor shell redesign (2026-09-25)
+
+Spec: `docs/superpowers/specs/2026-09-25-editor-shell-redesign-design.md`; plan: `docs/superpowers/plans/2026-09-25-editor-shell-redesign.md`. Presentation only: the document model, commands, geometry, input ownership and persistence are unchanged; the V1 amendments are logged in V1 §16.
+
+- **Built:** a dark-first theme with a light option and a pre-paint theme script; resizable, collapsible panes (`react-resizable-panels`); an icon column with dockable tools; the Layers, Motifs and Wood panes; floating drawing, actions and canvas-control bars; the edit pill, frame and top-bar breadcrumb; tooltips with styled hotkeys and a shortcuts sheet; an inspector in sections and tables; a New Project dialog with the six fixtures as samples, now shipped in production.
+- **Verification:** full results in `2026-09-24-gates.md` ("Editor shell redesign verification run", 2026-09-26, `bd2991f`). In one line each: typecheck clean; 457 unit tests passed; production build OK with the fixtures bundled and the test hook excluded; e2e 449 passed across chromium (175), firefox (169) and chromium-touch (105) with 0 failures and no page errors, webkit could not launch (missing OS packages on this host, an owner action item, not a code failure); perf medians (different machine from the earlier runs — see the gates entry for that caveat) all within the recorded ±20% band: typical work median 29.1 ms (target ≤ 33.5), typical inspector-to-paint 29.3 ms (≤ 35.6), worst-case work median 192.1 ms (≤ 239.8); Layers-row-click-to-paint recorded as a new baseline (22.9 ms typical, 17.0 ms packet scale).
+- **Keyboard-only walkthrough** (the plan's Task 10 Step 13.7, Chromium 1440×900, no pointer after load):
+  1. PASS — first Tab reaches the sidebar toggle, with a 2 px solid `--acc` ring at a 2 px outline offset.
+  2. PARTIAL — Tab to the project name, Enter opens the menu on New project…; Arrow-down to Keyboard shortcuts, Enter opens the sheet — both pass. Esc closes the sheet, but focus lands on `<body>`, not back on the project name button as expected. **Open item:** when the sheet is opened from the project menu (as opposed to the global `?` binding), Radix's Dialog appears to capture `document.activeElement` after the menu's own close-focus restoration has already moved it to `<body>`, so its close-autofocus restores to `<body>` instead of the trigger. Not fixed in this task (out of scope; `ShortcutsDialog.tsx` has no custom `onCloseAutoFocus` today).
+  3. PASS — `?` opens the sheet from the body; Esc closes it.
+  4. PASS — Project menu → New project…, Tab to the Checker card, Enter selects it (`aria-pressed` true), Tab to Create, Enter: Checker loads.
+  5. PASS — `Mod+\` and `Mod+Shift+\` collapse and restore the sidebar and inspector; focusing a pane separator and pressing ArrowLeft/ArrowRight resizes it (confirmed via `aria-valuenow`), and Enter collapses it.
+  6. PASS — Tab to the icon column's Motifs tab, Enter shows the pane; its Edit motif enters the checker motif (`editContext` set, pill reads "Editing Checker unit"); the pill's Done (focus, Enter) pops it back out.
+  7. PASS — `]` selects the first object and the Layers pane (once on that tab) shows it `aria-selected`; Tab into the inspector, edit Width, Enter: exactly one history entry.
+  8. PASS — a Points row's actions button, Enter, then Enter on Insert after (already the first, default-focused item — no ArrowDown was actually needed on this build) adds a point; Enter on the Points `<summary>` collapses it (native `<details>` behaviour).
+  9. PASS — Tab to the actions bar's Order button, Enter, ArrowDown ×2, Enter on Bring to front: the object moves to the end of its context's children (front of paint order).
+  10. PASS — `X` selects the Crossing tool; the Crossings/Band panel's Over/Under button is reachable and toggles the crossing on Enter, keeping focus (confirmed by reading `document.activeElement` after the toggle).
+  11. PASS — `Shift+T` undocks the tools into a Tab-reachable floating bar (`tabIndex` 0); `Shift+T` docks them again.
+  12. PASS — Esc cascade confirmed as four separate, ordered effects: cancels an in-progress Band drawing (leaves the tool, clears `drawing`); with an empty drawing, clears the selection; with an empty selection, pops the edit context one level; with an empty context, returns the tool to Select.
+- **200% zoom:** automated — the new `a11y.spec.ts` shell test passed on chromium and firefox (720×450 CSS px, no horizontal scroll, Export SVG stays in viewport, the canvas keeps > 300 px width, a click still resolves through the zoomed CTM). Manual, per-browser (Chrome/Firefox/Safari at 1440×900, actual browser zoom to 200%): **not run** — this session has no access to real browser zoom (CSS `zoom`/viewport-resize substitutes are not the same mechanism, and Safari does not run on this Linux host); recorded here as an open item for the owner, the same as the Mod+R and iPad rows below.
+- **Contrast (shell spec §2.1):** re-checked with the pairs read live from `src/index.css` (not hardcoded), including the tooltip-surface pairs (`.hint`/`.crossing-hover` always render with the dark token set, per that file's own comment, so a tooltip's label/hint/"On" state pairs are theme-invariant). **Every text pair is ≥ 4.5:1 and every UI pair is ≥ 3:1 in both themes** — the light-theme `--muted`, `--attn` and `--ok` values and the `--tip-hint` token that a prior review had flagged as failing are already at the values that review proposed (`#5f6773`, `#945800`, `#1e8049`, `#a9b0ba`), so there is no outstanding contrast decision for the owner. `--line-strong` on `--panel` is the one pair below 3:1 (1.94 dark, 1.68 light) and stays exempt as decorative (separators, keycap edges, WCAG 1.4.11).
+- **Mod+R (shell spec §12.2), checked by hand:**
+
+  | Engine | Version | Repeat applied | Page reloaded |
+  | --- | --- | --- | --- |
+  | Chrome | | | |
+  | Firefox | | | |
+  | Safari (macOS) | | | |
+
+  Not yet run (no row filled in); an agent cannot verify this (synthesised keys can't prove a real reload didn't happen) — the owner runs it per the exact steps in `2026-09-24-gates.md`/the plan.
+- **G6:** action counts rose across all six families (A 37→38, B 21→22, C 37→38, D 63→65, E 46→48, F 127→130). `setBackground` becoming a two-action menu (open, pick) accounts for one action each in D, E and F, which only they use; the uniform +1 in A/B/C and the remaining +1 (F: +2) in D/E/F reflect other UI changes accumulated across Tasks 0–9 (e.g. Rename moving from an inline Board-panel field to a top-bar action) that this task did not audit action-by-action. All six specs still pass.
+- **Firefox export-parity (shell spec §16 "Other checks"):** a Firefox-only `export-parity.spec.ts` failure was reported earlier in this branch. Re-run on this head (`bd2991f`): all four `export-parity.spec.ts` tests passed on firefox (part of the 169 firefox e2e passes above). It did not reproduce, so the pre-branch bisection (`5e33be0`) described in the task brief was not needed; recorded here rather than silently dropped in case it recurs.
+- **Known parked item:** a Firefox-only dev-mode React warning, `Cannot update a component (\`TopBar\`) while rendering a different component`, appears during the e2e run (seen in `e2e/a11y.spec.ts`/`e2e/persistence.spec.ts` on firefox). This is the shell-redesign equivalent of a warning V1 already had for `StatusBar` (`2026-09-24-gates.md`:142) — parked, not fixed, per that precedent.
+
 ## What the owner should do next
 
 1. Run the iPad Safari checklist (`2026-09-24-ipad-checklist.md`) and fill in the results; G7's manual half is the only gate not executed by a machine.
 2. Do a hands-on pass of the product success test; the scripted walkthrough measured automation time, not human time.
 3. Decide whether the G9 median miss at nine times the packet's scale matters for the boards you actually design; at the packet's scale the numbers are recorded separately.
 4. Consider the three performance next steps only after profiling a real design.
+5. Run the Mod+R check in Chrome, Firefox and Safari, the new iPad rows 8–13, and the manual 200% browser-zoom pass in Chrome, Firefox and Safari — none of the three can be done from this (Linux, no real browser zoom) session.
 
 ## Process record
 

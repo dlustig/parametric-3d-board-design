@@ -18,6 +18,19 @@ available, etc.) should say so in Notes rather than being left blank.
 | 6 | Pinch never zooms the page | With two fingers on the canvas, pinch in and out repeatedly, including starting the pinch near the screen edge. | The canvas content zooms (camera), but Safari's own page zoom never engages — no page-wide zoom, no bounce/rubber-band scroll of the surrounding page. | | |
 | 7 | `gesture*` events | Pinch and rotate with two fingers on the canvas (Safari fires `gesturestart`/`gesturechange`/`gestureend` in addition to touch events). | The camera pinch-zooms smoothly with no jump or double-application of the zoom delta (SPEC §7.2 lists Safari `gesture*` as an owned input, same row as Ctrl/Cmd+wheel and trackpad pinch); no page-level effect. | | |
 
+## Editor shell redesign (shell spec, 2026-09-25)
+
+Run on the same device, against `pnpm dev --host`, after the redesign merges.
+
+| # | Item | Steps | Expected | Result (Pass/Fail) | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 8 | Mod+R with a hardware keyboard | Select a band; press ⌘R. | A 2 × 2 Repeat appears; Safari does not reload (shell spec §12.2). | | |
+| 9 | Long-press tooltip | Hold the Band tool button for about a second, then lift. | Its tooltip (Band, B, hint line) shows; the tool does not change; the next tap anywhere closes the tooltip (§12.3). | | |
+| 10 | Narrow panes | Portrait orientation (under 1024 px): open Layers, then the inspector. | Each opens as an overlay; opening one closes the other; the canvas width does not change (§4). | | |
+| 11 | Hit targets | Tap every icon-column button, the canvas controls, a point row's ⋯ menu, a switch. | Each is easy to hit (44 px or more) and does what its tooltip says (§5, V1 §7.4). | | |
+| 12 | New Project fields | New project… → Checker → switch to in → type `11 3/4` in W → Create. | The on-screen keyboard offers `/` and space; the board is 298.45 mm wide (§10.2). | | |
+| 13 | Theme | Cycle the theme button through Dark, Light and System with iPadOS in dark mode. | System follows iPadOS; no flash of the wrong theme on reload (§3). | | |
+
 ## Environment
 
 - Device: _(fill in — model, iPadOS version)_
