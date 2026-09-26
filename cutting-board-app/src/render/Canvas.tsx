@@ -64,6 +64,7 @@ import { Proxies } from './Proxies.tsx'
 import { SceneSvg } from './SceneSvg.tsx'
 import { ContextScrim } from './overlays/ContextScrim.tsx'
 import { CrossingMarkers } from './overlays/CrossingMarkers.tsx'
+import { BoardDimensions } from './overlays/BoardDimensions.tsx'
 import { DrawPreview } from './overlays/DrawPreview.tsx'
 import { Grid } from './overlays/Grid.tsx'
 import { PivotMarkers } from './overlays/Pivot.tsx'
@@ -97,6 +98,8 @@ export function Canvas(): JSX.Element {
   const snapGuide = useEditor((s) => s.snapGuide)
   const gridMm = useEditor((s) => s.gridMm)
   const ctxMatrix = useEditor(useShallow(contextMatrix))
+  const bandWidthMm = useEditor((s) => s.lastBandWidthMm)
+  const woodColor = useEditor((s) => s.project.materials.find((m) => m.id === s.currentMaterialId)?.color)
 
   const [wrapper, setWrapper] = useState<HTMLDivElement | null>(null)
   const [svgEl, setSvgEl] = useState<SVGSVGElement | null>(null)
@@ -411,12 +414,13 @@ export function Canvas(): JSX.Element {
         <SceneSvg scene={scene} materials={shown.materials} clipPrefix="cbpd-clip" />
         {editContext.length > 0 && <ContextScrim scene={scene} materials={shown.materials} prefix={contextPrefix(editContext)} view={{ x: vx, y: vy, w: vw, h: vh }} />}
         <path className="board-mat" d={matD} fillRule="evenodd" pointerEvents="none" />
-        {showGrid && <Grid gridMm={gridMm} matrix={ctxMatrix} zoom={camera.zoom} view={{ x: vx, y: vy, w: vw, h: vh }} />}
+        <BoardDimensions board={project.board} zoom={camera.zoom} unit={project.displayUnits} />
+        {showGrid && <Grid gridMm={gridMm} matrix={ctxMatrix} zoom={camera.zoom} board={project.board} />}
         <Proxies bounds={bounds} />
         <SelectionOverlay boxes={selectedBoxes} zoom={camera.zoom} />
         {tool === 'select' && <VertexHandles handles={handlesFor(shown, editContext, selection)} matrix={ctxMatrix} zoom={camera.zoom} />}
         <PivotMarkers project={shown} selection={selection} matrix={ctxMatrix} zoom={camera.zoom} />
-        {drawing !== null && <DrawPreview drawing={drawing} matrix={ctxMatrix} zoom={camera.zoom} unit={project.displayUnits} />}
+        {drawing !== null && <DrawPreview drawing={drawing} matrix={ctxMatrix} zoom={camera.zoom} unit={project.displayUnits} widthMm={bandWidthMm} color={woodColor} />}
         {tool === 'crossing' && <CrossingMarkers scene={scene} zoom={camera.zoom} />}
         {drawing?.cursor != null && <SnapGuide snap={drawing.cursor} matrix={ctxMatrix} zoom={camera.zoom} />}
         {snapGuide !== null && <SnapGuide snap={snapGuide} matrix={ctxMatrix} zoom={camera.zoom} />}

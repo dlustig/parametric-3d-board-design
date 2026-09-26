@@ -22,6 +22,8 @@ import { createAutosave, loadAtStartup, openStorage, PROJECT_KEY } from '@/stora
 import { ActionsBar } from './ActionsBar.tsx'
 import { Breadcrumb } from './Breadcrumb.tsx'
 import { CanvasControls } from './CanvasControls.tsx'
+import { DrawingBar } from './DrawingBar.tsx'
+import { EmptyBoardHint } from './EmptyBoardHint.tsx'
 import { IconColumn } from './IconColumn.tsx'
 import { Inspector } from './Inspector/Inspector.tsx'
 import { LeftPane } from './LeftPane.tsx'
@@ -29,7 +31,6 @@ import { RecoveryBanner } from './RecoveryBanner.tsx'
 import { ShortcutsDialog } from './ShortcutsDialog.tsx'
 import { useThemeSync } from './theme.ts'
 import { ToolBar } from './ToolBar.tsx'
-import { ToolOptions } from './ToolOptions.tsx'
 import { TopBar } from './TopBar.tsx'
 
 /** SPEC §9: startup load, debounced autosave on every project change, flush on hide, suspend on another tab's write. */
@@ -220,10 +221,11 @@ function App(): JSX.Element {
             <Panel id="pane-canvas" className="canvas-pane">
               <main className="canvas-host">
                 <Canvas />
+                <EmptyBoardHint />
                 <ActionsBar />
                 <CanvasControls />
                 {!toolsDocked && <ToolBar />}
-                <ToolOptions />
+                <DrawingBar />
                 <Breadcrumb />
               </main>
             </Panel>

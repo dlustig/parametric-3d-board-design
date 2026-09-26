@@ -157,6 +157,34 @@ test.describe('mouse', () => {
     expectPoints((rect as Region).points, [{ x: 20, y: 150 }, { x: 60, y: 150 }, { x: 60, y: 200 }, { x: 20, y: 200 }])
     expect(await history(page)).toEqual({ past: 2, future: 0 })
   })
+
+  test('the band preview is drawn at the band width in the current wood (shell SPEC §9.3)', async ({ page }) => {
+    await start(page, 'Band')
+    for (const w of [{ x: 50, y: 50 }, { x: 100, y: 50 }]) {
+      const c = await at(page, w)
+      await page.mouse.click(c.x, c.y)
+    }
+    const c = await at(page, { x: 100, y: 100 })
+    await page.mouse.move(c.x, c.y)
+    const placed = page.locator('.draw-preview .draw-preview-placed')
+    await expect(placed).toHaveAttribute('stroke-width', '6.35') // lastBandWidthMm, in the svg's world-mm user units
+    await expect(placed).toHaveAttribute('stroke', '#E8D4A8') // Maple, the current wood
+    await expect(placed).toHaveAttribute('stroke-opacity', '0.85')
+    const pending = page.locator('.draw-preview .draw-preview-pending')
+    await expect(pending).toHaveAttribute('stroke-width', '6.35')
+    await expect(pending).toHaveAttribute('stroke-opacity', '0.45')
+  })
+
+  test('Cancel is an icon button with the Esc keycap that drops the drawing', async ({ page }) => {
+    await start(page, 'Band')
+    const a = await at(page, { x: 50, y: 50 })
+    await page.mouse.click(a.x, a.y)
+    const bar = page.getByRole('toolbar', { name: 'Drawing options' })
+    await expect(bar.getByRole('button', { name: /^Current wood: Maple/ })).toBeVisible()
+    await bar.getByRole('button', { name: 'Cancel' }).click()
+    expect(await page.evaluate(() => window.__cbpd!.getState().drawing)).toBeNull()
+    expect(await history(page)).toEqual({ past: 0, future: 0 })
+  })
 })
 
 test.describe('touch', () => {
@@ -214,5 +242,47 @@ test.describe('touch', () => {
     await page.touchscreen.tap(b.x, b.y)
     expectPoints(await drawnPoints(page), [{ x: 50, y: 50 }, { x: 100, y: 50 }])
     expect(await history(page)).toEqual({ past: 0, future: 0 })
+  })
+})
+
+test.describe('board overlays and the empty board (shell SPEC §9.1, §9.2, §9.5)', () => {
+  test.skip(({ isMobile }) => isMobile, 'mouse tests run in the desktop projects')
+
+  test('a blank board invites the first band; the invitation goes once a band exists', async ({ page }) => {
+    await seed(page, project([]))
+    await setCamera(page, cameraShowing({ x: 0, y: 0 }, { x: 60, y: 120 }, 2))
+    const hint = page.locator('.empty-board-hint')
+    await expect(hint).toContainText('Draw your first band')
+    await expect(hint).toContainText('then tap to place points. Double-tap to finish.')
+    const bandTool = page.getByRole('button', { name: 'Band', exact: true })
+    await expect(bandTool).toHaveAttribute('data-invite', '')
+
+    await bandTool.click()
+    const a = await at(page, { x: 50, y: 50 })
+    await page.mouse.click(a.x, a.y)
+    await expect(hint).toHaveCount(0) // hidden while drawing
+    const b = await at(page, { x: 100, y: 50 })
+    await page.mouse.click(b.x, b.y)
+    await page.getByRole('button', { name: 'Finish' }).click()
+    await expect(hint).toHaveCount(0)
+    await expect(bandTool).not.toHaveAttribute('data-invite')
+  })
+
+  test('the grid fills only the Board rectangle', async ({ page }) => {
+    await seed(page, project([]))
+    await setCamera(page, cameraShowing({ x: 0, y: 0 }, { x: 60, y: 120 }, 2))
+    const rect = page.locator('.grid > rect')
+    await expect(rect).toHaveAttribute('fill', 'url(#snap-grid)')
+    for (const [name, value] of [['x', '0'], ['y', '0'], ['width', '300'], ['height', '450']] as const) {
+      await expect(rect).toHaveAttribute(name, value)
+    }
+  })
+
+  test('dimension labels show the Board size and hide when the Board is under 80 px', async ({ page }) => {
+    await seed(page, project([]))
+    await setCamera(page, cameraShowing({ x: 0, y: 0 }, { x: 60, y: 120 }, 1))
+    await expect(page.locator('.board-dimensions text')).toHaveText(['300 mm', '450 mm'])
+    await setCamera(page, cameraShowing({ x: 0, y: 0 }, { x: 60, y: 120 }, 0.2)) // 60 px wide
+    await expect(page.locator('.board-dimensions')).toHaveCount(0)
   })
 })

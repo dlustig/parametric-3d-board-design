@@ -62,14 +62,14 @@ test.describe('accessibility (G11)', () => {
 
     // The Band tool's options bar (Length/Angle fields, Finish/Undo point/Cancel) renders regardless of project content.
     await page.getByRole('button', { name: 'Band', exact: true }).click()
-    offenders.push(...(await unlabeledButtons(page, '.tool-options button')))
+    offenders.push(...(await unlabeledButtons(page, '.drawing-bar button')))
 
     // The Crossing tool's scope control only renders for a pair with a common motif ancestor —
     // reseed with one so "All instances"/"This occurrence" are actually there to check.
     await seed(page, crossMotifProject())
     await page.getByRole('button', { name: 'Crossing', exact: true }).click()
     await expect(page.getByRole('button', { name: 'All instances' })).toBeVisible() // sanity: the scope control really rendered
-    offenders.push(...(await unlabeledButtons(page, '.tool-options button')))
+    offenders.push(...(await unlabeledButtons(page, '.drawing-bar button')))
 
     expect(offenders, `buttons without an accessible name:\n${offenders.join('\n')}`).toEqual([])
   })

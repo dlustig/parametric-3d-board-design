@@ -1,24 +1,24 @@
-// SPEC §7.4: the drawing tools' options bar — the Band tool's Width for new
-// Bands, the pending segment's Length and Angle (live snapped values; typed
-// values place the point on Enter), Finish, Undo point, Cancel. The drawing keys (Enter/Backspace/Ctrl+Z/Esc)
-// are dispatched by `editor/keyboard.ts`, not here. The Crossing tool's bar
-// holds the scope control and the tapped marker's read-out. Alt keyup is
-// preventDefault'ed (SPEC §7.7) — unrelated to that dispatch, so it stays a
-// small listener of its own.
-//
-// Review ruling (Task 16 fix round 1): the store's `message` (last command
-// failure/notice) is shown only in TopBar now, not here — this bar shows
-// tool-specific state only (`crossingNotice`, drawing hints), so it doesn't
-// go stale or blank when the current tool has nothing to do with a message
-// set elsewhere.
+// Shell SPEC §9.3 (V1 §7.4): the drawing bar, floating top-centre of the
+// canvas in the actions bar's slot (the two never show together: this one is
+// for the drawing tools and Crossing, that one for Select). Band: wood chip,
+// Width, Length, Angle, Undo point, Cancel, Finish. Polygon: the same without
+// Width. Rectangle: the chip and a hint. Length/Angle are the pending segment's
+// live snapped values; a typed value places the point on Enter. The drawing
+// keys (Enter/Backspace/Ctrl+Z/Esc) are dispatched by `editor/keyboard.ts`, not
+// here. Alt keyup is preventDefault'ed (V1 §7.7) — unrelated to that dispatch,
+// so it stays a small listener of its own. The store's `message` shows only in
+// the top bar; this bar shows tool-specific state.
 
+import { X } from 'lucide-react'
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useScene } from '@/editor/scene'
 import { useEditor } from '@/editor/store'
 import { scopeControlShown } from '@/editor/tools/crossing'
 import { cancelDrawing, finishDrawing, isDrawTool, placeTyped, undoPoint } from '@/editor/tools/draw'
+import { Hint } from './Hint.tsx'
 import { NumberField } from './Inspector/NumberField.tsx'
+import { WoodChip } from './ToolButtons.tsx'
 
 function useAltKeyupGuard(): void {
   useEffect(() => {
@@ -30,7 +30,7 @@ function useAltKeyupGuard(): void {
   }, [])
 }
 
-export function ToolOptions(): JSX.Element | null {
+export function DrawingBar(): JSX.Element | null {
   const tool = useEditor((s) => s.tool)
   const drawing = useEditor((s) => s.drawing)
   const unit = useEditor((s) => s.project.displayUnits)
@@ -64,51 +64,38 @@ export function ToolOptions(): JSX.Element | null {
   }
 
   return (
-    <div className="tool-options" role="toolbar" aria-label="Drawing options">
+    <div className="drawing-bar floating-top" role="toolbar" aria-label="Drawing options">
+      <WoodChip variant="bar" />
+      {!segmenting && <span className="drawing-bar-hint">Drag corner to corner</span>}
       {tool === 'band' && (
-        <div className="tool-options-fields">
+        <div className="drawing-bar-fields">
           <NumberField label="Width" value={bandWidth} unit={unit} policy="positive" onPreview={() => undefined} onCommit={(v) => useEditor.setState({ lastBandWidthMm: v })} />
         </div>
       )}
       {segmenting && (
-        <div className="tool-options-fields" onKeyDown={onKeyDown}>
-          <NumberField
-            label="Length"
-            value={typed.length ?? liveLength}
-            unit={unit}
-            policy="positive"
-            onPreview={() => undefined}
-            onCommit={(v) => setTypedBoth({ ...typedRef.current, length: v })}
-          />
-          <NumberField
-            label="Angle"
-            value={typed.angle ?? liveAngle}
-            unit="deg"
-            policy="any"
-            onPreview={() => undefined}
-            onCommit={(v) => setTypedBoth({ ...typedRef.current, angle: v })}
-          />
-        </div>
-      )}
-      {segmenting && (
         <>
-          <button type="button" onClick={finishDrawing} disabled={points === 0}>
-            Finish
-          </button>
-          <button type="button" onClick={undoPoint} disabled={points === 0}>
+          <div className="drawing-bar-fields" onKeyDown={onKeyDown}>
+            <NumberField label="Length" value={typed.length ?? liveLength} unit={unit} policy="positive" onPreview={() => undefined} onCommit={(v) => setTypedBoth({ ...typedRef.current, length: v })} />
+            <NumberField label="Angle" value={typed.angle ?? liveAngle} unit="deg" policy="any" onPreview={() => undefined} onCommit={(v) => setTypedBoth({ ...typedRef.current, angle: v })} />
+          </div>
+          <button type="button" className="drawing-bar-button" onClick={undoPoint} disabled={points === 0}>
             Undo point
           </button>
-          <button type="button" onClick={cancelDrawing} disabled={drawing === null}>
-            Cancel
+          <Hint label="Cancel" keys={['Escape']} side="bottom">
+            <button type="button" className="icon-button" aria-label="Cancel" onClick={cancelDrawing} disabled={drawing === null}>
+              <X size={18} strokeWidth={1.6} />
+            </button>
+          </Hint>
+          <button type="button" className="drawing-bar-button drawing-bar-primary" onClick={finishDrawing} disabled={points === 0}>
+            Finish
           </button>
         </>
       )}
-      {!segmenting && <span className="tool-options-hint">Drag corner to corner</span>}
     </div>
   )
 }
 
-/** SPEC §7.4 Crossing options: the scope control (only when some pair has a common motif ancestor) and the tapped marker's read-out. */
+/** V1 §7.4 Crossing options: the scope control (only when some pair has a common motif ancestor) and the tapped marker's read-out. Restyled in Task 7. */
 function CrossingOptions(): JSX.Element {
   const scope = useEditor((s) => s.crossingScope)
   const notice = useEditor((s) => s.crossingNotice)
@@ -119,14 +106,14 @@ function CrossingOptions(): JSX.Element {
     </button>
   )
   return (
-    <div className="tool-options" role="toolbar" aria-label="Crossing options">
+    <div className="drawing-bar floating-top" role="toolbar" aria-label="Crossing options">
       {scoped && (
-        <div className="button-row" role="group" aria-label="Scope">
+        <div className="segmented" role="group" aria-label="Scope">
           {scopeButton('all', 'All instances')}
           {scopeButton('occurrence', 'This occurrence')}
         </div>
       )}
-      <span className="tool-options-hint" role="status">
+      <span className="drawing-bar-hint" role="status">
         {notice ?? 'Tap a crossing to swap which band is on top'}
       </span>
     </div>

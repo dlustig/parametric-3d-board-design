@@ -8,6 +8,7 @@ import { formatLength } from '@/domain/units'
 import { useLayout } from '@/editor/layout'
 import type { Tool } from '@/editor/store'
 import { useEditor } from '@/editor/store'
+import { emptyBoardHintShown } from './EmptyBoardHint.tsx'
 import { Hint } from './Hint.tsx'
 import { BandIcon, CrossingIcon } from './icons.tsx'
 
@@ -27,13 +28,21 @@ const TOOLS: ReadonlyArray<{ tool: Tool; label: string; icon: JSX.Element }> = [
 export function ToolButtons({ variant }: { variant: Variant }): JSX.Element {
   const tool = useEditor((s) => s.tool)
   const setTool = useEditor((s) => s.setTool)
+  const invite = useEditor(emptyBoardHintShown)
   return (
     <>
       {TOOLS.map(({ tool: t, label, icon }) => (
         <Fragment key={t}>
           {variant === 'bar' && t === 'band' && <span className="bar-divider" aria-hidden="true" />}
           <Hint shortcut={t} side={variant === 'column' ? 'right' : 'top'}>
-            <button type="button" className="icon-button" aria-label={label} aria-pressed={tool === t} onClick={() => setTool(t)}>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={label}
+              aria-pressed={tool === t}
+              data-invite={t === 'band' && invite ? '' : undefined}
+              onClick={() => setTool(t)}
+            >
               {icon}
             </button>
           </Hint>
