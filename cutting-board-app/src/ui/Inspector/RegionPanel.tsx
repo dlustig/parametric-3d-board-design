@@ -43,13 +43,15 @@ export function RegionPanel({ region }: Props): JSX.Element {
           <label htmlFor="region-material" className="field-label">
             Material
           </label>
-          <select id="region-material" value={region.materialId} onChange={(e) => useEditor.getState().run((p) => setMaterial(p, [region.id], e.target.value))}>
-            {project.materials.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+          <div className="field-box">
+            <select id="region-material" value={region.materialId} onChange={(e) => useEditor.getState().run((p) => setMaterial(p, [region.id], e.target.value))}>
+              {project.materials.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="field-grid">
           <NumberField label="Width" prefix="W" value={width} unit={unit} policy="positive" onPreview={(v) => previewScale('x', v)} onCommit={() => useEditor.getState().commit()} />

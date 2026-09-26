@@ -82,13 +82,15 @@ export function BandPanel({ band }: Props): JSX.Element {
           <label htmlFor="band-material" className="field-label">
             Material
           </label>
-          <select id="band-material" value={band.materialId} onChange={(e) => useEditor.getState().run((p) => setMaterial(p, [band.id], e.target.value))}>
-            {project.materials.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+          <div className="field-box">
+            <select id="band-material" value={band.materialId} onChange={(e) => useEditor.getState().run((p) => setMaterial(p, [band.id], e.target.value))}>
+              {project.materials.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <NumberField
           label="Width"

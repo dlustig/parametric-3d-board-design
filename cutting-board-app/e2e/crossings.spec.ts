@@ -172,6 +172,24 @@ test.describe('crossing tool (mouse)', () => {
     await expect(page.getByRole('button', { name: /^Over: toggle crossing with Maple at 20, 20$/ })).toBeFocused()
   })
 
+  test('the Over/Under control: clicking the lit segment changes nothing, the unlit one toggles', async ({ page }) => {
+    await seed(page, weave())
+    await page.evaluate(() => {
+      const s = window.__cbpd!.getState()
+      s.enterContext({ motifId: 'mw', path: [{ repeatId: 'rp', row: 0, column: 0 }] })
+      s.select(['h1'])
+    })
+    const toggle = page.getByRole('button', { name: /^Under: toggle crossing with Maple at 20, 20$/ })
+    const before = await history(page)
+    await toggle.locator('[data-on="true"]').click() // "Under", already lit
+    expect(await history(page)).toEqual(before)
+    expect(await oversOfH1V1(page)).toEqual(Array(9).fill('v1'))
+    await toggle.locator('[data-on="false"]').click() // "Over"
+    expect(await history(page)).toEqual({ past: before.past + 1, future: 0 })
+    expect(await oversOfH1V1(page)).toEqual(Array(9).fill('h1'))
+    await expect(page.getByRole('button', { name: /^Over: toggle crossing with Maple at 20, 20$/ })).toBeFocused()
+  })
+
   test('hovering a marker grows it and names the over and under woods, with a Click keycap', async ({ page }) => {
     await start(page)
     const at = await clientAt(page, h1v1(0, 0))

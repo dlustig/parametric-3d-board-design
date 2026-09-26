@@ -140,8 +140,15 @@ input[type='number'] {
   min-width: 14rem;
 }
 
-.material-editor-popover .field select {
+.material-editor-popover .field > label {
+  min-width: 5.5rem;
+  font-size: 12px;
+}
+
+.material-editor-popover .field > input,
+.material-editor-popover .field > select {
   flex: 1;
+  min-width: 0;
 }
 
 .popover-arrow {
@@ -1573,10 +1580,6 @@ button.crumb:hover {
   color: var(--muted);
 }
 
-.panel {
-  margin: 0;
-}
-
 .section {
   margin: 0;
   padding: 10px 12px;
@@ -1666,7 +1669,8 @@ details:not([open]) > summary.section-title {
   border-color: var(--danger);
 }
 
-.field-box input {
+.field-box input,
+.field-box select {
   flex: 1;
   width: 100%;
   min-width: 0;
@@ -1694,20 +1698,6 @@ details:not([open]) > summary.section-title {
   color: var(--danger);
 }
 
-.field > select,
-.field > input[type='text'] {
-  flex: 1;
-  min-width: 0;
-  height: 28px;
-  padding: 0 6px;
-  background: var(--raised);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-}
-
 .field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1728,8 +1718,13 @@ details:not([open]) > summary.section-title {
 .button-row {
   display: flex;
   flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.inspector .button-row {
   gap: 6px;
-  margin-top: 4px;
+  margin: 4px 0 0;
 }
 
 .inspector-button {
@@ -1922,6 +1917,11 @@ details:not([open]) > summary.section-title {
   .row-menu-trigger,
   .inspector-button {
     min-width: 44px;
+    min-height: 44px;
+  }
+
+  .menu-select,
+  summary.section-title {
     min-height: 44px;
   }
 

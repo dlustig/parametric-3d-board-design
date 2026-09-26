@@ -28,7 +28,8 @@ test.describe('accessibility (G11)', () => {
   async function unlabeledButtons(page: Page, selector: string): Promise<string[]> {
     return page.locator(selector).evaluateAll((buttons) =>
       buttons
-        .filter((b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim() === '')
+        // A name from aria-label, a <label for> (the inspector switches), or the text content.
+        .filter((b) => (b.getAttribute('aria-label') ?? [...(b as HTMLButtonElement).labels].map((l) => l.textContent).join('') + (b.textContent ?? '')).trim() === '')
         .map((b) => b.outerHTML.slice(0, 120)),
     )
   }

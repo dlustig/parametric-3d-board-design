@@ -60,15 +60,17 @@ export function RepeatPanel({ field }: { field: RepeatField }): JSX.Element {
           <label htmlFor={`alt-rotation-${field.id}`} className="field-label">
             Alternate rotation
           </label>
-          <select
-            id={`alt-rotation-${field.id}`}
-            value={field.alternateRotationDeg}
-            onChange={(e) => set({ alternateRotationDeg: Number(e.target.value) as RepeatField['alternateRotationDeg'] })}
-          >
-            <option value={0}>0°</option>
-            <option value={90}>90°</option>
-            <option value={180}>180°</option>
-          </select>
+          <div className="field-box">
+            <select
+              id={`alt-rotation-${field.id}`}
+              value={field.alternateRotationDeg}
+              onChange={(e) => set({ alternateRotationDeg: Number(e.target.value) as RepeatField['alternateRotationDeg'] })}
+            >
+              <option value={0}>0°</option>
+              <option value={90}>90°</option>
+              <option value={180}>180°</option>
+            </select>
+          </div>
         </div>
       </Section>
       <TransformFields obj={field} />

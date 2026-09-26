@@ -153,6 +153,10 @@ test.describe('inspector sections (shell spec §13)', () => {
     await expect(closed).toHaveAttribute('aria-checked', 'true')
     expect(bandOf(await getProject(page), 'b1').closed).toBe(true)
     expect(await history(page)).toEqual({ past: 1, future: 0 })
+
+    await page.getByRole('region', { name: 'Band' }).locator('label', { hasText: /^Closed$/ }).click() // the visible text toggles too
+    await expect(closed).toHaveAttribute('aria-checked', 'false')
+    expect(await history(page)).toEqual({ past: 2, future: 0 })
   })
 
   test('a point row’s menu inserts after the point and deletes it; Points collapses', async ({ page }) => {

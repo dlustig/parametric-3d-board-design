@@ -47,8 +47,16 @@ export function CrossingList({ bandId }: { bandId: Id }): JSX.Element {
               </span>
               {i.cls === 'eligible' && (
                 // Shell spec §13: V1's one toggle button, drawn as an Over/Under segmented control. It stays
-                // one button so its accessible name is unchanged and focus stays on it across the flip.
-                <button type="button" className="segmented segmented-toggle" aria-label={`${over ? 'Over' : 'Under'}: toggle crossing ${label}`} onClick={() => toggleAt(i)}>
+                // one button so its accessible name is unchanged and focus stays on it across the flip. A click
+                // on the lit segment is a no-op, like any segmented control; Enter/Space (target: the button) toggles.
+                <button
+                  type="button"
+                  className="segmented segmented-toggle"
+                  aria-label={`${over ? 'Over' : 'Under'}: toggle crossing ${label}`}
+                  onClick={(e) => {
+                    if ((e.target as Element).closest('[data-on="true"]') === null) toggleAt(i)
+                  }}
+                >
                   <span data-on={over}>Over</span>
                   <span data-on={!over}>Under</span>
                 </button>
@@ -76,7 +84,7 @@ export function UnresolvedList({ matches }: { matches: (u: UnresolvedMarker) => 
   if (records.length === 0) return null
   return (
     <>
-      <h4 className="section-subtitle">Unresolved crossings</h4>
+      <p className="section-subtitle">Unresolved crossings</p>
       <ul className="overrides">
         {records.map((u) => (
           <li key={u.record.id}>

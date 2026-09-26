@@ -40,21 +40,23 @@ export function MotifNameField({ obj }: { obj: Placed }): JSX.Element {
       <label htmlFor={`motif-name-${obj.id}`} className="field-label">
         Motif name
       </label>
-      <input
-        id={`motif-name-${obj.id}`}
-        type="text"
-        value={text ?? name}
-        onFocus={() => setText(name)}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commitName}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur()
-          else if (e.key === 'Escape') {
-            e.stopPropagation()
-            setText(name)
-          }
-        }}
-      />
+      <div className="field-box">
+        <input
+          id={`motif-name-${obj.id}`}
+          type="text"
+          value={text ?? name}
+          onFocus={() => setText(name)}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            else if (e.key === 'Escape') {
+              e.stopPropagation()
+              setText(name)
+            }
+          }}
+        />
+      </div>
     </div>
   )
 }
