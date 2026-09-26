@@ -94,76 +94,6 @@ input[type='number'] {
   height: 100%;
 }
 
-.panel {
-  margin-bottom: 18px;
-}
-
-.panel h2 {
-  margin: 0 0 8px;
-  font-size: 0.9rem;
-}
-
-.panel h3 {
-  margin: 12px 0 6px;
-  font-size: 0.75rem;
-  opacity: 0.75;
-}
-
-.field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
-.field label {
-  min-width: 5.5rem;
-  font-size: 0.8rem;
-}
-
-.field input,
-.field select {
-  flex: 1;
-  min-width: 0;
-}
-
-.field-checkbox {
-  justify-content: flex-start;
-}
-
-.field-unit {
-  font-size: 0.7rem;
-  opacity: 0.7;
-}
-
-.field-error {
-  flex-basis: 100%;
-  font-size: 0.7rem;
-  color: var(--danger);
-}
-
-.point-row,
-.segment-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.segment-label {
-  min-width: 4.5rem;
-  font-size: 0.7rem;
-  opacity: 0.75;
-}
-
-.button-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
 .canvas {
   position: absolute;
   inset: 0;
@@ -222,35 +152,6 @@ input[type='number'] {
 .context-scrim-rect {
   fill: var(--paste);
   opacity: 0.62;
-}
-
-/* SPEC §7.5 Repeat panel: an offset field with its ½ step button. */
-.field-with-button {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.field-with-button .field {
-  flex: 1;
-  min-width: 0; /* else the input's intrinsic width pushes the row past the 280 px inspector */
-}
-
-.overrides {
-  list-style: none;
-  padding: 0;
-}
-
-.overrides li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.panel-note {
-  font-size: 0.8rem;
-  opacity: 0.75;
 }
 
 .visually-hidden {
@@ -966,11 +867,11 @@ input[type='number'] {
   height: 28px;
 }
 
-/* Inspector frame (restyled in Task 9). */
+/* Inspector frame; its header and sections (§13) carry their own padding. */
 .inspector {
   box-sizing: border-box;
   height: 100%;
-  padding: 10px 12px;
+  padding: 0;
   overflow-y: auto;
   background: var(--panel);
   color: var(--text);
@@ -1306,7 +1207,8 @@ input.motif-name {
   background: var(--raised);
 }
 
-.segmented button {
+.segmented button,
+.segmented-toggle > span {
   height: 26px;
   padding: 0 10px;
   border: 0;
@@ -1317,7 +1219,8 @@ input.motif-name {
   font-size: 12px;
 }
 
-.segmented button[aria-pressed='true'] {
+.segmented button[aria-pressed='true'],
+.segmented-toggle > [data-on='true'] {
   background: var(--panel);
   color: var(--text);
   box-shadow: 0 0 0 1px var(--line);
@@ -1325,7 +1228,8 @@ input.motif-name {
 
 @media (pointer: coarse) {
   .drawing-bar-button,
-  .segmented button {
+  .segmented button,
+  .segmented-toggle > span {
     min-height: 44px;
   }
 }
@@ -1614,5 +1518,416 @@ button.crumb:hover {
   .crumb-menu {
     width: 44px;
     height: 44px;
+  }
+}
+
+/* Shell spec §13 inspector: header, sections, fields (a --raised box with a
+   muted unit suffix and an optional compact prefix), two-column grids,
+   tables, the switch, the Over/Under toggle, the Background select. The
+   Background and point-row menus reuse `.menu`/`.menu-item`. `.field`,
+   `.field-box` and `.button-row` are shared with the drawing bar (its
+   NumberFields) and the dialogs. */
+.inspector-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.inspector-mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+
+.inspector-swatch {
+  display: inline-block;
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.inspector-swatch-none {
+  background: repeating-linear-gradient(45deg, var(--raised) 0 3px, var(--panel) 3px 6px);
+}
+
+.inspector-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.inspector-note {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.panel {
+  margin: 0;
+}
+
+.section {
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.section-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+summary.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  cursor: pointer;
+}
+
+summary.section-title::-webkit-details-marker {
+  display: none;
+}
+
+summary.section-title::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+}
+
+details[open] > summary.section-title::before {
+  transform: rotate(45deg);
+}
+
+details:not([open]) > summary.section-title {
+  margin-bottom: 0;
+}
+
+.section-subtitle {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 6px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.inspector .field-label {
+  flex: 0 0 88px;
+}
+
+.field-box {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  background: var(--raised);
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+/* §2.3: the ring sits on the box, on :focus-visible only. */
+.field-box:has(:focus-visible) {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.field-box:has(input[aria-invalid='true']) {
+  border-color: var(--danger);
+}
+
+.field-box input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.field-prefix,
+.field-unit {
+  display: inline-flex;
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field-error {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.field > select,
+.field > input[type='text'] {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  background: var(--raised);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 8px;
+}
+
+.field-with-button {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.field-with-button .field {
+  flex: 1;
+  min-width: 0; /* else the input's intrinsic width pushes the row past the inspector */
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.inspector-button {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.inspector-button:hover {
+  border-color: var(--line-strong);
+}
+
+.panel-note {
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.overrides {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overrides li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.overrides-text {
+  min-width: 0;
+}
+
+.overrides-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.data-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.data-table th {
+  padding: 0 2px 4px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.data-table td {
+  padding: 2px;
+  vertical-align: top;
+}
+
+.data-table .field {
+  margin: 0;
+}
+
+.data-table .field-box {
+  gap: 2px;
+  padding: 0 6px;
+}
+
+.data-table .col-index {
+  width: 16px;
+  padding-top: 7px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table .col-menu {
+  width: 28px;
+}
+
+.row-menu-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.row-menu-trigger:hover,
+.row-menu-trigger[data-state='open'] {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.field-switch {
+  justify-content: space-between;
+}
+
+.inspector .field-switch .field-label {
+  flex: 1;
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--line-strong);
+  cursor: pointer;
+}
+
+.switch[aria-checked='true'] {
+  background: var(--acc);
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--panel);
+}
+
+.switch[aria-checked='true'] .switch-thumb {
+  transform: translateX(14px);
+}
+
+/* The crossing list's Over/Under toggle: one button drawn by `.segmented`
+   (its segments are the spans, see the `.segmented` rules above). */
+.segmented-toggle {
+  flex: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.segmented-toggle > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.menu-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--raised);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-select-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-item[data-state='checked'] {
+  background: var(--acc-soft);
+}
+
+@media (pointer: coarse) {
+  .row-menu-trigger,
+  .inspector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .switch::after {
+    content: '';
+    position: absolute;
+    inset: -13px -6px;
   }
 }

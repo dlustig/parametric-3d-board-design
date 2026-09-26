@@ -14,6 +14,7 @@ import { useScene } from '@/editor/scene'
 import { useEditor } from '@/editor/store'
 import { toggleAt } from '@/editor/tools/crossing'
 import { contextPrefix } from '@/editor/selection'
+import { Section } from './Section.tsx'
 
 export function CrossingList({ bandId }: { bandId: Id }): JSX.Element {
   const scene = useScene()
@@ -31,8 +32,7 @@ export function CrossingList({ bandId }: { bandId: Id }): JSX.Element {
   })
 
   return (
-    <>
-      <h3>Crossings</h3>
+    <Section title="Crossings" collapsible>
       {rows.length === 0 && <p className="panel-note">None</p>}
       <ul className="overrides">
         {rows.map(({ i, over, partner }, k) => {
@@ -40,14 +40,17 @@ export function CrossingList({ bandId }: { bandId: Id }): JSX.Element {
           const label = `with ${materialName(partner.occ.materialId)} at ${where}`
           return (
             <li key={k}>
-              <span>
+              <span className="overrides-text">
                 {label}
                 {i.cls !== 'eligible' && ` (${i.cls})`}
                 {i.source === 'override' && ' (override)'}
               </span>
               {i.cls === 'eligible' && (
-                <button type="button" aria-label={`${over ? 'Over' : 'Under'}: toggle crossing ${label}`} onClick={() => toggleAt(i)}>
-                  {over ? 'Over' : 'Under'}
+                // Shell spec §13: V1's one toggle button, drawn as an Over/Under segmented control. It stays
+                // one button so its accessible name is unchanged and focus stays on it across the flip.
+                <button type="button" className="segmented segmented-toggle" aria-label={`${over ? 'Over' : 'Under'}: toggle crossing ${label}`} onClick={() => toggleAt(i)}>
+                  <span data-on={over}>Over</span>
+                  <span data-on={!over}>Under</span>
                 </button>
               )}
             </li>
@@ -55,7 +58,7 @@ export function CrossingList({ bandId }: { bandId: Id }): JSX.Element {
         })}
       </ul>
       <UnresolvedList matches={(u) => u.record.a.bandId === bandId || u.record.b.bandId === bandId} />
-    </>
+    </Section>
   )
 }
 
@@ -73,12 +76,14 @@ export function UnresolvedList({ matches }: { matches: (u: UnresolvedMarker) => 
   if (records.length === 0) return null
   return (
     <>
-      <h3>Unresolved crossings</h3>
+      <h4 className="section-subtitle">Unresolved crossings</h4>
       <ul className="overrides">
         {records.map((u) => (
           <li key={u.record.id}>
-            Unresolved at {formatLength(u.worldHint.x, unit)}, {formatLength(u.worldHint.y, unit)}
-            <button type="button" onClick={() => useEditor.getState().run((p) => removeRecord(p, u.contextId, u.record.id))}>
+            <span className="overrides-text">
+              Unresolved at {formatLength(u.worldHint.x, unit)}, {formatLength(u.worldHint.y, unit)}
+            </span>
+            <button type="button" className="inspector-button" onClick={() => useEditor.getState().run((p) => removeRecord(p, u.contextId, u.record.id))}>
               Remove
             </button>
           </li>

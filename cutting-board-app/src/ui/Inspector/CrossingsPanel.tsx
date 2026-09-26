@@ -1,7 +1,8 @@
 // Shell SPEC §9.6: the Inspector while the Crossing tool is active and
-// nothing is selected — the crossing count; Needs attention (unresolved
-// records, each with Show and Remove); Swapped (the overridden crossings);
-// Can't swap (a count, grouped by reason). Show enters the record's context
+// nothing is selected (under the Inspector's §13 header) — the crossing
+// count; Needs attention (unresolved records, each with Show and Remove);
+// Swapped (the overridden crossings); Can't swap (a count, grouped by
+// reason). Show enters the record's context
 // (§6.4) at its first placement and selects the top-level object of the
 // record's first band reference there — which validation guarantees is a
 // child of that context (V1 §2.1).
@@ -18,6 +19,7 @@ import { useScene } from '@/editor/scene'
 import { contextLevelsForPath } from '@/editor/selection'
 import { useEditor } from '@/editor/store'
 import { uniqueUnresolved } from './CrossingList.tsx'
+import { Section } from './Section.tsx'
 
 export function CrossingsPanel(): JSX.Element {
   const scene = useScene()
@@ -42,57 +44,60 @@ export function CrossingsPanel(): JSX.Element {
 
   return (
     <section className="panel crossings-panel" aria-label="Crossings">
-      <h2>Crossings</h2>
-      <p className="panel-note">{total === 1 ? '1 crossing' : `${total} crossings`}</p>
+      <p className="panel-note section">{total === 1 ? '1 crossing' : `${total} crossings`}</p>
       {attention.length > 0 && (
-        <div className="needs-attention">
-          <h3>
+        <div className="section needs-attention">
+          <h3 className="section-title">
             <TriangleAlert size={14} strokeWidth={1.6} aria-hidden="true" /> Needs attention
           </h3>
           <ul className="overrides">
             {attention.map((u) => (
               <li key={u.record.id}>
-                Unresolved at {where(u.worldHint)}
-                <button type="button" onClick={() => show(u)}>
-                  Show
-                </button>
-                <button type="button" onClick={() => useEditor.getState().run((p) => removeRecord(p, u.contextId, u.record.id))}>
-                  Remove
-                </button>
+                <span className="overrides-text">Unresolved at {where(u.worldHint)}</span>
+                <span className="overrides-actions">
+                  <button type="button" className="inspector-button" onClick={() => show(u)}>
+                    Show
+                  </button>
+                  <button type="button" className="inspector-button" onClick={() => useEditor.getState().run((p) => removeRecord(p, u.contextId, u.record.id))}>
+                    Remove
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
         </div>
       )}
-      <h3>Swapped</h3>
-      {swapped.length === 0 ? (
-        <p className="panel-note">None</p>
-      ) : (
-        <ul className="overrides swapped">
-          {swapped.map((i) => {
-            const over = i.a.occ.key === i.overKey ? i.a : i.b
-            const under = over === i.a ? i.b : i.a
-            return (
-              <li key={`${i.a.occ.key}@${i.a.segmentStart}|${i.b.occ.key}@${i.b.segmentStart}`}>
-                {name(over.occ.materialId)} over {name(under.occ.materialId)} at {where(i.point)}
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      <h3>Can't swap</h3>
-      <div className="cant-swap">
-        <p className="panel-note">{unsupported.length}</p>
-        {reasons.size > 0 && (
-          <ul className="overrides">
-            {[...reasons].map(([reason, count]) => (
-              <li key={reason}>
-                {reason}: {count}
-              </li>
-            ))}
+      <Section title="Swapped">
+        {swapped.length === 0 ? (
+          <p className="panel-note">None</p>
+        ) : (
+          <ul className="overrides swapped">
+            {swapped.map((i) => {
+              const over = i.a.occ.key === i.overKey ? i.a : i.b
+              const under = over === i.a ? i.b : i.a
+              return (
+                <li key={`${i.a.occ.key}@${i.a.segmentStart}|${i.b.occ.key}@${i.b.segmentStart}`}>
+                  {name(over.occ.materialId)} over {name(under.occ.materialId)} at {where(i.point)}
+                </li>
+              )
+            })}
           </ul>
         )}
-      </div>
+      </Section>
+      <Section title="Can't swap">
+        <div className="cant-swap">
+          <p className="panel-note">{unsupported.length}</p>
+          {reasons.size > 0 && (
+            <ul className="overrides">
+              {[...reasons].map(([reason, count]) => (
+                <li key={reason}>
+                  {reason}: {count}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Section>
     </section>
   )
 }

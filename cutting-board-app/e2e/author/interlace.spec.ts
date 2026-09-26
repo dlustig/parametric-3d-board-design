@@ -151,7 +151,7 @@ test('G6 F interlace: authored from blank through the UI matches the fixture', a
 
   expect(compareSummaries(await authoredSummary(page), fixtureSummary('interlace'))).toEqual([])
 
-  // Source motif edit: Edit Motif (cell (0, 0)), select p1 at a point on it alone, width 3.25 → 3; all 25 follow.
+  // Source motif edit: Edit motif (cell (0, 0)), select p1 at a point on it alone, width 3.25 → 3; all 25 follow.
   await a.tool('Select')
   await a.click(cell0(-10, 11.739))
   await a.enterMotif()

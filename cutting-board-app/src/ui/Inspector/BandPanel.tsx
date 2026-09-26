@@ -1,17 +1,20 @@
-// SPEC §7.5 Band panel: material, width, closed, per-point X/Y with
-// per-segment length/angle (editing a segment moves its end point and
-// translates the points after it), insert-after and delete; the crossings
-// list with unresolved records (CrossingList.tsx).
+// SPEC §7.5 Band panel, shell spec §13: Band (material, width, Closed as a
+// switch); Offset copy (width, Left, Right); Points and Segments tables
+// (editing a segment moves its end point and translates the points after
+// it); the crossings list with unresolved records (CrossingList.tsx).
 
 import type { JSX } from 'react'
 import { useState } from 'react'
 import { offsetCopyBand, setBandClosed, setBandWidth, setMaterial } from '@/domain/commands'
 import type { Band } from '@/domain/model'
 import { useEditor } from '@/editor/store'
+import { Hint } from '../Hint.tsx'
 import { CrossingList } from './CrossingList.tsx'
 import { NumberField } from './NumberField.tsx'
-import { PointRow } from './PointRow.tsx'
+import { PointsTable } from './PointRow.tsx'
+import { Section } from './Section.tsx'
 import { previewSetPoints } from './shared.ts'
+import { Switch } from './Switch.tsx'
 
 type XY = { x: number; y: number }
 
@@ -74,100 +77,108 @@ export function BandPanel({ band }: Props): JSX.Element {
 
   return (
     <section className="panel" aria-label="Band">
-      <h2>Band</h2>
-      <div className="field">
-        <label htmlFor="band-material">Material</label>
-        <select
-          id="band-material"
-          value={band.materialId}
-          onChange={(e) => useEditor.getState().run((p) => setMaterial(p, [band.id], e.target.value))}
-        >
-          {project.materials.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <NumberField
-        label="Width"
-        value={band.widthMm}
-        unit={unit}
-        policy="positive"
-        onPreview={(v) => {
-          useEditor.getState().setPreview(setBandWidth(project, band.id, v), 'commit')
-          return undefined
-        }}
-        onCommit={(v) => {
-          commit()
-          useEditor.setState({ lastBandWidthMm: v })
-        }}
-      />
-      <div className="field field-checkbox">
-        <label htmlFor="band-closed">Closed</label>
-        <input
-          id="band-closed"
-          type="checkbox"
-          checked={band.closed}
-          onChange={(e) => useEditor.getState().run((p) => setBandClosed(p, band.id, e.target.checked))}
+      <Section title="Band">
+        <div className="field">
+          <label htmlFor="band-material" className="field-label">
+            Material
+          </label>
+          <select id="band-material" value={band.materialId} onChange={(e) => useEditor.getState().run((p) => setMaterial(p, [band.id], e.target.value))}>
+            {project.materials.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <NumberField
+          label="Width"
+          value={band.widthMm}
+          unit={unit}
+          policy="positive"
+          onPreview={(v) => {
+            useEditor.getState().setPreview(setBandWidth(project, band.id, v), 'commit')
+            return undefined
+          }}
+          onCommit={(v) => {
+            commit()
+            useEditor.setState({ lastBandWidthMm: v })
+          }}
         />
-      </div>
+        <Switch label="Closed" checked={band.closed} onChange={(closed) => useEditor.getState().run((p) => setBandClosed(p, band.id, closed))} />
+      </Section>
 
-      <h3>Offset copy</h3>
-      <NumberField
-        label="Offset copy width"
-        value={offsetWidth}
-        unit={unit}
-        policy="positive"
-        onPreview={() => undefined}
-        onCommit={setOffsetWidth}
-      />
-      <div className="button-row">
-        <button type="button" onClick={() => useEditor.getState().run((p) => offsetCopyBand(p, band.id, 'left', offsetWidth))}>
-          Offset copy left
-        </button>
-        <button type="button" onClick={() => useEditor.getState().run((p) => offsetCopyBand(p, band.id, 'right', offsetWidth))}>
-          Offset copy right
-        </button>
-      </div>
+      <Section title="Offset copy">
+        <div className="field-with-button">
+          <NumberField label="Offset copy width" prefix="W" value={offsetWidth} unit={unit} policy="positive" onPreview={() => undefined} onCommit={setOffsetWidth} />
+          <Hint label="Offset copy left">
+            <button type="button" className="inspector-button" aria-label="Offset copy left" onClick={() => useEditor.getState().run((p) => offsetCopyBand(p, band.id, 'left', offsetWidth))}>
+              Left
+            </button>
+          </Hint>
+          <Hint label="Offset copy right">
+            <button type="button" className="inspector-button" aria-label="Offset copy right" onClick={() => useEditor.getState().run((p) => offsetCopyBand(p, band.id, 'right', offsetWidth))}>
+              Right
+            </button>
+          </Hint>
+        </div>
+      </Section>
 
-      <h3>Points</h3>
-      {band.points.map((pt, k) => (
-        <PointRow key={pt.id} project={project} objectId={band.id} points={band.points} wraps={band.closed} index={k} unit={unit} />
-      ))}
+      <Section title="Points" collapsible>
+        <PointsTable project={project} objectId={band.id} points={band.points} wraps={band.closed} unit={unit} />
+      </Section>
 
-      <h3>Segments</h3>
-      {Array.from({ length: segmentCount(band) }, (_, i) => i).map((i) => {
-        const start = band.points[i]!
-        const end = band.points[endpointIndex(i, n)]!
-        const segLength = length(start, end)
-        const segAngle = angleDeg(start, end)
-        const endpointAt = (l: number, a: number): XY => {
-          const rad = (a * Math.PI) / 180
-          return { x: start.x + l * Math.cos(rad), y: start.y + l * Math.sin(rad) }
-        }
-        return (
-          <div className="segment-row" key={`segment-${i}`}>
-            <span className="segment-label">Segment {i + 1}</span>
-            <NumberField
-              label={`Segment ${i + 1} length`}
-              value={segLength}
-              unit={unit}
-              policy="positive"
-              onPreview={(v) => previewSetPoints(project, band.id, movedPoints(band, i, endpointAt(v, segAngle)))}
-              onCommit={commit}
-            />
-            <NumberField
-              label={`Segment ${i + 1} angle`}
-              value={segAngle}
-              unit="deg"
-              policy="any"
-              onPreview={(deg) => previewSetPoints(project, band.id, movedPoints(band, i, endpointAt(segLength, deg)))}
-              onCommit={commit}
-            />
-          </div>
-        )
-      })}
+      <Section title="Segments" collapsible>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th scope="col" className="col-index">
+                #
+              </th>
+              <th scope="col">Length</th>
+              <th scope="col">Angle</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: segmentCount(band) }, (_, i) => i).map((i) => {
+              const start = band.points[i]!
+              const end = band.points[endpointIndex(i, n)]!
+              const segLength = length(start, end)
+              const segAngle = angleDeg(start, end)
+              const endpointAt = (l: number, a: number): XY => {
+                const rad = (a * Math.PI) / 180
+                return { x: start.x + l * Math.cos(rad), y: start.y + l * Math.sin(rad) }
+              }
+              return (
+                <tr key={`segment-${i}`}>
+                  <td className="col-index">{i + 1}</td>
+                  <td>
+                    <NumberField
+                      label={`Segment ${i + 1} length`}
+                      prefix={null}
+                      value={segLength}
+                      unit={unit}
+                      policy="positive"
+                      onPreview={(v) => previewSetPoints(project, band.id, movedPoints(band, i, endpointAt(v, segAngle)))}
+                      onCommit={commit}
+                    />
+                  </td>
+                  <td>
+                    <NumberField
+                      label={`Segment ${i + 1} angle`}
+                      prefix={null}
+                      value={segAngle}
+                      unit="deg"
+                      policy="any"
+                      onPreview={(deg) => previewSetPoints(project, band.id, movedPoints(band, i, endpointAt(segLength, deg)))}
+                      onCommit={commit}
+                    />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </Section>
 
       <CrossingList bandId={band.id} />
     </section>

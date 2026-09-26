@@ -1,7 +1,7 @@
 // Shell SPEC §6.1: the current context's children as a listbox, topmost
 // first. Click selects; Shift, Mod or Add to selection toggles (V1 §7.4, the
 // canvas's `toggleSelection`); double-clicking an Instance or Repeat enters
-// it as the Inspector's Edit Motif does. At the root a Board header labels
+// it as the Inspector's Edit motif does. At the root a Board header labels
 // the list; inside a definition the title row (`LayersTitle`, rendered by
 // LeftPane) holds a back button and the motif name, and a muted line gives
 // the occurrence count.

@@ -50,7 +50,7 @@ test('G6 E isometric: authored from blank through the UI matches the fixture', a
 
   expect(compareSummaries(await authoredSummary(page), fixtureSummary('isometric'))).toEqual([])
 
-  // Source motif edit: Edit Motif, select the top rhombus, its apex (point 3, definition (0, −24)) to y −26.
+  // Source motif edit: Edit motif, select the top rhombus, its apex (point 3, definition (0, −24)) to y −26.
   await a.enterMotif()
   await a.click({ x: 80, y: 78 })
   await a.setField('Point 3 Y', '-26', 'Region')

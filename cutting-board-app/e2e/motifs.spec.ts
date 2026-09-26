@@ -131,7 +131,7 @@ test.describe('motifs', () => {
     expect(p.rootChildren.map((id) => (p.objects[id] as Band).type)).toEqual(['band', 'band'])
   })
 
-  test('Edit Motif enters the instance; tapping another occurrence re-targets; Esc pops', async ({ page }) => {
+  test('Edit motif enters the instance; tapping another occurrence re-targets; Esc pops', async ({ page }) => {
     await seed(page, project([]))
     await setCamera(page, CAMERA)
     await page.getByRole('button', { name: 'Band', exact: true }).click()
@@ -145,7 +145,7 @@ test.describe('motifs', () => {
     expect(field).toMatchObject({ type: 'repeat', rows: 2, columns: 2 })
     expect(await history(page)).toEqual({ past: 2, future: 0 })
 
-    await page.getByRole('button', { name: 'Edit Motif', exact: true }).click()
+    await page.getByRole('region', { name: 'Repeat' }).getByRole('button', { name: 'Edit motif', exact: true }).click()
     expect(await editContext(page)).toEqual([{ motifId: field.motifId, path: [{ repeatId: fieldId, row: 0, column: 0 }] }])
 
     // Tap the band of cell (1, 0): outside the entered cell, same definition.

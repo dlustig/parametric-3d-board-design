@@ -1,7 +1,7 @@
-// SPEC §7.5 Instance panel: motif name, X/Y/rotation/mirror/scale, the world
-// width read-out, Edit Motif, Detach, and the overrides list. The name,
-// transform fields, Edit Motif, and overrides list are shared with the
-// Repeat panel.
+// SPEC §7.5 Instance panel, shell spec §13: Motif (name, the world width
+// read-out, Edit motif, Detach), Transform (X/Y, rotation, scale, mirror
+// switches), and the collapsible Overrides list. The name, transform fields,
+// Edit motif, and overrides list are shared with the Repeat panel.
 
 import type { JSX } from 'react'
 import { useState } from 'react'
@@ -19,6 +19,8 @@ import { contextMatrix, useEditor } from '@/editor/store'
 import { contextPrefix } from '@/editor/selection'
 import { UnresolvedList } from './CrossingList.tsx'
 import { NumberField } from './NumberField.tsx'
+import { Section } from './Section.tsx'
+import { Switch } from './Switch.tsx'
 
 type Placed = MotifInstance | RepeatField
 
@@ -35,7 +37,9 @@ export function MotifNameField({ obj }: { obj: Placed }): JSX.Element {
   }
   return (
     <div className="field">
-      <label htmlFor={`motif-name-${obj.id}`}>Motif name</label>
+      <label htmlFor={`motif-name-${obj.id}`} className="field-label">
+        Motif name
+      </label>
       <input
         id={`motif-name-${obj.id}`}
         type="text"
@@ -66,20 +70,16 @@ export function TransformFields({ obj }: { obj: Placed }): JSX.Element {
   }
   const toggle = (patch: Partial<Transform>): void => useEditor.getState().run((p) => setTransform(p, obj.id, patch))
   return (
-    <>
-      <NumberField label="Position X" value={t.x} unit={unit} policy="any" onPreview={(x) => preview({ x })} onCommit={commit} />
-      <NumberField label="Position Y" value={t.y} unit={unit} policy="any" onPreview={(y) => preview({ y })} onCommit={commit} />
+    <Section title="Transform">
+      <div className="field-grid">
+        <NumberField label="Position X" prefix="X" value={t.x} unit={unit} policy="any" onPreview={(x) => preview({ x })} onCommit={commit} />
+        <NumberField label="Position Y" prefix="Y" value={t.y} unit={unit} policy="any" onPreview={(y) => preview({ y })} onCommit={commit} />
+      </div>
       <NumberField label="Rotation" value={t.rotationDeg} unit="deg" policy="any" onPreview={(rotationDeg) => preview({ rotationDeg })} onCommit={commit} />
       <NumberField label="Scale" value={t.scale} unit={null} policy="positive" onPreview={(scale) => preview({ scale })} onCommit={commit} />
-      <div className="field field-checkbox">
-        <label htmlFor={`mirror-x-${obj.id}`}>Mirror X</label>
-        <input id={`mirror-x-${obj.id}`} type="checkbox" checked={t.mirrorX} onChange={(e) => toggle({ mirrorX: e.target.checked })} />
-      </div>
-      <div className="field field-checkbox">
-        <label htmlFor={`mirror-y-${obj.id}`}>Mirror Y</label>
-        <input id={`mirror-y-${obj.id}`} type="checkbox" checked={t.mirrorY} onChange={(e) => toggle({ mirrorY: e.target.checked })} />
-      </div>
-    </>
+      <Switch label="Mirror X" checked={t.mirrorX} onChange={(mirrorX) => toggle({ mirrorX })} />
+      <Switch label="Mirror Y" checked={t.mirrorY} onChange={(mirrorY) => toggle({ mirrorY })} />
+    </Section>
   )
 }
 
@@ -111,8 +111,8 @@ export function detachInstanceAndSelect(id: Id): void {
 
 export function EditMotifButton({ obj }: { obj: Placed }): JSX.Element {
   return (
-    <button type="button" onClick={() => enterMotif(obj)}>
-      Edit Motif
+    <button type="button" className="inspector-button" onClick={() => enterMotif(obj)}>
+      Edit motif
     </button>
   )
 }
@@ -143,21 +143,22 @@ export function OverridesList({ obj }: { obj: Placed }): JSX.Element {
   })
   const unit = project.displayUnits
   return (
-    <>
-      <h3>Overrides</h3>
+    <Section title="Overrides" collapsible>
       {overrides.length === 0 && <p className="panel-note">None</p>}
       <ul className="overrides">
         {overrides.map(({ i, record }) => (
           <li key={record.id}>
-            Crossing at {formatLength(i.point.x, unit)}, {formatLength(i.point.y, unit)}
-            <button type="button" onClick={() => useEditor.getState().run((p) => removeRecord(p, null, record.id))}>
+            <span className="overrides-text">
+              Crossing at {formatLength(i.point.x, unit)}, {formatLength(i.point.y, unit)}
+            </span>
+            <button type="button" className="inspector-button" onClick={() => useEditor.getState().run((p) => removeRecord(p, null, record.id))}>
               Remove
             </button>
           </li>
         ))}
       </ul>
       <UnresolvedList matches={(u) => [u.record.a, u.record.b].some((r) => throughObject(refWorldKeys(u, r), prefixKeys, obj))} />
-    </>
+    </Section>
   )
 }
 
@@ -177,21 +178,22 @@ export function InstancePanel({ instance }: { instance: MotifInstance }): JSX.El
   const unit = project.displayUnits
   return (
     <section className="panel" aria-label="Instance">
-      <h2>Instance</h2>
-      <MotifNameField obj={instance} />
+      <Section title="Motif">
+        <MotifNameField obj={instance} />
+        {Math.abs(factor - 1) > EPS_RELATIVE &&
+          worldWidths(project, instance, factor).map(({ width, world }) => (
+            <p key={width} className="panel-note">
+              World width: {formatLength(width, unit)} → {formatLength(world, unit)} {unit}
+            </p>
+          ))}
+        <div className="button-row">
+          <EditMotifButton obj={instance} />
+          <button type="button" className="inspector-button" onClick={() => detachInstanceAndSelect(instance.id)}>
+            Detach
+          </button>
+        </div>
+      </Section>
       <TransformFields obj={instance} />
-      {Math.abs(factor - 1) > EPS_RELATIVE &&
-        worldWidths(project, instance, factor).map(({ width, world }) => (
-          <p key={width} className="panel-note">
-            World width: {formatLength(width, unit)} → {formatLength(world, unit)} {unit}
-          </p>
-        ))}
-      <div className="button-row">
-        <EditMotifButton obj={instance} />
-        <button type="button" onClick={() => detachInstanceAndSelect(instance.id)}>
-          Detach
-        </button>
-      </div>
       <OverridesList obj={instance} />
     </section>
   )

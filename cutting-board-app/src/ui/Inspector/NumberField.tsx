@@ -4,8 +4,15 @@
 // keystroke; commit on Enter or blur only when the text changed from focus
 // and is valid (no history entry, no rounding, for an unchanged Tab-through);
 // Esc reverts the text and cancels the pending preview.
+//
+// Shell spec §13 look: a --raised box with the unit as a muted suffix and the
+// error below in --danger. With `prefix`, a compact visible prefix (X, Y, W,
+// H, a rotate icon) sits inside the box and the full `label` stays the
+// accessible name through a visually hidden <label>. `prefix={null}` hides
+// the label with no prefix, for table cells whose column header names the
+// value.
 
-import type { JSX } from 'react'
+import type { JSX, ReactNode } from 'react'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FieldPolicy, Unit } from '@/domain/units'
 import { formatAngle, formatLength, parseAngle, parseLength } from '@/domain/units'
@@ -21,6 +28,7 @@ interface NumberFieldProps {
   policy: FieldPolicy
   onPreview: (value: number) => PreviewOutcome
   onCommit: (value: number) => void
+  prefix?: ReactNode
 }
 
 type Parsed = { ok: true; value: number } | { ok: false; error: string }
@@ -47,7 +55,7 @@ function satisfiesPolicy(value: number, policy: FieldPolicy): boolean {
   return true
 }
 
-export function NumberField({ label, value, unit, policy, onPreview, onCommit }: NumberFieldProps): JSX.Element {
+export function NumberField({ label, value, unit, policy, onPreview, onCommit, prefix }: NumberFieldProps): JSX.Element {
   const id = useId()
   const errorId = `${id}-error`
   const [editing, setEditing] = useState(false)
@@ -77,69 +85,78 @@ export function NumberField({ label, value, unit, policy, onPreview, onCommit }:
 
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        type="text"
-        inputMode="text"
-        autoCapitalize="off"
-        autoCorrect="off"
-        spellCheck={false}
-        enterKeyHint="done"
-        aria-invalid={error !== null}
-        aria-describedby={error !== null ? errorId : undefined}
-        value={text}
-        onFocus={() => {
-          focusTextRef.current = text
-          setEditing(true)
-        }}
-        onChange={(e) => {
-          const next = e.target.value
-          setText(next)
-          const parsed = parseText(next, unit)
-          if (!parsed.ok) {
-            setError(parsed.error)
-            return
-          }
-          if (!satisfiesPolicy(parsed.value, policy)) {
-            setError('Out of range')
-            return
-          }
-          setError(onPreview(parsed.value) ?? null)
-        }}
-        onBlur={() => {
-          setEditing(false)
-          if (text === focusTextRef.current) {
-            // Nothing to commit, but a keystroke earlier in this focus session
-            // (typed away and back to the original text) may have left a live
-            // preview pending — e.g. retype "1/2" then back to "1/4". Left
-            // alone, the NEXT command's settlePreview() would commit that
-            // stale preview as its own spurious history entry.
-            useEditor.getState().cancelPreview()
-            return
-          }
-          if (error !== null) {
-            revert()
-            return
-          }
-          const parsed = parseText(text, unit)
-          if (parsed.ok) onCommit(parsed.value)
-          else revert() // defensive: `error` should already reflect this, but never commit unparsed text
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.currentTarget.blur()
-          } else if (e.key === 'Escape') {
-            e.stopPropagation()
-            revert()
-          }
-        }}
-      />
-      {unit !== null && (
-        <span className="field-unit" aria-hidden="true">
-          {unit === 'deg' ? '°' : unit}
-        </span>
-      )}
+      <label htmlFor={id} className={prefix === undefined ? 'field-label' : 'visually-hidden'}>
+        {label}
+      </label>
+      <div className="field-box">
+        {prefix !== undefined && prefix !== null && (
+          <span className="field-prefix" aria-hidden="true">
+            {prefix}
+          </span>
+        )}
+        <input
+          id={id}
+          type="text"
+          inputMode="text"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="done"
+          aria-invalid={error !== null}
+          aria-describedby={error !== null ? errorId : undefined}
+          value={text}
+          onFocus={() => {
+            focusTextRef.current = text
+            setEditing(true)
+          }}
+          onChange={(e) => {
+            const next = e.target.value
+            setText(next)
+            const parsed = parseText(next, unit)
+            if (!parsed.ok) {
+              setError(parsed.error)
+              return
+            }
+            if (!satisfiesPolicy(parsed.value, policy)) {
+              setError('Out of range')
+              return
+            }
+            setError(onPreview(parsed.value) ?? null)
+          }}
+          onBlur={() => {
+            setEditing(false)
+            if (text === focusTextRef.current) {
+              // Nothing to commit, but a keystroke earlier in this focus session
+              // (typed away and back to the original text) may have left a live
+              // preview pending — e.g. retype "1/2" then back to "1/4". Left
+              // alone, the NEXT command's settlePreview() would commit that
+              // stale preview as its own spurious history entry.
+              useEditor.getState().cancelPreview()
+              return
+            }
+            if (error !== null) {
+              revert()
+              return
+            }
+            const parsed = parseText(text, unit)
+            if (parsed.ok) onCommit(parsed.value)
+            else revert() // defensive: `error` should already reflect this, but never commit unparsed text
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur()
+            } else if (e.key === 'Escape') {
+              e.stopPropagation()
+              revert()
+            }
+          }}
+        />
+        {unit !== null && (
+          <span className="field-unit" aria-hidden="true">
+            {unit === 'deg' ? '°' : unit}
+          </span>
+        )}
+      </div>
       {error !== null && (
         <span id={errorId} className="field-error">
           {error}

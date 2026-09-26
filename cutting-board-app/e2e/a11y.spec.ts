@@ -90,7 +90,7 @@ test.describe('accessibility (G11)', () => {
     await page.locator('.canvas').focus()
     await page.keyboard.press(']')
     expect(await state<string[]>(page, 's.selection')).toEqual(['h1'])
-    await expect(page.getByRole('heading', { name: 'Band' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Band', level: 2 })).toBeVisible()
 
     // Tab moves focus natively out of the canvas (it never cycles the selection, only `]`/`[` do).
     await page.keyboard.press('Tab')

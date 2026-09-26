@@ -161,6 +161,8 @@ test.describe('crossing tool (mouse)', () => {
     const toggle = page.getByRole('button', { name: /^Under: toggle crossing with Maple at 20, 20$/ })
     await expect(toggle).toBeVisible()
     await page.getByLabel('Segment 1 angle').focus()
+    await page.keyboard.press('Tab') // the collapsible Crossings section's summary (shell spec §13)
+    await expect(page.locator('summary', { hasText: 'Crossings' })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(toggle).toBeFocused()
     const before = await history(page)

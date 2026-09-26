@@ -185,10 +185,11 @@ export class Author {
     await this.tick()
   }
 
+  /** An inspector switch (shell spec §13): one click when it is not already `on`. */
   async check(label: string, on: boolean): Promise<void> {
-    const box = this.page.getByLabel(label, { exact: true })
-    if (on) await box.check()
-    else await box.uncheck()
+    const toggle = this.page.getByRole('switch', { name: label, exact: true })
+    if ((await toggle.getAttribute('aria-checked')) !== String(on)) await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-checked', String(on))
     await this.tick()
   }
 
@@ -249,7 +250,8 @@ export class Author {
   }
 
   async enterMotif(): Promise<void> {
-    await this.button('Edit Motif')
+    await this.page.getByRole('toolbar', { name: 'Selection actions' }).getByRole('button', { name: 'Edit motif', exact: true }).click()
+    await this.tick()
   }
 
   async done(): Promise<void> {
@@ -283,8 +285,12 @@ export class Author {
     await this.setField('Height', height, 'Board')
   }
 
+  /** The Board panel's Background menu (shell spec §13): open it, pick the material — two actions. */
   async setBackground(material: string): Promise<void> {
-    await this.choose('Background material', material)
+    await this.page.getByRole('region', { name: 'Board', exact: true }).getByRole('button', { name: /^Background material/ }).click()
+    await this.tick()
+    await this.page.getByRole('menuitemradio', { name: material, exact: true }).click()
+    await this.tick()
   }
 
   async setGrid(text: string): Promise<void> {

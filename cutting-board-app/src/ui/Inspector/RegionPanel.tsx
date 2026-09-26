@@ -1,5 +1,5 @@
-// SPEC §7.5 Region panel: material, bounds width/height (scales the polygon
-// about the bounds origin), per-point X/Y with insert-after and delete.
+// SPEC §7.5 Region panel, shell spec §13: Material and bounds W/H (scaling
+// the polygon about the bounds origin), then the Points table.
 
 import type { JSX } from 'react'
 import { setMaterial } from '@/domain/commands'
@@ -9,7 +9,8 @@ import { EPS_GEOMETRY } from '@/geometry/tolerance'
 import { useEditor } from '@/editor/store'
 import type { PreviewOutcome } from './NumberField.tsx'
 import { NumberField } from './NumberField.tsx'
-import { PointRow } from './PointRow.tsx'
+import { PointsTable } from './PointRow.tsx'
+import { Section } from './Section.tsx'
 import { previewSetPoints } from './shared.ts'
 
 interface Props {
@@ -37,28 +38,27 @@ export function RegionPanel({ region }: Props): JSX.Element {
 
   return (
     <section className="panel" aria-label="Region">
-      <h2>Region</h2>
-      <div className="field">
-        <label htmlFor="region-material">Material</label>
-        <select
-          id="region-material"
-          value={region.materialId}
-          onChange={(e) => useEditor.getState().run((p) => setMaterial(p, [region.id], e.target.value))}
-        >
-          {project.materials.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <NumberField label="Width" value={width} unit={unit} policy="positive" onPreview={(v) => previewScale('x', v)} onCommit={() => useEditor.getState().commit()} />
-      <NumberField label="Height" value={height} unit={unit} policy="positive" onPreview={(v) => previewScale('y', v)} onCommit={() => useEditor.getState().commit()} />
-
-      <h3>Points</h3>
-      {region.points.map((pt, k) => (
-        <PointRow key={pt.id} project={project} objectId={region.id} points={region.points} wraps index={k} unit={unit} />
-      ))}
+      <Section title="Region">
+        <div className="field">
+          <label htmlFor="region-material" className="field-label">
+            Material
+          </label>
+          <select id="region-material" value={region.materialId} onChange={(e) => useEditor.getState().run((p) => setMaterial(p, [region.id], e.target.value))}>
+            {project.materials.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field-grid">
+          <NumberField label="Width" prefix="W" value={width} unit={unit} policy="positive" onPreview={(v) => previewScale('x', v)} onCommit={() => useEditor.getState().commit()} />
+          <NumberField label="Height" prefix="H" value={height} unit={unit} policy="positive" onPreview={(v) => previewScale('y', v)} onCommit={() => useEditor.getState().commit()} />
+        </div>
+      </Section>
+      <Section title="Points" collapsible>
+        <PointsTable project={project} objectId={region.id} points={region.points} wraps unit={unit} />
+      </Section>
     </section>
   )
 }
