@@ -1,5 +1,5 @@
 // Shell §5: the icon column, with these parts:
-// - pane tabs (Wood only until Task 5);
+// - pane tabs: Layers, Motifs, Wood;
 // - a separator;
 // - the docked tools and the current-wood chip;
 // - after flexible space, Undock tools. It is hidden while undocked, when the
@@ -7,12 +7,19 @@
 // Clicking the active tab toggles the left pane; an inactive tab opens the
 // pane on that tab (§4.1).
 
-import { Palette, PictureInPicture2 } from 'lucide-react'
+import { Layers, Palette, PictureInPicture2 } from 'lucide-react'
 import type { JSX } from 'react'
 import type { LeftTab } from '@/editor/layout'
 import { useLayout } from '@/editor/layout'
 import { Hint } from './Hint.tsx'
+import { MotifIcon } from './icons.tsx'
 import { ToolButtons, WoodChip } from './ToolButtons.tsx'
+
+const TABS: ReadonlyArray<{ tab: LeftTab; label: string; icon: JSX.Element }> = [
+  { tab: 'layers', label: 'Layers', icon: <Layers size={18} strokeWidth={1.6} /> },
+  { tab: 'motifs', label: 'Motifs', icon: <MotifIcon size={18} /> },
+  { tab: 'wood', label: 'Wood', icon: <Palette size={18} strokeWidth={1.6} /> },
+]
 
 export function IconColumn(): JSX.Element {
   const leftTab = useLayout((s) => s.leftTab)
@@ -27,11 +34,13 @@ export function IconColumn(): JSX.Element {
 
   return (
     <div className="icon-column">
-      <Hint label="Wood" side="right">
-        <button type="button" className="icon-button" aria-label="Wood" aria-pressed={leftOpen && leftTab === 'wood'} onClick={() => onTab('wood')}>
-          <Palette size={18} strokeWidth={1.6} />
-        </button>
-      </Hint>
+      {TABS.map(({ tab, label, icon }) => (
+        <Hint key={tab} label={label} side="right">
+          <button type="button" className="icon-button" aria-label={label} aria-pressed={leftOpen && leftTab === tab} onClick={() => onTab(tab)}>
+            {icon}
+          </button>
+        </Hint>
+      ))}
       <div className="icon-column-separator" role="separator" />
       {docked && (
         <>

@@ -51,6 +51,18 @@ export async function select(page: Page, ids: string[]): Promise<void> {
   await nextFrame(page)
 }
 
+/**
+ * Shows the left pane on `name`'s tab (shell SPEC §4.1). A tab reads pressed
+ * only while the pane is open on it, so an unpressed tab is clicked: an
+ * inactive tab opens the pane on it, and the active tab of a collapsed pane
+ * reopens it.
+ */
+export async function openPane(page: Page, name: 'Layers' | 'Motifs' | 'Wood'): Promise<void> {
+  const tab = page.locator('.icon-column').getByRole('button', { name, exact: true })
+  if ((await tab.getAttribute('aria-pressed')) !== 'true') await tab.click()
+  await expect(tab).toHaveAttribute('aria-pressed', 'true')
+}
+
 /** Opens the top bar's project menu and chooses `item` (shell §10.1). */
 export async function projectMenuItem(page: Page, item: string): Promise<void> {
   await page.locator('.project-name').click()

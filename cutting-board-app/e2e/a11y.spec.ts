@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test'
 import type { Band, Project } from '../src/domain/model.ts'
 import { band, instance, MAT2, project } from '../src/domain/test-builders.ts'
 import type { XY } from './helpers.ts'
-import { cameraShowing, getProject, history, nextFrame, seed, select, setCamera, toClient } from './helpers.ts'
+import { cameraShowing, getProject, history, nextFrame, openPane, seed, select, setCamera, toClient } from './helpers.ts'
 
 test.describe('accessibility (G11)', () => {
   test.skip(({ isMobile }) => isMobile, 'a11y checks run in the desktop chromium project')
@@ -55,7 +55,8 @@ test.describe('accessibility (G11)', () => {
     const offenders: string[] = []
     offenders.push(...(await unlabeledButtons(page, '.top-bar button')))
     offenders.push(...(await unlabeledButtons(page, '.icon-column button')))
-    offenders.push(...(await unlabeledButtons(page, '.left-pane button'))) // the Wood pane, open by default
+    await openPane(page, 'Wood')
+    offenders.push(...(await unlabeledButtons(page, '.left-pane button')))
     offenders.push(...(await unlabeledButtons(page, '.canvas-controls button')))
     offenders.push(...(await unlabeledButtons(page, '.actions-bar button')))
 

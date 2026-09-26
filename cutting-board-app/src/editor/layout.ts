@@ -91,7 +91,7 @@ export const useLayout = create<LayoutState>()(
   persist(
     (set) => ({
       theme: 'dark',
-      leftTab: 'wood', // Task 5 restores 'layers' with the Layers pane
+      leftTab: 'layers',
       toolsDocked: true,
       setTheme: (theme) => set({ theme }),
       setLeftTab: (leftTab) => set({ leftTab }),

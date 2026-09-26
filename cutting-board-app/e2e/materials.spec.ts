@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { Band, Material, Project } from '../src/domain/model.ts'
 import { band, instance, MAT2, project } from '../src/domain/test-builders.ts'
-import { getProject, history, projectMenuItem, seed, select, toClient } from './helpers.ts'
+import { getProject, history, openPane, projectMenuItem, seed, select, toClient } from './helpers.ts'
 
 function bandOf(p: Project, id: string): Band {
   return p.objects[id] as Band
@@ -33,6 +33,7 @@ function projectWithCherry(root: Band[]): Project {
 test.describe('materials palette', () => {
   test('clicking a swatch with two Bands selected recolours both in one history entry', async ({ page }) => {
     await seed(page, project([band('b1', [[0, 40], [80, 40]]), band('b2', [[0, 80], [80, 80]])]))
+    await openPane(page, 'Wood')
     await select(page, ['b1', 'b2'])
 
     await page.getByRole('button', { name: 'Walnut', exact: true }).click()
@@ -50,6 +51,7 @@ test.describe('materials palette', () => {
 
   test('clicking a swatch with an empty selection sets the current material instead', async ({ page }) => {
     await seed(page, project([]))
+    await openPane(page, 'Wood')
     const before = await page.evaluate(() => window.__cbpd!.getState().currentMaterialId)
 
     await page.getByRole('button', { name: 'Walnut', exact: true }).click()
@@ -65,6 +67,7 @@ test.describe('materials palette', () => {
   test('Replace everywhere updates every occurrence of the source material in one history entry', async ({ page }) => {
     const seeded = projectWithCherry([band('b1', [[0, 40], [80, 40]]), band('b2', [[0, 80], [80, 80]], { materialId: MAT2 })])
     await seed(page, seeded)
+    await openPane(page, 'Wood')
 
     await page.getByRole('button', { name: 'Edit Maple', exact: true }).click()
     await page.getByLabel('Replace everywhere with').selectOption({ label: 'Cherry' })
@@ -79,6 +82,7 @@ test.describe('materials palette', () => {
   test('a selection of only instances/repeats shows the recolour hint and swatches do nothing', async ({ page }) => {
     const seeded = project([instance('i1', 'm1')], [{ id: 'm1', children: [band('mb1', [[-10, 0], [10, 0]])] }])
     await seed(page, seeded)
+    await openPane(page, 'Wood')
     await select(page, ['i1'])
 
     await expect(page.getByText('Edit the motif to recolour')).toBeVisible()
@@ -90,6 +94,7 @@ test.describe('materials palette', () => {
 test.describe('materials palette: deleting the current material', () => {
   test('resets currentMaterialId to the first remaining material', async ({ page }) => {
     await seed(page, project([]))
+    await openPane(page, 'Wood')
     await page.getByRole('button', { name: 'Walnut', exact: true }).click() // empty selection: sets the current material
     const walnut = materialId(await getProject(page), 'Walnut')
     expect(await page.evaluate(() => window.__cbpd!.getState().currentMaterialId)).toBe(walnut)

@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test'
 import type { Project } from '../src/domain/model.ts'
 import { band, project } from '../src/domain/test-builders.ts'
 import type { Camera } from './helpers.ts'
-import { expectClose, getProject, history, open, projectMenuItem, seed, select } from './helpers.ts'
+import { expectClose, getProject, history, open, openPane, projectMenuItem, seed, select } from './helpers.ts'
 
 declare global {
   interface Window {
@@ -99,15 +99,16 @@ test.describe('side panes (desktop 1440 × 900)', () => {
 
   test('clicking the active tab toggles the sidebar; the wood chip reopens it on Wood', async ({ page }) => {
     await open(page)
-    const wood = page.getByRole('button', { name: 'Wood', exact: true })
-    await expect(wood).toHaveAttribute('aria-pressed', 'true')
-    await wood.click()
+    const layers = page.getByRole('button', { name: 'Layers', exact: true }) // the default tab (§11)
+    await expect(layers).toHaveAttribute('aria-pressed', 'true')
+    await layers.click()
     await expect(page.locator('.left-pane')).toHaveCount(0)
-    await expect(wood).toHaveAttribute('aria-pressed', 'false')
-    await wood.click()
+    await expect(layers).toHaveAttribute('aria-pressed', 'false')
+    await layers.click()
     await expect(page.locator('.left-pane')).toBeVisible()
+    await expect(page.getByRole('complementary', { name: 'Layers' })).toBeVisible()
 
-    await wood.click()
+    await layers.click()
     await expect(page.locator('.left-pane')).toHaveCount(0)
     await page.getByRole('button', { name: /^Current wood: / }).click()
     await expect(page.getByRole('region', { name: 'Wood' })).toBeVisible()
@@ -221,6 +222,7 @@ test.describe('side panes (desktop 1440 × 900)', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     expect(await selectionOf(page)).toEqual(['b1'])
 
+    await openPane(page, 'Wood')
     await page.getByRole('button', { name: 'Edit Walnut', exact: true }).click()
     const popover = page.getByRole('dialog', { name: 'Edit Walnut' })
     await expect(popover).toBeVisible()

@@ -1150,3 +1150,145 @@ input[type='number'] {
   width: 28px;
   height: 28px;
 }
+
+/* ---- Layers and Motifs panes (shell spec §6.1, §6.2; Task 5) ---- */
+
+/* Names truncate with an ellipsis (their full text is the title attribute),
+   never widening the pane. */
+.layers-pane,
+.motifs-pane {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.layers-board {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 12px 4px;
+  font-weight: 600;
+}
+
+.layers-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 4px;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.layer-row:hover {
+  background: var(--raised);
+}
+
+.layer-row[aria-selected='true'] {
+  background: var(--acc-soft);
+  color: var(--acc);
+}
+
+.layer-mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+
+.layer-swatch {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+}
+
+.layer-name,
+.layer-detail,
+.motif-name,
+.motif-usage {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-name {
+  flex: 1 1 auto;
+}
+
+.layer-detail {
+  flex: 0 1 auto;
+  max-width: 50%;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.motif-list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+.motif-row {
+  display: grid;
+  grid-template-areas:
+    'thumb name actions'
+    'thumb usage actions';
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.motif-row:hover {
+  background: var(--raised);
+}
+
+.motif-thumb {
+  grid-area: thumb;
+  border-radius: 6px;
+  background: var(--paste);
+}
+
+.motif-name {
+  grid-area: name;
+}
+
+input.motif-name {
+  padding: 2px 6px;
+  border: 1px solid var(--acc);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+}
+
+.motif-usage {
+  grid-area: usage;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.motif-actions {
+  display: flex;
+  grid-area: actions;
+  gap: 2px;
+}

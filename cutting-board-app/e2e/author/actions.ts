@@ -204,8 +204,13 @@ export class Author {
 
   // --- Named commands (each one action) ---
 
-  /** A palette swatch: sets the current material with nothing selected, else assigns it (SPEC §3). */
+  /** A palette swatch: sets the current material with nothing selected, else assigns it (SPEC §3). Opening the Wood pane is one more action, needed once. */
   async swatch(material: string): Promise<void> {
+    const wood = this.page.locator('.icon-column').getByRole('button', { name: 'Wood', exact: true })
+    if ((await wood.getAttribute('aria-pressed')) !== 'true') {
+      await wood.click()
+      await this.tick()
+    }
     await this.button(material)
   }
 
