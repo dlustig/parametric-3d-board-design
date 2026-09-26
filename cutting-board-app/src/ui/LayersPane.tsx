@@ -16,7 +16,7 @@ import { currentContext, useEditor } from '@/editor/store'
 import { toggleSelection } from '@/editor/tools/select'
 import { Hint } from './Hint.tsx'
 import { MotifIcon, RepeatIcon } from './icons.tsx'
-import { enterMotif } from './Inspector/InstancePanel.tsx'
+import { enterMotif, leaveContext } from './Inspector/InstancePanel.tsx'
 
 const TITLE_ID = 'layers-title'
 const BOARD_ID = 'layers-board'
@@ -41,15 +41,10 @@ export function LayersTitle(): JSX.Element {
 
   const parent = editContext.length >= 2 ? project.motifs[editContext[editContext.length - 2]!.motifId]!.name : project.name
   const name = project.motifs[ctx]!.name
-  const back = (): void => {
-    const s = useEditor.getState()
-    s.select([])
-    s.popContext()
-  }
   return (
     <>
       <Hint label={`Back to ${parent}`} side="bottom">
-        <button type="button" className="icon-button" aria-label={`Back to ${parent}`} onClick={back}>
+        <button type="button" className="icon-button" aria-label={`Back to ${parent}`} onClick={leaveContext}>
           <ArrowLeft size={18} strokeWidth={1.6} />
         </button>
       </Hint>

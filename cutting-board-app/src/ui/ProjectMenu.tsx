@@ -21,7 +21,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { ChevronDown, ChevronRight, Download, FileOutput, FilePlus, FolderOpen, Keyboard, PencilLine } from 'lucide-react'
 import type { ChangeEvent, JSX, ReactElement, RefObject } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { setProjectName } from '@/domain/commands'
 import { importProject } from '@/domain/migrate'
 import type { Project } from '@/domain/model'
@@ -32,6 +32,8 @@ import { SHORTCUTS } from '@/editor/shortcuts'
 import { useEditor } from '@/editor/store'
 import { downloadExportSvg, downloadProject } from '@/export/download'
 import { fixtures } from '@/fixtures'
+import { Hint } from './Hint.tsx'
+import { popContextTo } from './Inspector/InstancePanel.tsx'
 import { ChordKeys } from './Keycap.tsx'
 
 const ICON = { size: 16, strokeWidth: 1.6 } as const
@@ -69,6 +71,8 @@ type PendingAction = 'new' | 'open' | null
 
 export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() => void> }): JSX.Element {
   const name = useEditor((s) => s.project.name)
+  const editContext = useEditor((s) => s.editContext)
+  const motifs = useEditor((s) => s.project.motifs)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<PendingAction>(null)
@@ -151,13 +155,43 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
               }
             }}
           />
-        ) : (
+        ) : editContext.length === 0 ? (
           <DropdownMenu.Trigger asChild>
             <button type="button" className="project-name" title={name}>
               <span className="project-name-text">{name}</span>
               <ChevronDown {...ICON} />
             </button>
           </DropdownMenu.Trigger>
+        ) : (
+          <nav className="crumbs" aria-label="Breadcrumb">
+            <button type="button" className="crumb" title={name} onClick={() => popContextTo(0)}>
+              {name}
+            </button>
+            <Hint label="Project menu" side="bottom">
+              <DropdownMenu.Trigger asChild>
+                <button type="button" className="crumb-menu" aria-label="Project menu">
+                  <ChevronDown size={14} strokeWidth={1.6} aria-hidden="true" />
+                </button>
+              </DropdownMenu.Trigger>
+            </Hint>
+            {editContext.map((level, k) => {
+              const motifName = motifs[level.motifId]!.name
+              return (
+                <Fragment key={k}>
+                  <ChevronRight className="crumb-sep" size={14} strokeWidth={1.6} aria-hidden="true" />
+                  {k < editContext.length - 1 ? (
+                    <button type="button" className="crumb" title={motifName} onClick={() => popContextTo(k + 1)}>
+                      {motifName}
+                    </button>
+                  ) : (
+                    <span className="crumb crumb-current" title={motifName} aria-current="location">
+                      {motifName}
+                    </span>
+                  )}
+                </Fragment>
+              )
+            })}
+          </nav>
         )}
         <DropdownMenu.Portal>
           <DropdownMenu.Content

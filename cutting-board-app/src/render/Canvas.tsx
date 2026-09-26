@@ -64,7 +64,7 @@ import {
 import { CrossingHover } from '@/ui/CrossingHover'
 import { Proxies } from './Proxies.tsx'
 import { SceneSvg } from './SceneSvg.tsx'
-import { ContextScrim } from './overlays/ContextScrim.tsx'
+import { ContextOutline, ContextScrim } from './overlays/ContextScrim.tsx'
 import { CrossingMarkers } from './overlays/CrossingMarkers.tsx'
 import { BoardDimensions } from './overlays/BoardDimensions.tsx'
 import { DrawPreview } from './overlays/DrawPreview.tsx'
@@ -427,6 +427,7 @@ export function Canvas(): JSX.Element {
         <SceneSvg scene={scene} materials={shown.materials} clipPrefix="cbpd-clip" />
         {editContext.length > 0 && <ContextScrim scene={scene} materials={shown.materials} prefix={contextPrefix(editContext)} view={{ x: vx, y: vy, w: vw, h: vh }} />}
         <path className="board-mat" d={matD} fillRule="evenodd" pointerEvents="none" />
+        {editContext.length > 0 && <ContextOutline scene={scene} prefix={contextPrefix(editContext)} zoom={camera.zoom} />}
         <BoardDimensions board={project.board} zoom={camera.zoom} unit={project.displayUnits} />
         {showGrid && <Grid gridMm={gridMm} matrix={ctxMatrix} zoom={camera.zoom} board={project.board} />}
         <Proxies bounds={bounds} />

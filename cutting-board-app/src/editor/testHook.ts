@@ -46,7 +46,8 @@ declare global {
 }
 
 const HIDE_CHROME_ID = 'cbpd-test-hide-chrome'
-const HIDE_CHROME_CSS = '.board-mat, .proxies, .selection-overlay, .pivot-marker, .moveable-control-box, .grid, .draw-preview, .snap-guide, .crossing-markers, .drawing-bar, .board-dimensions, .empty-board-hint, .canvas-controls, .actions-bar, .tool-bar, .crossing-hover { display: none !important; }'
+const HIDE_CHROME_CSS =
+  '.board-mat, .proxies, .selection-overlay, .pivot-marker, .moveable-control-box, .grid, .draw-preview, .snap-guide, .crossing-markers, .drawing-bar, .board-dimensions, .empty-board-hint, .canvas-controls, .actions-bar, .tool-bar, .crossing-hover, .edit-pill, .canvas-top-stack { display: none !important; }'
 
 function setHideChrome(hide: boolean): void {
   document.getElementById(HIDE_CHROME_ID)?.remove()

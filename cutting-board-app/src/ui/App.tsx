@@ -20,9 +20,9 @@ import { useEditor } from '@/editor/store'
 import { Canvas } from '@/render/Canvas'
 import { createAutosave, loadAtStartup, openStorage, PROJECT_KEY } from '@/storage/local'
 import { ActionsBar } from './ActionsBar.tsx'
-import { Breadcrumb } from './Breadcrumb.tsx'
 import { CanvasControls } from './CanvasControls.tsx'
 import { DrawingBar } from './DrawingBar.tsx'
+import { EditPill } from './EditPill.tsx'
 import { EmptyBoardHint } from './EmptyBoardHint.tsx'
 import { IconColumn } from './IconColumn.tsx'
 import { Inspector } from './Inspector/Inspector.tsx'
@@ -128,6 +128,7 @@ function App(): JSX.Element {
   const leftOpen = useLayout((s) => s.leftOpen)
   const rightOpen = useLayout((s) => s.rightOpen)
   const toolsDocked = useLayout((s) => s.toolsDocked)
+  const inContext = useEditor((s) => s.editContext.length > 0)
   const leftRef = useRef<PanelImperativeHandle | null>(null)
   const rightRef = useRef<PanelImperativeHandle | null>(null)
   const openProjectRef = useRef<() => void>(() => {})
@@ -219,14 +220,16 @@ function App(): JSX.Element {
               </>
             )}
             <Panel id="pane-canvas" className="canvas-pane">
-              <main className="canvas-host">
+              <main className={inContext ? 'canvas-host in-context' : 'canvas-host'}>
                 <Canvas />
+                <div className="canvas-top-stack">
+                  <EditPill />
+                  <ActionsBar />
+                  <DrawingBar />
+                </div>
                 <EmptyBoardHint />
-                <ActionsBar />
                 <CanvasControls />
                 {!toolsDocked && <ToolBar />}
-                <DrawingBar />
-                <Breadcrumb />
               </main>
             </Panel>
             {!narrow && (

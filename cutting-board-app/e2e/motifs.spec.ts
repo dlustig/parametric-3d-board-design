@@ -95,13 +95,13 @@ test.describe('motifs', () => {
     expect(await getProject(page).then((q) => q.objects[instanceId])).toMatchObject({ rows: 3, columns: 3 })
     expect(await history(page)).toEqual({ past: 6, future: 0 })
 
-    // Double-click cell (1, 1) → breadcrumb, scrim, and that cell drawn again above it.
+    // Double-click cell (1, 1) → edit pill, scrim, and that cell drawn again above it.
     const field = (await getProject(page)).objects[instanceId] as RepeatField
     const cellCentre = { x: field.transform.x + field.stepXMm, y: field.transform.y + field.stepYMm }
     const target = await at(page, cellCentre)
     await page.mouse.dblclick(target.x, target.y)
     const motifName = Object.values((await getProject(page)).motifs)[0]!.name
-    await expect(page.getByRole('navigation', { name: 'Edit context' })).toContainText(`Board / Motif: ${motifName}`)
+    await expect(page.getByRole('navigation', { name: 'Edit context' })).toContainText(`Editing ${motifName}`)
     expect(await editContext(page)).toEqual([{ motifId: field.motifId, path: [{ repeatId: instanceId, row: 1, column: 1 }] }])
     await expect(page.locator('.context-scrim > g.scene > path')).toHaveCount(2)
 
@@ -174,6 +174,6 @@ test.describe('motifs (touch)', () => {
     }
     await nextFrame(page)
     expect(await editContext(page)).toEqual([{ motifId: 'm2', path: [{ repeatId: 'rp1', row: 0, column: 1 }] }])
-    await expect(page.getByRole('navigation', { name: 'Edit context' })).toContainText('Board / Motif: m2')
+    await expect(page.getByRole('navigation', { name: 'Edit context' })).toContainText('Editing m2')
   })
 })
