@@ -33,7 +33,6 @@ import { useEditor } from '@/editor/store'
 import { downloadExportSvg, downloadProject } from '@/export/download'
 import { fixtures } from '@/fixtures'
 import { Hint } from './Hint.tsx'
-import { popContextTo } from './Inspector/InstancePanel.tsx'
 import { ChordKeys } from './Keycap.tsx'
 
 const ICON = { size: 16, strokeWidth: 1.6 } as const
@@ -82,6 +81,9 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
   // run before a re-render could show them the new value.
   const renamingRef = useRef(false)
   const reverted = useRef(false)
+
+  /** Shell spec §8: pops the edit context to `depth` levels (0 = the root). The breadcrumb's own crumb clicks. */
+  const popTo = (depth: number): void => useEditor.getState().setEditContext(editContext.slice(0, depth))
 
   const startNew = (): void => {
     const displayUnits = useEditor.getState().project.displayUnits
@@ -164,7 +166,7 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
           </DropdownMenu.Trigger>
         ) : (
           <nav className="crumbs" aria-label="Breadcrumb">
-            <button type="button" className="crumb" title={name} onClick={() => popContextTo(0)}>
+            <button type="button" className="crumb" title={name} onClick={() => popTo(0)}>
               {name}
             </button>
             <Hint label="Project menu" side="bottom">
@@ -180,7 +182,7 @@ export function ProjectMenu({ openProjectRef }: { openProjectRef: RefObject<() =
                 <Fragment key={k}>
                   <ChevronRight className="crumb-sep" size={14} strokeWidth={1.6} aria-hidden="true" />
                   {k < editContext.length - 1 ? (
-                    <button type="button" className="crumb" title={motifName} onClick={() => popContextTo(k + 1)}>
+                    <button type="button" className="crumb" title={motifName} onClick={() => popTo(k + 1)}>
                       {motifName}
                     </button>
                   ) : (

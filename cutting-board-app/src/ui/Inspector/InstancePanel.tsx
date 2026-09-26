@@ -97,12 +97,6 @@ export function leaveContext(): void {
   s.popContext()
 }
 
-/** Shell spec §8: pops to `depth` levels (0 = the root). Shared by the top-bar breadcrumb's crumb clicks. */
-export function popContextTo(depth: number): void {
-  const s = useEditor.getState()
-  s.setEditContext(s.editContext.slice(0, depth))
-}
-
 /** V1 §5.6 Detach: the instance becomes copies of its definition's objects, which are then selected. Shared with the actions bar. */
 export function detachInstanceAndSelect(id: Id): void {
   let copies: Id[] = []

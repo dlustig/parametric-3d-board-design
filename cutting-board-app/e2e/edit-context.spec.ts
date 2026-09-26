@@ -7,7 +7,7 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { Project, Step } from '../src/domain/model.ts'
 import { band, instance, project } from '../src/domain/test-builders.ts'
-import { expectClose, nextFrame, seed, seededProject } from './helpers.ts'
+import { expectClose, nextFrame, seed, seededProject, setCamera } from './helpers.ts'
 
 /** i1 (motif m1) at the root; m1 holds i2 (motif m2) and a band; m2 holds one band. */
 function nestedProject(): Project {
@@ -92,11 +92,38 @@ test.describe('edit context', () => {
     expect(await outline.getAttribute('stroke-dasharray')).not.toBeNull()
   })
 
-  test('the actions bar sits 8 px below the pill, centred with it', async ({ page }) => {
+  test('the outline’s stroke width and dashes are in screen px, scaling by 1/zoom', async ({ page }) => {
     await seed(page, seededProject())
     await enter(page, REPEAT_CELL)
+    const outline = page.locator('.context-outline')
+    const read = (): Promise<{ width: number; dashes: number[] }> =>
+      outline.evaluate((el) => ({
+        width: Number(el.getAttribute('stroke-width')),
+        dashes: el.getAttribute('stroke-dasharray')!.trim().split(/\s+/).map(Number),
+      }))
+
+    const zoom1 = await page.evaluate(() => window.__cbpd!.getState().camera.zoom)
+    const before = await read()
+    expectClose(before.width, 1.5 / zoom1, 1e-9)
+    expectClose(before.dashes[0]!, 6 / zoom1, 1e-9)
+    expectClose(before.dashes[1]!, 4 / zoom1, 1e-9)
+
+    const camera = await page.evaluate(() => window.__cbpd!.getState().camera)
+    await setCamera(page, { ...camera, zoom: camera.zoom * 2 })
+    const after = await read()
+    expectClose(after.width, before.width / 2, 1e-9)
+    expectClose(after.dashes[0]!, before.dashes[0]! / 2, 1e-9)
+    expectClose(after.dashes[1]!, before.dashes[1]! / 2, 1e-9)
+  })
+
+  test('the pill sits 12 px below the canvas top, centred on it, and the actions bar sits 8 px below the pill', async ({ page }) => {
+    await seed(page, seededProject())
+    await enter(page, REPEAT_CELL)
+    const host = (await page.locator('main.canvas-host').boundingBox())!
     const pill = (await page.getByRole('navigation', { name: 'Edit context' }).boundingBox())!
     const bar = (await page.getByRole('toolbar', { name: 'Selection actions' }).boundingBox())!
+    expectClose(pill.y - host.y, 12, 1)
+    expectClose(pill.x + pill.width / 2, host.x + host.width / 2, 1)
     expectClose(bar.y - (pill.y + pill.height), 8, 1)
     expectClose(bar.x + bar.width / 2, pill.x + pill.width / 2, 1)
   })
