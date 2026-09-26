@@ -92,6 +92,8 @@ export interface EditorState {
   setTool(t: Tool): void
   enterContext(c: EditContextLevel): void
   popContext(): void
+  /** Shell SPEC §6.4: enters a whole stack at once, from a list (Motifs → Edit motif, Crossings → Show). */
+  setEditContext(levels: EditContextLevel[]): void
   setCamera(c: Camera): void
   setViewport(v: { w: number; h: number }): void
   setGridMm(mm: number): void
@@ -229,6 +231,11 @@ export const useEditor: UseBoundStore<StoreApi<EditorState>> & { temporal: Tempo
 
       popContext() {
         set((s) => ({ editContext: s.editContext.slice(0, -1) }))
+      },
+
+      setEditContext(levels) {
+        get().settlePreview()
+        set({ editContext: levels, selection: [], drawing: null })
       },
 
       setCamera(c) {

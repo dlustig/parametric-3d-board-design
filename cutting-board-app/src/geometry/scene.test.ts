@@ -3,7 +3,7 @@ import type { Crossing, Project } from '@/domain/model'
 import { band, instance, project, record, ref, repeat } from '@/domain/test-builders'
 import { footprint } from './footprint.ts'
 import type { Scene } from './scene.ts'
-import { buildScene, pathD } from './scene.ts'
+import { buildScene, occurrencePaths, pathD } from './scene.ts'
 
 const E = 0.3
 
@@ -133,5 +133,39 @@ describe('pathD', () => {
     ]
     expect(pathD(pts, false)).toBe('M 0 1.5 L 2.1235 -3.1 L 10 0')
     expect(pathD(pts, true)).toBe('M 0 1.5 L 2.1235 -3.1 L 10 0 Z')
+  })
+})
+
+describe('occurrencePaths', () => {
+  const cell = { id: 'M', children: [band('A', [[0, 0], [10, 0]])] }
+
+  it('counts every repeat cell and every nested placement, in paint order', () => {
+    const p = project(
+      [repeat('rep', 'M', { rows: 2, columns: 3 }), instance('iO', 'O', { x: 400 })],
+      [cell, { id: 'O', children: [instance('iM', 'M'), repeat('rin', 'M', { rows: 1, columns: 2 })] }],
+    )
+    const cells = [0, 1].flatMap((row) => [0, 1, 2].map((column) => [{ repeatId: 'rep', row, column }]))
+    expect(occurrencePaths(p, 'M')).toEqual([
+      ...cells,
+      [{ instanceId: 'iO' }, { instanceId: 'iM' }],
+      [{ instanceId: 'iO' }, { repeatId: 'rin', row: 0, column: 0 }],
+      [{ instanceId: 'iO' }, { repeatId: 'rin', row: 0, column: 1 }],
+    ])
+    expect(occurrencePaths(p, 'O')).toEqual([[{ instanceId: 'iO' }]])
+  })
+
+  it('is empty for a motif that is not placed', () => {
+    const p = project([band('root', [[0, 0], [10, 0]])], [cell])
+    expect(occurrencePaths(p, 'M')).toEqual([])
+  })
+
+  it('finds a motif placed only inside another motif', () => {
+    const p = project([instance('iO', 'O')], [cell, { id: 'O', children: [band('B', [[0, 20], [10, 20]]), instance('iM', 'M')] }])
+    expect(occurrencePaths(p, 'M')).toEqual([[{ instanceId: 'iO' }, { instanceId: 'iM' }]])
+  })
+
+  it('counts a placement whose definition paints nothing', () => {
+    const p = project([instance('iE', 'E')], [{ id: 'E', children: [] }])
+    expect(occurrencePaths(p, 'E')).toEqual([[{ instanceId: 'iE' }]])
   })
 })

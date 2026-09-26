@@ -4,7 +4,7 @@
 
 import { canonicalKey, recordsOf } from '@/domain/crossings'
 import { stepKey, stepObjectId } from '@/domain/keys'
-import type { ContextId, Crossing, Project, Step } from '@/domain/model'
+import type { ContextId, Crossing, Id, Project, Step } from '@/domain/model'
 import { apply } from './affine.ts'
 import type { BandOccurrence, Occurrence, RegionOccurrence } from './expand.ts'
 import { pathMatrix } from './expand.ts'
@@ -73,6 +73,33 @@ function placementsOf(p: Project, occurrences: Occurrence[], motifId: string): S
     }
   }
   return [...seen.values()]
+}
+
+/**
+ * SPEC §6.4 (shell): one world path per occurrence of `motifId`'s definition
+ * (every repeat cell counts), in document order — the paint order. Walks the
+ * document, not the scene, so a placement whose definition paints nothing
+ * still has its path.
+ */
+export function occurrencePaths(p: Project, motifId: Id): Step[][] {
+  const paths: Step[][] = []
+  const walk = (children: Id[], prefix: Step[]): void => {
+    for (const id of children) {
+      const obj = p.objects[id]!
+      if (obj.type !== 'motif-instance' && obj.type !== 'repeat') continue
+      const steps: Step[] =
+        obj.type === 'motif-instance'
+          ? [{ instanceId: obj.id }]
+          : Array.from({ length: obj.rows * obj.columns }, (_, k) => ({ repeatId: obj.id, row: Math.floor(k / obj.columns), column: k % obj.columns }))
+      for (const step of steps) {
+        const path = [...prefix, step]
+        if (obj.motifId === motifId) paths.push(path)
+        walk(p.motifs[obj.motifId]!.children, path)
+      }
+    }
+  }
+  walk(p.rootChildren, [])
+  return paths
 }
 
 /** SPEC §5.5: every record not bound to a listed intersection of its context, once per world occurrence of that context. */

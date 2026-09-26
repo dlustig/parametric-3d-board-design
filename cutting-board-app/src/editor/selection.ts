@@ -3,7 +3,7 @@
 // levels whose occurrence no longer resolves. Pure helpers over a Project; no
 // store dependency.
 
-import type { ContextId, Id, Project, Step } from '@/domain/model'
+import type { ContextId, Id, MotifInstance, Project, RepeatField, Step } from '@/domain/model'
 import { stepObjectId } from '@/domain/keys'
 import { childrenOf } from '@/domain/project'
 
@@ -15,6 +15,18 @@ export interface EditContextLevel {
 /** The world path of the entered occurrence: each level's path is relative to the previous level. */
 export function contextPrefix(editContext: EditContextLevel[]): Step[] {
   return editContext.flatMap((level) => level.path)
+}
+
+/**
+ * SPEC §6.4 (shell): splits a world path into `editContext` levels, one per
+ * step, each entering the motif its instance or repeat places and each
+ * relative to the level before it. `contextPrefix` of the result is `path`.
+ */
+export function contextLevelsForPath(p: Project, path: Step[]): EditContextLevel[] {
+  return path.map((step) => {
+    const placed = p.objects[stepObjectId(step)] as MotifInstance | RepeatField // every step names an instance or a repeat
+    return { motifId: placed.motifId, path: [step] }
+  })
 }
 
 /**

@@ -435,3 +435,24 @@ describe('immutability outside production (the geometry caches key on identity)'
     }).toThrow(TypeError)
   })
 })
+
+describe('setEditContext (shell SPEC §6.4)', () => {
+  it('settles the preview, clears selection and drawing, and replaces the whole edit context in one update', () => {
+    const p0 = project([instance('i1', 'm1'), band('b1', [[0, 40], [10, 40]])], [{ id: 'm1', children: [band('c1', [[0, 0], [10, 0]])] }])
+    resetStore(p0)
+    useEditor.getState().enterContext({ motifId: 'm1', path: [{ instanceId: 'i1' }] })
+    useEditor.getState().setPreview({ ...p0, name: 'field edit' }, 'commit')
+    useEditor.setState({ selection: ['c1'], drawing: { tool: 'band', points: [{ x: 0, y: 0 }], cursor: null } })
+
+    const levels = [{ motifId: 'm1', path: [{ instanceId: 'i1' }] }]
+    useEditor.getState().setEditContext(levels)
+
+    const s = useEditor.getState()
+    expect(s.preview).toBeNull()
+    expect(s.project.name).toBe('field edit') // a commit preview is committed, not dropped
+    expect(useEditor.temporal.getState().pastStates.length).toBe(1)
+    expect(s.selection).toEqual([])
+    expect(s.drawing).toBeNull()
+    expect(s.editContext).toBe(levels) // replaced, not appended
+  })
+})
