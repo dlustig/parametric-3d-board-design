@@ -30,7 +30,7 @@ import { apply } from '@/geometry/affine'
 import { TAP_SLOP_PX } from '@/geometry/tolerance'
 import { screenToWorld, viewBoxFor, worldToScreen } from '@/editor/camera'
 import { fitView, useCanvasGestures } from '@/editor/input'
-import { useScene } from '@/editor/scene'
+import { editorScene, useScene } from '@/editor/scene'
 import { contextPrefix } from '@/editor/selection'
 import { contextMatrix, useEditor } from '@/editor/store'
 import { createTapTracker, isTap } from '@/editor/tapTracker'
@@ -41,6 +41,7 @@ import {
   crossingPointerUp,
   HIT_RADIUS_MOUSE_PX,
   HIT_RADIUS_TOUCH_PX,
+  markerAt,
   pickNearest,
   resetCrossingInput,
 } from '@/editor/tools/crossing'
@@ -60,6 +61,7 @@ import {
   startTranslate,
   toggleSelection,
 } from '@/editor/tools/select'
+import { CrossingHover } from '@/ui/CrossingHover'
 import { Proxies } from './Proxies.tsx'
 import { SceneSvg } from './SceneSvg.tsx'
 import { ContextScrim } from './overlays/ContextScrim.tsx'
@@ -114,6 +116,8 @@ export function Canvas(): JSX.Element {
   const [spaceDown, setSpaceDown] = useState(false)
   const [multiTouch, setMultiTouch] = useState(false)
   const [rotating, setRotating] = useState(false)
+  /** The crossing marker under a fine pointer (shell SPEC §9.6), as an index into [...intersections, ...unresolved]. */
+  const [hovered, setHovered] = useState<number | null>(null)
 
   useCanvasGestures(wrapper, svgEl, spaceDown)
 
@@ -389,21 +393,30 @@ export function Canvas(): JSX.Element {
     }
   }, [selecting, wrapper, svgEl, taps])
 
-  // The Crossing tool owns single-pointer taps the same way (SPEC §7.4).
+  // The Crossing tool owns single-pointer taps the same way (SPEC §7.4); a
+  // fine pointer's moves also hover the nearest marker (shell SPEC §9.6).
   useEffect(() => {
     if (tool !== 'crossing' || wrapper === null || svgEl === null) return
     const onDown = (e: PointerEvent): void => crossingPointerDown(e, spaceRef.current)
     const onUp = (e: PointerEvent): void => crossingPointerUp(svgEl, e)
+    const onMove = (e: PointerEvent): void => {
+      crossingPointerMove(e)
+      setHovered(e.pointerType === 'touch' || e.buttons !== 0 ? null : markerAt(svgEl, editorScene(useEditor.getState()), clientOf(e), e.pointerType))
+    }
+    const onLeave = (): void => setHovered(null)
     wrapper.addEventListener('pointerdown', onDown)
-    wrapper.addEventListener('pointermove', crossingPointerMove)
+    wrapper.addEventListener('pointermove', onMove)
+    wrapper.addEventListener('pointerleave', onLeave)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', crossingPointerCancel)
     return () => {
       wrapper.removeEventListener('pointerdown', onDown)
-      wrapper.removeEventListener('pointermove', crossingPointerMove)
+      wrapper.removeEventListener('pointermove', onMove)
+      wrapper.removeEventListener('pointerleave', onLeave)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', crossingPointerCancel)
       resetCrossingInput()
+      setHovered(null)
     }
   }, [tool, wrapper, svgEl])
 
@@ -421,10 +434,11 @@ export function Canvas(): JSX.Element {
         {tool === 'select' && <VertexHandles handles={handlesFor(shown, editContext, selection)} matrix={ctxMatrix} zoom={camera.zoom} />}
         <PivotMarkers project={shown} selection={selection} matrix={ctxMatrix} zoom={camera.zoom} />
         {drawing !== null && <DrawPreview drawing={drawing} matrix={ctxMatrix} zoom={camera.zoom} unit={project.displayUnits} widthMm={bandWidthMm} color={woodColor} />}
-        {tool === 'crossing' && <CrossingMarkers scene={scene} zoom={camera.zoom} />}
+        {tool === 'crossing' && <CrossingMarkers scene={scene} zoom={camera.zoom} view={{ x: vx, y: vy, w: vw, h: vh }} hovered={hovered} />}
         {drawing?.cursor != null && <SnapGuide snap={drawing.cursor} matrix={ctxMatrix} zoom={camera.zoom} />}
         {snapGuide !== null && <SnapGuide snap={snapGuide} matrix={ctxMatrix} zoom={camera.zoom} />}
       </svg>
+      {tool === 'crossing' && hovered !== null && <CrossingHover scene={scene} index={hovered} materials={shown.materials} camera={camera} />}
       {selecting && (
         <Moveable
           ref={moveableRef}

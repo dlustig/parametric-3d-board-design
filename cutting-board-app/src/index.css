@@ -1,8 +1,10 @@
 /* Shell spec §2.1 colour tokens. `data-theme` on <html> always holds the
    resolved theme (§3). Tooltips are dark in both themes (--tip-bg), so the
-   tooltip surfaces take the dark set too. */
+   tooltip surfaces take the dark set too. `.crossing-hover` (§12.3, §9.6) is
+   a tooltip surface too, so it takes the same scope. */
 :root[data-theme='dark'],
-.hint {
+.hint,
+.crossing-hover {
   color-scheme: dark;
   --paste: #1a1c20;
   --panel: #202328;
@@ -325,9 +327,9 @@ input[type='number'] {
   display: inline-flex;
 }
 
-.hint {
-  z-index: 6;
-  max-width: 280px;
+/* Shared with .crossing-hover (§9.6): the same tooltip surface — radius, padding, weight, shadow. */
+.hint,
+.crossing-hover {
   padding: 6px 8px;
   border-radius: 8px;
   background: var(--tip-bg);
@@ -335,6 +337,11 @@ input[type='number'] {
   box-shadow: var(--shadow);
   font-size: 12px;
   font-weight: 500;
+}
+
+.hint {
+  z-index: 6;
+  max-width: 280px;
   line-height: 1.4;
   animation: hint-fade 100ms ease-out;
 }
@@ -385,6 +392,11 @@ input[type='number'] {
 
 .hint-line {
   margin-top: 2px;
+}
+
+/* Shared with .crossing-hover-hint (§9.6): both sit on the --tip-bg surface, where --muted fails contrast. */
+.hint-line,
+.crossing-hover-hint {
   color: var(--tip-hint);
   font-weight: 400;
 }
@@ -1379,4 +1391,100 @@ input.motif-name {
 
 [data-invite] {
   box-shadow: inset 0 0 0 1.5px var(--acc);
+}
+
+/* Shell SPEC §9.6: Crossing tool — scene wash, hover tooltip, legend, panel.
+   `.crossing-hover`'s surface (radius, padding, weight, shadow, dark token
+   scope) and its hint line's colour are shared with `.hint` above, not
+   redeclared here (§12.3 ruling). */
+.crossing-wash {
+  fill: var(--paste);
+  opacity: 0.18;
+}
+
+.crossing-hover {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, calc(-100% - 20px));
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 260px;
+}
+
+.crossing-hover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .crossing-hover {
+    animation: crossing-hover-in 100ms ease-out;
+  }
+}
+
+@keyframes crossing-hover-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.crossing-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.crossing-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-mark {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.legend-eligible {
+  background: var(--acc);
+  border: 2px solid #ffffff;
+}
+
+.legend-swapped {
+  background: var(--acc);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 2px var(--attn);
+}
+
+.legend-unsupported {
+  background: repeating-linear-gradient(45deg, var(--muted) 0 1.5px, #ffffff 1.5px 3.5px);
+}
+
+.legend-attn {
+  color: var(--attn);
+}
+
+.needs-attention {
+  border-left: 3px solid var(--attn);
+  padding-left: 8px;
+}
+
+.needs-attention h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--attn);
 }

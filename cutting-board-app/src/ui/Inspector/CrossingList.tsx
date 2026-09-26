@@ -9,7 +9,7 @@ import { removeRecord } from '@/domain/commands'
 import { hasKeyPrefix, stepKey } from '@/domain/keys'
 import type { Id } from '@/domain/model'
 import { formatLength } from '@/domain/units'
-import type { UnresolvedMarker } from '@/geometry/scene'
+import type { Scene, UnresolvedMarker } from '@/geometry/scene'
 import { useScene } from '@/editor/scene'
 import { useEditor } from '@/editor/store'
 import { toggleAt } from '@/editor/tools/crossing'
@@ -59,18 +59,23 @@ export function CrossingList({ bandId }: { bandId: Id }): JSX.Element {
   )
 }
 
-/** SPEC §5.5: unresolved records matching `matches`, once per record, each with Remove. */
-export function UnresolvedList({ matches }: { matches: (u: UnresolvedMarker) => boolean }): JSX.Element | null {
-  const scene = useScene()
-  const unit = useEditor((s) => s.project.displayUnits)
+/** SPEC §5.5: the unresolved records matching `matches`, once per record (its first marker, in placement order). */
+export function uniqueUnresolved(scene: Scene, matches: (u: UnresolvedMarker) => boolean): UnresolvedMarker[] {
   const byId = new Map<Id, UnresolvedMarker>()
   for (const u of scene.unresolved) if (!byId.has(u.record.id) && matches(u)) byId.set(u.record.id, u)
-  if (byId.size === 0) return null
+  return [...byId.values()]
+}
+
+/** SPEC §5.5: unresolved records matching `matches`, once per record, each with Remove. */
+export function UnresolvedList({ matches }: { matches: (u: UnresolvedMarker) => boolean }): JSX.Element | null {
+  const records = uniqueUnresolved(useScene(), matches)
+  const unit = useEditor((s) => s.project.displayUnits)
+  if (records.length === 0) return null
   return (
     <>
       <h3>Unresolved crossings</h3>
       <ul className="overrides">
-        {[...byId.values()].map((u) => (
+        {records.map((u) => (
           <li key={u.record.id}>
             Unresolved at {formatLength(u.worldHint.x, unit)}, {formatLength(u.worldHint.y, unit)}
             <button type="button" onClick={() => useEditor.getState().run((p) => removeRecord(p, u.contextId, u.record.id))}>

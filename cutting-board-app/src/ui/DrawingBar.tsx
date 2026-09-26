@@ -9,7 +9,7 @@
 // so it stays a small listener of its own. The store's `message` shows only in
 // the top bar; this bar shows tool-specific state.
 
-import { X } from 'lucide-react'
+import { TriangleAlert, X } from 'lucide-react'
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useScene } from '@/editor/scene'
@@ -95,11 +95,13 @@ export function DrawingBar(): JSX.Element | null {
   )
 }
 
-/** V1 §7.4 Crossing options: the scope control (only when some pair has a common motif ancestor) and the tapped marker's read-out. Restyled in Task 7. */
+/** Shell SPEC §9.6 (V1 §7.4): the scope control (only when some pair has a common motif ancestor), the marker legend, and the tapped marker's read-out. */
 function CrossingOptions(): JSX.Element {
   const scope = useEditor((s) => s.crossingScope)
   const notice = useEditor((s) => s.crossingNotice)
-  const scoped = scopeControlShown(useScene())
+  const scene = useScene()
+  const scoped = scopeControlShown(scene)
+  const unresolved = new Set(scene.unresolved.map((u) => u.record.id)).size
   const scopeButton = (value: 'all' | 'occurrence', label: string): JSX.Element => (
     <button type="button" aria-pressed={scope === value} onClick={() => useEditor.setState({ crossingScope: value })}>
       {label}
@@ -113,6 +115,26 @@ function CrossingOptions(): JSX.Element {
           {scopeButton('occurrence', 'This occurrence')}
         </div>
       )}
+      <ul className="crossing-legend" aria-label="Legend">
+        <li>
+          <span className="legend-mark legend-eligible" aria-hidden="true" />
+          Can swap
+        </li>
+        <li>
+          <span className="legend-mark legend-swapped" aria-hidden="true" />
+          Swapped
+        </li>
+        <li>
+          <span className="legend-mark legend-unsupported" aria-hidden="true" />
+          Can't swap
+        </li>
+        {unresolved > 0 && (
+          <li className="legend-attn">
+            <TriangleAlert size={14} strokeWidth={1.6} aria-hidden="true" />
+            {unresolved} unresolved
+          </li>
+        )}
+      </ul>
       <span className="drawing-bar-hint" role="status">
         {notice ?? 'Tap a crossing to swap which band is on top'}
       </span>

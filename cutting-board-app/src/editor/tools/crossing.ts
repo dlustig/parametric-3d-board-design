@@ -9,7 +9,6 @@
 import { toggleCrossing } from '@/domain/commands/crossings'
 import { commonPrefix } from '@/domain/crossings'
 import type { Scene, SceneIntersection } from '@/geometry/scene'
-import { worldToScreen } from '@/editor/camera'
 import { editorScene } from '@/editor/scene'
 import { useEditor } from '@/editor/store'
 import { createTapTracker, isTap } from '../tapTracker.ts'
@@ -58,11 +57,25 @@ export function toggleAt(i: SceneIntersection): void {
   useEditor.setState({ crossingNotice: notice })
 }
 
+/**
+ * Index into `[...scene.intersections, ...scene.unresolved]` of the marker
+ * centre nearest `client` within the pointer type's hit radius (12 px
+ * mouse/pen, 22 px touch), or null. One screen CTM for all centres, so the
+ * hover can call it on every pointer move.
+ */
+export function markerAt(svg: SVGSVGElement, scene: Scene, client: XY, pointerType: string): number | null {
+  const ctm = svg.getScreenCTM()!
+  const centres = [...scene.intersections.map((i) => i.point), ...scene.unresolved.map((u) => u.worldHint)].map((w) => {
+    const q = new DOMPoint(w.x, w.y).matrixTransform(ctm)
+    return { x: q.x, y: q.y }
+  })
+  return pickNearest(centres, client, pointerType === 'touch' ? HIT_RADIUS_TOUCH_PX : HIT_RADIUS_MOUSE_PX)
+}
+
 function tap(svg: SVGSVGElement, client: XY, pointerType: string): void {
   const scene = editorScene(useEditor.getState())
   const listed = scene.intersections
-  const centres = [...listed.map((i) => i.point), ...scene.unresolved.map((u) => u.worldHint)].map((w) => worldToScreen(svg, w))
-  const k = pickNearest(centres, client, pointerType === 'touch' ? HIT_RADIUS_TOUCH_PX : HIT_RADIUS_MOUSE_PX)
+  const k = markerAt(svg, scene, client, pointerType)
   if (k === null) {
     useEditor.setState({ crossingNotice: null })
     return

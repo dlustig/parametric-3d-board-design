@@ -7,7 +7,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { Project } from '../src/domain/model.ts'
-import { band, project, repeat, transform } from '../src/domain/test-builders.ts'
+import { band, instance, project, record, ref, repeat, transform } from '../src/domain/test-builders.ts'
 import type { SceneIntersection } from '../src/geometry/scene.ts'
 import type { XY } from './helpers.ts'
 import { cameraShowing, getProject, history, nextFrame, seed, setCamera, toClient } from './helpers.ts'
@@ -44,6 +44,15 @@ function weave(): Project {
 /** World point of the h1×v1 crossing in cell (row, column). */
 function h1v1(row: number, column: number): XY {
   return { x: 20 + 50 * column, y: 20 + 50 * row }
+}
+
+/** A definition record between two parallel bands of motif M: unresolved in its context, shown once for instance i1. */
+function lostInMotif(): Project {
+  const lost = record('lost', ref('A', 'A0'), ref('B', 'B0'), 'a', { x: 5, y: 5 })
+  return project(
+    [instance('i1', 'M', { x: 50, y: 50 })],
+    [{ id: 'M', children: [band('A', [[0, 0], [40, 0]]), band('B', [[0, 20], [40, 20]], { materialId: 'walnut' })], crossings: [lost] }],
+  )
 }
 
 const CELLS: Array<[number, number]> = [0, 1, 2].flatMap((r) => [0, 1, 2].map((c): [number, number] => [r, c]))
@@ -159,6 +168,55 @@ test.describe('crossing tool (mouse)', () => {
     expect(await history(page)).toEqual({ past: before.past + 1, future: 0 })
     expect(await oversOfH1V1(page)).toEqual(Array(9).fill('h1'))
     await expect(page.getByRole('button', { name: /^Over: toggle crossing with Maple at 20, 20$/ })).toBeFocused()
+  })
+
+  test('hovering a marker grows it and names the over and under woods, with a Click keycap', async ({ page }) => {
+    await start(page)
+    const at = await clientAt(page, h1v1(0, 0))
+    await page.mouse.move(at.x, at.y)
+    const tip = page.locator('.crossing-hover')
+    await expect(tip).toContainText('Maple over Walnut') // v1 (Maple) is over by paint order
+    await expect(tip).toContainText('Click to put Walnut on top')
+    await expect(tip.locator('.keycap', { hasText: 'Click' })).toBeVisible()
+    await expect(page.locator('.crossing-markers [data-crossing-class="eligible"] svg')).toHaveCount(1) // the ArrowLeftRight glyph
+
+    const unsupported = await clientAt(page, { x: 50, y: 160 })
+    await page.mouse.move(unsupported.x, unsupported.y)
+    await expect(tip).toContainText('The crossing angle is below')
+
+    const far = await clientAt(page, h1v1(0, 0), { x: -30, y: 0 })
+    await page.mouse.move(far.x, far.y)
+    await expect(tip).toHaveCount(0)
+  })
+
+  test('the Crossings panel lists an unresolved record; Show enters its context and selects its band', async ({ page }) => {
+    await seed(page, lostInMotif())
+    await setCamera(page, CAMERA)
+    await page.keyboard.press('x')
+    await expect(page.getByRole('toolbar', { name: 'Crossing options' })).toContainText('1 unresolved')
+    const panel = page.getByRole('region', { name: 'Crossings' })
+    await expect(panel).toContainText('Needs attention')
+    await panel.getByRole('button', { name: 'Show' }).click()
+    expect(await page.evaluate(() => window.__cbpd!.getState().editContext)).toEqual([{ motifId: 'M', path: [{ instanceId: 'i1' }] }])
+    expect(await page.evaluate(() => window.__cbpd!.getState().selection)).toEqual(['A'])
+  })
+
+  test("the Crossings panel counts swaps and unsupported crossings, and Remove drops an unresolved record", async ({ page }) => {
+    await start(page)
+    const panel = page.getByRole('region', { name: 'Crossings' })
+    const total = await page.evaluate(() => window.__cbpd!.getScene().intersections.length)
+    await expect(panel).toContainText(`${total} crossings`)
+    await expect(panel.locator('.cant-swap')).toContainText('The crossing angle is below')
+    await page.getByRole('button', { name: 'This occurrence' }).click()
+    const cell = await clientAt(page, h1v1(1, 2))
+    await page.mouse.click(cell.x, cell.y)
+    await expect(panel.locator('.swapped li')).toHaveCount(1)
+
+    await seed(page, lostInMotif())
+    await page.keyboard.press('x')
+    await page.getByRole('region', { name: 'Crossings' }).getByRole('button', { name: 'Remove' }).click()
+    expect(await page.evaluate(() => window.__cbpd!.getProject().motifs['M']!.crossings)).toEqual([])
+    await expect(page.getByRole('toolbar', { name: 'Crossing options' })).not.toContainText('unresolved')
   })
 })
 
