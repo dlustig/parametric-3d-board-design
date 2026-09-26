@@ -2,7 +2,7 @@
 // switching, undo/redo, the selection commands (Delete, Duplicate,
 // Copy/Paste, arrow nudge) and the drawing keys (Enter/Backspace/Esc while
 // drawing).
-// Ignores events whose target is inside a menu, listbox or dialog (Escape
+// Ignores events whose target is inside a menu or dialog (Escape
 // excepted, see `isWidgetTarget`), and events whose target is an input,
 // textarea, select, or contenteditable: Esc on a field is excepted only in the sense that the
 // field's own handler already reverted it and stopped the event from
@@ -55,15 +55,15 @@ function isFieldTarget(t: EventTarget | null): boolean {
 }
 
 /**
- * Keys aimed at a menu, a listbox or a dialog belong to that widget: Radix
- * menus preventDefault their arrows and typeahead letters without stopping
- * them, the Layers listbox moves focus with its arrows, and a modal dialog
- * must not edit the project behind it. Escape is not routed here — every
- * Radix layer stops its own Escape, and on a Layers row Esc keeps its place
- * in the cascade.
+ * Keys aimed at a menu or a dialog belong to that widget: Radix menus
+ * preventDefault their arrows and typeahead letters without stopping them,
+ * and a modal dialog must not edit the project behind it. Escape is not
+ * routed here — every Radix layer stops its own Escape. The Layers listbox
+ * is not a widget here: it stops only the keys it handles (LayersPane), so
+ * Delete, tool letters and Mod chords still act on a clicked row.
  */
 function isWidgetTarget(t: EventTarget | null): boolean {
-  return t instanceof Element && t.closest('[role="menu"], [role="menuitem"], [role="listbox"], [role="option"], [role="dialog"], [role="alertdialog"]') !== null
+  return t instanceof Element && t.closest('[role="menu"], [role="menuitem"], [role="dialog"], [role="alertdialog"]') !== null
 }
 
 // --- Selection command actions, shared by this dispatcher and the toolbar/inspector buttons ---

@@ -84,6 +84,20 @@ test.describe('layers and motifs panes', () => {
     await expect(list.locator('[tabindex="0"]')).toHaveCount(1) // one Tab stop: the focused row
   })
 
+  test('after clicking a row, editor shortcuts still act: Delete deletes it, B picks the Band tool', async ({ page }) => {
+    await seed(page)
+    const row = page.getByRole('listbox', { name: 'Board' }).getByRole('option', { name: 'Band, Maple', exact: true })
+    await row.click()
+    await page.keyboard.press('b')
+    expect(await state(page, (s) => s.tool)).toBe('band')
+    await page.keyboard.press('v')
+    await row.click()
+    await expect(row).toBeFocused()
+    await page.keyboard.press('Delete')
+    expect(Object.keys((await getProject(page)).objects)).not.toContain('b1')
+    expect(await history(page)).toEqual({ past: 1, future: 0 })
+  })
+
   test('double-clicking a repeat row enters its definition; the back button pops out', async ({ page }) => {
     await seed(page)
     await page.getByRole('option', { name: 'm2, 2 × 2' }).dblclick()

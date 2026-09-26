@@ -171,11 +171,24 @@ test.describe('tablet gate (G7)', () => {
     expect(undersized, `icon buttons under 44×44 px: ${undersized.join(', ')}`).toEqual([])
   })
 
-  test('Layers rows, menu items, the project name and Export SVG are 44 px tall', async ({ page }) => {
+  test('Layers rows and menu items are 44 px tall; the top-bar text buttons are 40 px and their focus ring fits the bar', async ({ page }) => {
     await seed(page)
     await openPane(page, 'Layers')
-    const targets = [page.getByRole('option', { name: 'Band, Maple' }), page.locator('.project-name'), page.getByRole('button', { name: 'Export SVG', exact: true })]
-    for (const t of targets) expect((await t.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    expect((await page.getByRole('option', { name: 'Band, Maple' }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    const bar = (await page.locator('.top-bar').boundingBox())!
+    for (const t of [page.locator('.project-name'), page.getByRole('button', { name: 'Export SVG', exact: true })]) {
+      const box = (await t.boundingBox())!
+      expect(box.height).toBeGreaterThanOrEqual(40)
+      // The ring's outer edge (outline-offset + outline-width beyond the box, when positive) stays inside the bar's 43 px content box.
+      const reach = await t.evaluate((el) => {
+        ;(el as HTMLElement).focus({ focusVisible: true } as FocusOptions)
+        if (!el.matches(':focus-visible')) throw new Error('no focus ring to measure')
+        const cs = getComputedStyle(el)
+        return Math.max(0, parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth))
+      })
+      expect(box.y - reach).toBeGreaterThanOrEqual(bar.y)
+      expect(box.y + box.height + reach).toBeLessThanOrEqual(bar.y + bar.height - 1) // 1 px bottom border
+    }
     await page.locator('.project-name').tap()
     const items = page.getByRole('menuitem')
     await expect(items.first()).toBeVisible()

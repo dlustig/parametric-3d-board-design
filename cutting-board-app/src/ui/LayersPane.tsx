@@ -3,10 +3,11 @@
 // canvas's `toggleSelection`); double-clicking an Instance or Repeat enters
 // it as the Inspector's Edit motif does. The list is one Tab stop (a roving
 // tabIndex); ArrowUp/ArrowDown, Home and End move focus between rows, and
-// Enter or Space selects the focused row as a click does. At the root a
-// Board header labels the list; inside a definition the title row
-// (`LayersTitle`, rendered by LeftPane) holds a back button and the motif
-// name, and a muted line gives the occurrence count.
+// Enter or Space selects the focused row as a click does. Only those keys
+// stop at the list; Delete, tool letters and Mod chords reach the editor.
+// At the root a Board header labels the list; inside a definition the title
+// row (`LayersTitle`, rendered by LeftPane) holds a back button and the
+// motif name, and a muted line gives the occurrence count.
 
 import { ArrowLeft } from 'lucide-react'
 import type { JSX, KeyboardEvent, MouseEvent } from 'react'
@@ -73,12 +74,18 @@ export function LayersPane(): JSX.Element {
     s.select(toggleSelection(s.selection, id, e.shiftKey || e.metaKey || e.ctrlKey || s.addToSelection))
   }
 
+  /** The list's own keys stop here, so keyboard.ts never sees them (no nudge, no Enter-finishes-drawing); every other key reaches the editor. */
   const moveFocus = (e: KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.stopPropagation() // the row button's own activation selects it
+      return
+    }
     const rows = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="option"]')]
     const at = rows.findIndex((r) => r === e.target)
     const to = e.key === 'ArrowDown' ? at + 1 : e.key === 'ArrowUp' ? at - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? rows.length - 1 : null
     if (to === null) return
     e.preventDefault()
+    e.stopPropagation()
     rows[Math.min(Math.max(to, 0), rows.length - 1)]?.focus()
   }
 

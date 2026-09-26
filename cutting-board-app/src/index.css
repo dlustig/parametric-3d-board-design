@@ -929,8 +929,8 @@ input[type='number'] {
   background: var(--raised);
 }
 
-/* Touch (§5, V1 §7.4): 44 px hit areas, also for the menu items, project
-   name and top-bar text buttons; the column widens to 56 px. */
+/* Touch (§5, V1 §7.4): 44 px hit areas, also for the menu items; the
+   column widens to 56 px. */
 @media (pointer: coarse) {
   .app-body {
     grid-template-columns: 56px minmax(0, 1fr);
@@ -947,11 +947,27 @@ input[type='number'] {
     min-height: 44px;
   }
 
-  .menu-item,
+  .menu-item {
+    height: 44px;
+  }
+
+  /* The top bar's text buttons are 40 px so they fit its 43 px content box
+     (44 px less the border, overflow hidden); their ring goes inside so it
+     isn't clipped — --acc-ink on the --acc Export SVG button. */
   .project-name,
   .primary-button,
   .text-button {
-    height: 44px;
+    height: 40px;
+  }
+
+  .project-name:focus-visible,
+  .primary-button:focus-visible,
+  .text-button:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .primary-button:focus-visible {
+    outline-color: var(--acc-ink);
   }
 }
 

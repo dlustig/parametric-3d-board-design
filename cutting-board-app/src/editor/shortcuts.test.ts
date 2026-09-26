@@ -237,7 +237,7 @@ describe('SHORTCUTS → keyboard.ts dispatch', () => {
     expect(s().tool).toBe('hand')
   })
 
-  it.each(['menu', 'listbox', 'dialog', 'alertdialog'])('keys aimed inside role=%s never reach the editor, except Escape', (role) => {
+  it.each(['menu', 'dialog', 'alertdialog'])('keys aimed inside role=%s never reach the editor, except Escape', (role) => {
     const widget = document.createElement('div')
     widget.setAttribute('role', role)
     const inner = document.createElement('button')
@@ -251,6 +251,20 @@ describe('SHORTCUTS → keyboard.ts dispatch', () => {
     press('Escape', inner) // Radix layers stop their own Escape; one that arrives keeps its place in the cascade
     widget.remove()
     expect(s().selection).toEqual([])
+  })
+
+  it('keys aimed inside a listbox still reach the editor (the Layers list stops only the keys it handles)', () => {
+    const list = document.createElement('div')
+    list.setAttribute('role', 'listbox')
+    const row = document.createElement('button')
+    row.setAttribute('role', 'option')
+    list.append(row)
+    document.body.append(list)
+    press('Delete', row)
+    press('B', row)
+    list.remove()
+    expect(s().project.rootChildren).toEqual(['b'])
+    expect(s().tool).toBe('band')
   })
 
   it('? typed in a text field does not open the sheet', () => {
