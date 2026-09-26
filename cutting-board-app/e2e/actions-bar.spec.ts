@@ -62,6 +62,16 @@ test('Order → Send to back changes the paint order in one history step', async
   expect(await history(page)).toEqual({ past: 1, future: 0 })
 })
 
+test('Order menu: Escape closes it without clearing the selection', async ({ page }) => {
+  await seed(page, twoBands())
+  await select(page, ['b1'])
+  await bar(page).getByRole('button', { name: 'Order', exact: true }).click()
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  expect(await page.evaluate(() => window.__cbpd!.getState().selection)).toEqual(['b1'])
+})
+
 test('Edit motif enters an instance; Detach is offered for an instance, never for a repeat', async ({ page }) => {
   await seed(page, seededProject()) // i1: an instance of m1; rp1: a 2×2 repeat of m2
   await select(page, ['rp1'])

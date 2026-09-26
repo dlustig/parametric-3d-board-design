@@ -1027,9 +1027,12 @@ input[type='number'] {
   font-size: 13px;
 }
 
-/* Canvas controls (§7.2). */
-.canvas-controls {
-  position: absolute;
+/* Canvas controls (§7.2), the actions bar (§9.4) and the tool bar (§7.1)
+   share the same floating-panel chrome; each keeps only its own position
+   and layout below. */
+.canvas-controls,
+.actions-bar,
+.tool-bar {
   z-index: 2;
   display: flex;
   align-items: center;
@@ -1039,6 +1042,10 @@ input[type='number'] {
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: var(--shadow);
+}
+
+.canvas-controls {
+  position: absolute;
   right: 14px;
   bottom: 14px;
 }
@@ -1092,17 +1099,8 @@ input[type='number'] {
 }
 
 .actions-bar {
-  z-index: 2;
-  display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
   font-size: 12px;
 }
 
@@ -1123,17 +1121,8 @@ input[type='number'] {
   position: absolute;
   bottom: 14px;
   left: 50%;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 2px;
   max-width: calc(100% - 24px);
-  padding: 4px;
   transform: translateX(-50%);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
 }
 
 .tool-bar .icon-button {
